@@ -52,6 +52,54 @@ def test_ready_endpoint_reports_invalid_provider() -> None:
     assert "unknown generator provider" in provider_check["fields"]["failures"][0]
 
 
+def test_ready_endpoint_reports_read_protection_without_key() -> None:
+    client = TestClient(app)
+    original_key = settings.operator_api_key
+    original_read_required = settings.require_read_api_key
+    settings.operator_api_key = None
+    settings.require_read_api_key = True
+    try:
+        response = client.get("/ready")
+    finally:
+        settings.operator_api_key = original_key
+        settings.require_read_api_key = original_read_required
+
+    assert response.status_code == 503
+    security_check = next(
+        check for check in response.json()["checks"] if check["name"] == "operator_security"
+    )
+    assert security_check["status"] == "fail"
+    assert security_check["fields"]["read_routes_protected"] is True
+
+
+def test_read_routes_can_require_operator_key() -> None:
+    client = TestClient(app)
+    run = client.post("/runs", json={"topic": "Read route protection"}).json()
+    original_key = settings.operator_api_key
+    original_read_required = settings.require_read_api_key
+    settings.operator_api_key = SecretStr("read-secret")
+    settings.require_read_api_key = True
+    try:
+        health_response = client.get("/health")
+        blocked_runs_response = client.get("/runs")
+        blocked_dashboard_response = client.get("/dashboard")
+        allowed_runs_response = client.get(
+            "/runs",
+            headers={"x-contentops-api-key": "read-secret"},
+        )
+        allowed_run_response = client.get(f"/runs/{run['id']}?api_key=read-secret")
+    finally:
+        settings.operator_api_key = original_key
+        settings.require_read_api_key = original_read_required
+
+    assert health_response.status_code == 200
+    assert blocked_runs_response.status_code == 401
+    assert blocked_dashboard_response.status_code == 401
+    assert allowed_runs_response.status_code == 200
+    assert allowed_run_response.status_code == 200
+    assert allowed_run_response.json()["id"] == run["id"]
+
+
 def test_run_artifact_and_publish_endpoints() -> None:
     client = TestClient(app)
 

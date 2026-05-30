@@ -152,3 +152,5 @@ Recommended AWS-backed setup:
 
 Mutating API and dashboard operations should use `CONTENTOPS_OPERATOR_API_KEY` in shared
 deployments.
+Use `CONTENTOPS_REQUIRE_READ_API_KEY=true` when generated artifacts, source audits, job execution
+receipts, content inventory, or evidence bundles are not safe for public read access.

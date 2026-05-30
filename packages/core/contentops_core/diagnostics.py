@@ -143,16 +143,26 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
 
 
 def _operator_security_check(settings: Settings) -> ComponentCheck:
+    if settings.require_read_api_key and settings.operator_api_key is None:
+        return ComponentCheck(
+            name="operator_security",
+            status="fail",
+            message="Read-route API key protection requires CONTENTOPS_OPERATOR_API_KEY.",
+            fields={"read_routes_protected": True},
+        )
     if settings.operator_api_key is None:
         return ComponentCheck(
             name="operator_security",
             status="degraded",
             message="Operator API key is not configured; mutating routes are unprotected.",
+            fields={"read_routes_protected": False},
         )
+    read_message = " Read routes are also protected." if settings.require_read_api_key else ""
     return ComponentCheck(
         name="operator_security",
         status="ok",
-        message="Operator API key is configured.",
+        message=f"Operator API key is configured.{read_message}",
+        fields={"read_routes_protected": settings.require_read_api_key},
     )
 
 

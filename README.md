@@ -308,6 +308,9 @@ CONTENTOPS_OPERATOR_API_KEY=replace-with-a-long-random-secret
 
 When configured, mutating API and dashboard actions require `X-ContentOps-Api-Key` or an
 `api_key` query parameter. Read-only endpoints remain available for dashboards and integrations.
+Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` to protect dashboard pages, artifact downloads, source
+audits, evidence bundles, job receipts, and the published-content catalog with the same operator
+key. `/health` and `/ready` remain open for load balancers and deployment probes.
 
 Use real source URLs:
 

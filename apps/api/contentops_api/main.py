@@ -61,6 +61,17 @@ async def require_operator(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Valid operator API key required.")
 
 
+async def require_read_access(request: Request) -> None:
+    if not settings.require_read_api_key:
+        return
+    if settings.operator_api_key is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Read access protection requires an operator API key.",
+        )
+    await require_operator(request)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -74,8 +85,8 @@ def ready(response: Response) -> SystemStatus:
     return status
 
 
-@app.get("/", response_class=HTMLResponse)
-@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, dependencies=[Depends(require_read_access)])
+@app.get("/dashboard", response_class=HTMLResponse, dependencies=[Depends(require_read_access)])
 def dashboard(
     q: str = Query(default=""),
     status: str = Query(default=""),
@@ -200,7 +211,11 @@ async def dashboard_create_run(
     return RedirectResponse(f"/dashboard/runs/{result.run.id}", status_code=303)
 
 
-@app.get("/dashboard/runs/{run_id}", response_class=HTMLResponse)
+@app.get(
+    "/dashboard/runs/{run_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_read_access)],
+)
 def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLResponse:
     run = repository.get(run_id)
     if run is None:
@@ -344,7 +359,11 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     )
 
 
-@app.get("/dashboard/compare", response_class=HTMLResponse)
+@app.get(
+    "/dashboard/compare",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_read_access)],
+)
 def dashboard_compare(base_run_id: str, candidate_run_id: str) -> HTMLResponse:
     try:
         comparison = review_service.compare(base_run_id, candidate_run_id)
@@ -467,7 +486,7 @@ def create_run(
     return result.run
 
 
-@app.get("/runs", response_model=list[RunRecord])
+@app.get("/runs", response_model=list[RunRecord], dependencies=[Depends(require_read_access)])
 def list_runs(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -482,7 +501,11 @@ def list_runs(
     )
 
 
-@app.get("/review-queue", response_model=RunListResponse)
+@app.get(
+    "/review-queue",
+    response_model=RunListResponse,
+    dependencies=[Depends(require_read_access)],
+)
 def review_queue(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -503,7 +526,11 @@ def review_queue(
     )
 
 
-@app.get("/job-executions", response_model=JobExecutionListResponse)
+@app.get(
+    "/job-executions",
+    response_model=JobExecutionListResponse,
+    dependencies=[Depends(require_read_access)],
+)
 def list_job_executions(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -515,7 +542,11 @@ def list_job_executions(
     )
 
 
-@app.get("/job-executions/{execution_id}", response_model=JobExecutionReport)
+@app.get(
+    "/job-executions/{execution_id}",
+    response_model=JobExecutionReport,
+    dependencies=[Depends(require_read_access)],
+)
 def get_job_execution(execution_id: str) -> JobExecutionReport:
     try:
         return get_job_execution_report(
@@ -526,7 +557,11 @@ def get_job_execution(execution_id: str) -> JobExecutionReport:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/content", response_model=PublishedContentListResponse)
+@app.get(
+    "/content",
+    response_model=PublishedContentListResponse,
+    dependencies=[Depends(require_read_access)],
+)
 def list_published_content(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -534,7 +569,11 @@ def list_published_content(
     return review_service.published_content(limit=limit, offset=offset)
 
 
-@app.get("/runs/{run_id}", response_model=RunRecord)
+@app.get(
+    "/runs/{run_id}",
+    response_model=RunRecord,
+    dependencies=[Depends(require_read_access)],
+)
 def get_run(run_id: str) -> RunRecord:
     run = repository.get(run_id)
     if run is None:
@@ -542,7 +581,11 @@ def get_run(run_id: str) -> RunRecord:
     return run
 
 
-@app.get("/runs/{run_id}/artifacts", response_model=list[str])
+@app.get(
+    "/runs/{run_id}/artifacts",
+    response_model=list[str],
+    dependencies=[Depends(require_read_access)],
+)
 def list_artifacts(run_id: str) -> list[str]:
     try:
         return review_service.list_artifacts(run_id)
@@ -550,7 +593,11 @@ def list_artifacts(run_id: str) -> list[str]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/runs/{run_id}/artifact-manifest", response_model=ArtifactManifest)
+@app.get(
+    "/runs/{run_id}/artifact-manifest",
+    response_model=ArtifactManifest,
+    dependencies=[Depends(require_read_access)],
+)
 def get_artifact_manifest(run_id: str) -> ArtifactManifest:
     try:
         return review_service.artifact_manifest(run_id)
@@ -558,7 +605,7 @@ def get_artifact_manifest(run_id: str) -> ArtifactManifest:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/runs/{run_id}/bundle")
+@app.get("/runs/{run_id}/bundle", dependencies=[Depends(require_read_access)])
 def get_run_bundle(run_id: str) -> FileResponse:
     try:
         bundle_path = review_service.create_bundle(run_id)
@@ -571,7 +618,10 @@ def get_run_bundle(run_id: str) -> FileResponse:
     )
 
 
-@app.get("/runs/{run_id}/artifacts/{artifact_name}")
+@app.get(
+    "/runs/{run_id}/artifacts/{artifact_name}",
+    dependencies=[Depends(require_read_access)],
+)
 def get_artifact(run_id: str, artifact_name: str) -> Response:
     try:
         content = review_service.read_artifact(run_id, artifact_name)
@@ -649,7 +699,11 @@ def batch_reject_runs(
     )
 
 
-@app.get("/runs/{run_id}/approval", response_model=ApprovalRecord | None)
+@app.get(
+    "/runs/{run_id}/approval",
+    response_model=ApprovalRecord | None,
+    dependencies=[Depends(require_read_access)],
+)
 def get_approval(run_id: str) -> ApprovalRecord | None:
     try:
         return review_service.approval(run_id)
@@ -657,7 +711,11 @@ def get_approval(run_id: str) -> ApprovalRecord | None:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/runs/{run_id}/publish-receipt", response_model=PublishReceipt | None)
+@app.get(
+    "/runs/{run_id}/publish-receipt",
+    response_model=PublishReceipt | None,
+    dependencies=[Depends(require_read_access)],
+)
 def get_publish_receipt(run_id: str) -> PublishReceipt | None:
     try:
         return review_service.publish_receipt(run_id)
@@ -679,7 +737,11 @@ def rollback_published_run(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@app.get("/runs/{run_id}/audit-log", response_model=list[AuditEvent])
+@app.get(
+    "/runs/{run_id}/audit-log",
+    response_model=list[AuditEvent],
+    dependencies=[Depends(require_read_access)],
+)
 def get_audit_log(run_id: str) -> list[AuditEvent]:
     try:
         return review_service.audit_log(run_id)
@@ -702,7 +764,7 @@ def rerun(
     return pipeline.run(request).run
 
 
-@app.get("/runs/{run_id}/publish-plan")
+@app.get("/runs/{run_id}/publish-plan", dependencies=[Depends(require_read_access)])
 def get_publish_plan(run_id: str) -> dict[str, object]:
     try:
         return review_service.publish_plan(run_id).model_dump(mode="json")
@@ -710,7 +772,11 @@ def get_publish_plan(run_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/runs/{run_id}/metrics", response_model=RunMetrics)
+@app.get(
+    "/runs/{run_id}/metrics",
+    response_model=RunMetrics,
+    dependencies=[Depends(require_read_access)],
+)
 def get_run_metrics(run_id: str) -> RunMetrics:
     try:
         return review_service.metrics(run_id)
@@ -718,7 +784,11 @@ def get_run_metrics(run_id: str) -> RunMetrics:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@app.get("/runs/{run_id}/source-audit", response_model=SourceAuditReport)
+@app.get(
+    "/runs/{run_id}/source-audit",
+    response_model=SourceAuditReport,
+    dependencies=[Depends(require_read_access)],
+)
 def get_source_audit(run_id: str) -> SourceAuditReport:
     try:
         raw = review_service.read_artifact(run_id, "source-audit.json")
@@ -727,7 +797,11 @@ def get_source_audit(run_id: str) -> SourceAuditReport:
     return SourceAuditReport.model_validate_json(raw)
 
 
-@app.get("/runs/{base_run_id}/compare/{candidate_run_id}", response_model=RunComparison)
+@app.get(
+    "/runs/{base_run_id}/compare/{candidate_run_id}",
+    response_model=RunComparison,
+    dependencies=[Depends(require_read_access)],
+)
 def compare_runs(base_run_id: str, candidate_run_id: str) -> RunComparison:
     try:
         return review_service.compare(base_run_id, candidate_run_id)

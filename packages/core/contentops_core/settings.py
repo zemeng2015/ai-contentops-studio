@@ -38,5 +38,6 @@ class Settings(BaseSettings):
     openai_retry_backoff_seconds: float = 0.5
     openai_fallback_on_failure: bool = True
     operator_api_key: SecretStr | None = None
+    require_read_api_key: bool = False
     homepage_repo_path: Path | None = None
     homepage_public_base_url: str = "https://zemeng2015.github.io/zack-ai-homepage"

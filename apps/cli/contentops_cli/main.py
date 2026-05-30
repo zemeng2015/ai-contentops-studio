@@ -461,6 +461,7 @@ def init_config(
                 "CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true",
                 "# CONTENTOPS_OPENAI_API_KEY=",
                 "# CONTENTOPS_OPERATOR_API_KEY=",
+                "CONTENTOPS_REQUIRE_READ_API_KEY=false",
                 "# CONTENTOPS_HOMEPAGE_REPO_PATH=C:\\path\\to\\zack-ai-homepage",
                 "# CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage",
             ]
