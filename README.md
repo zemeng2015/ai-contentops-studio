@@ -89,6 +89,12 @@ infra/                     Docker and AWS deployment notes
 tests/                     Unit and integration tests
 ```
 
+Operational docs:
+
+- [Architecture](docs/architecture.md)
+- [Deployment](docs/deployment.md)
+- [Production runbook](docs/runbook.md)
+
 ## Architecture principles
 
 - The pipeline is stateful and inspectable. Every step writes an artifact.
