@@ -126,6 +126,8 @@ def test_cli_queue_and_manifest_commands(
     )
     scorecard_result = runner.invoke(app, ["scorecard", run_id])
     scorecards_result = runner.invoke(app, ["scorecards", "--query", "searchable", "--json"])
+    cost_report_result = runner.invoke(app, ["cost-report", run_id])
+    cost_reports_result = runner.invoke(app, ["cost-reports", "--query", "searchable", "--json"])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
     bundle_path = tmp_path / "bundle.zip"
@@ -144,6 +146,14 @@ def test_cli_queue_and_manifest_commands(
     scorecards_payload = json.loads(scorecards_result.output)
     assert scorecards_payload["total"] == 1
     assert scorecards_payload["items"][0]["run_id"] == run_id
+    assert cost_report_result.exit_code == 0
+    cost_report_payload = json.loads(cost_report_result.output)
+    assert cost_report_payload["run_id"] == run_id
+    assert cost_report_payload["estimated_total_tokens"] > 0
+    assert cost_reports_result.exit_code == 0
+    cost_reports_payload = json.loads(cost_reports_result.output)
+    assert cost_reports_payload["total"] == 1
+    assert cost_reports_payload["items"][0]["run_id"] == run_id
     assert manifest_result.exit_code == 0
     manifest_payload = json.loads(manifest_result.output)
     assert manifest_payload["run_id"] == run_id

@@ -115,6 +115,8 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("latency SLO must be greater than 0")
     if settings.min_source_count < 1:
         failures.append("minimum source count must be at least 1")
+    if settings.token_budget_per_run < 1:
+        failures.append("token budget per run must be at least 1")
     if settings.publisher_provider == "homepage" and settings.homepage_repo_path is None:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
@@ -147,6 +149,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             "notification_timeout_seconds": settings.notification_timeout_seconds,
             "latency_slo_ms": settings.latency_slo_ms,
             "min_source_count": settings.min_source_count,
+            "token_budget_per_run": settings.token_budget_per_run,
             "warnings": warnings,
         },
     )

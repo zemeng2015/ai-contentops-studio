@@ -277,6 +277,29 @@ class ScorecardListResponse(BaseModel):
     avg_duration_ms: int | None = None
 
 
+class RunCostReport(BaseModel):
+    run_id: str
+    status: RunStatus
+    topic: str
+    slug: str
+    model: str
+    estimated_input_tokens: int = Field(ge=0)
+    estimated_output_tokens: int = Field(ge=0)
+    estimated_total_tokens: int = Field(ge=0)
+    token_budget: int = Field(ge=1)
+    budget_pass: bool
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CostReportListResponse(BaseModel):
+    items: list[RunCostReport]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    budget_pass_rate: float = Field(ge=0, le=1)
+    estimated_total_tokens: int = Field(ge=0)
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str

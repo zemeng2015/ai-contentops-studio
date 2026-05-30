@@ -105,6 +105,8 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     metrics = review_service.metrics(result.run.id)
     scorecard = review_service.scorecard(result.run.id)
     scorecards = review_service.scorecards(limit=5)
+    cost_report = review_service.cost_report(result.run.id)
+    cost_reports = review_service.cost_reports(limit=5)
     original_request = review_service.request(result.run.id)
     approved = review_service.approve(
         result.run.id,
@@ -135,6 +137,11 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert scorecard.groundedness is not None
     assert any(item.run_id == result.run.id for item in scorecards.items)
     assert scorecards.quality_pass_rate >= 0
+    assert cost_report.run_id == result.run.id
+    assert cost_report.estimated_total_tokens > 0
+    assert cost_report.budget_pass is True
+    assert any(item.run_id == result.run.id for item in cost_reports.items)
+    assert cost_reports.estimated_total_tokens >= cost_report.estimated_total_tokens
     assert original_request.topic == "Reviewable AI article"
     assert {step.step for step in metrics.step_metrics} >= {"research", "planning", "drafting"}
     assert approved.status == RunStatus.APPROVED
@@ -448,3 +455,18 @@ def test_system_status_validates_scorecard_slo_settings(tmp_path: Path) -> None:
     provider_check = next(check for check in status.checks if check.name == "provider_config")
     assert "latency SLO must be greater than 0" in provider_check.fields["failures"]
     assert "minimum source count must be at least 1" in provider_check.fields["failures"]
+
+
+def test_system_status_validates_token_budget_settings(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        token_budget_per_run=0,
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    assert status.status == "fail"
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    assert "token budget per run must be at least 1" in provider_check.fields["failures"]

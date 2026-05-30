@@ -51,3 +51,4 @@ Set `notification_webhook_url_secret_arn` to deliver review and publishing event
 webhook while retaining local `notification-log.json` receipts.
 Tune `latency_slo_ms` and `min_source_count` to make the dashboard and `/scorecards` API reflect
 the production quality bar for recurring content runs.
+Tune `token_budget_per_run` to make `/cost-reports` useful as a recurring-run budget guardrail.

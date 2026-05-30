@@ -18,6 +18,7 @@ from contentops_core.models import (
     ArtifactManifest,
     ArtifactMetadata,
     AuditEvent,
+    CostReportListResponse,
     Draft,
     EvaluationReport,
     NotificationDelivery,
@@ -31,6 +32,7 @@ from contentops_core.models import (
     ReviewActionResult,
     ReviewBatchResult,
     RunComparison,
+    RunCostReport,
     RunMetrics,
     RunRecord,
     RunRequest,
@@ -54,12 +56,16 @@ class ReviewService:
         notifier: NotificationPublisher | None = None,
         latency_slo_ms: int = 120000,
         min_source_count: int = 1,
+        token_budget_per_run: int = 12000,
+        model: str = "template",
     ) -> None:
         self.repository = repository
         self.publisher = publisher
         self.notifier = notifier or LocalNotificationPublisher()
         self.latency_slo_ms = latency_slo_ms
         self.min_source_count = min_source_count
+        self.token_budget_per_run = token_budget_per_run
+        self.model = model
         self.metrics_service = MetricsService()
 
     def list_artifacts(self, run_id: str) -> list[str]:
@@ -393,6 +399,28 @@ class ReviewService:
     def request(self, run_id: str) -> RunRequest:
         return self._load_json(self._get_run(run_id), "request.json", RunRequest)
 
+    def cost_report(self, run_id: str) -> RunCostReport:
+        return self._cost_report_for_run(self._get_run(run_id))
+
+    def cost_reports(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        status: RunStatus | None = None,
+        query: str = "",
+    ) -> CostReportListResponse:
+        runs = self.repository.list(limit=limit, offset=offset, status=status, query=query)
+        items = [self._cost_report_for_run(run) for run in runs]
+        passing = sum(1 for item in items if item.budget_pass)
+        return CostReportListResponse(
+            items=items,
+            total=self.repository.count(status=status, query=query),
+            limit=limit,
+            offset=offset,
+            budget_pass_rate=round(passing / len(items), 3) if items else 0.0,
+            estimated_total_tokens=sum(item.estimated_total_tokens for item in items),
+        )
+
     def compare(self, base_run_id: str, candidate_run_id: str) -> RunComparison:
         base = self._get_run(base_run_id)
         candidate = self._get_run(candidate_run_id)
@@ -595,6 +623,40 @@ class ReviewService:
             warnings=warnings,
         )
 
+    def _cost_report_for_run(self, run: RunRecord) -> RunCostReport:
+        warnings: list[str] = []
+        input_text = self._artifact_text(
+            run,
+            ["request.json", "research.json", "source-audit.json", "outline.md"],
+            warnings,
+        )
+        output_text = self._artifact_text(
+            run,
+            ["draft.md", "draft.json", "eval-report.json"],
+            warnings,
+        )
+        input_tokens = self._estimate_tokens(input_text)
+        output_tokens = self._estimate_tokens(output_text)
+        total_tokens = input_tokens + output_tokens
+        budget_pass = total_tokens <= self.token_budget_per_run
+        if not budget_pass:
+            warnings.append(
+                f"Estimated token usage exceeds budget of {self.token_budget_per_run}."
+            )
+        return RunCostReport(
+            run_id=run.id,
+            status=run.status,
+            topic=run.topic,
+            slug=run.slug,
+            model=self.model,
+            estimated_input_tokens=input_tokens,
+            estimated_output_tokens=output_tokens,
+            estimated_total_tokens=total_tokens,
+            token_budget=self.token_budget_per_run,
+            budget_pass=budget_pass,
+            warnings=warnings,
+        )
+
     def _record_audit_event(self, run: RunRecord, event: AuditEvent) -> None:
         self._append_audit_event(run, event)
         delivery = self.notifier.notify(run, event)
@@ -635,6 +697,23 @@ class ReviewService:
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
         return model.model_validate(data)
+
+    @staticmethod
+    def _artifact_text(run: RunRecord, artifact_names: list[str], warnings: list[str]) -> str:
+        parts: list[str] = []
+        for artifact_name in artifact_names:
+            path = run.artifact_dir / artifact_name
+            if not path.exists():
+                warnings.append(f"Artifact missing from cost estimate: {artifact_name}.")
+                continue
+            parts.append(path.read_text(encoding="utf-8"))
+        return "\n".join(parts)
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        if not text:
+            return 0
+        return (len(text) + 3) // 4
 
     @classmethod
     def _source_overlap(

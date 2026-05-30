@@ -43,5 +43,6 @@ class Settings(BaseSettings):
     notification_timeout_seconds: float = 5.0
     latency_slo_ms: int = 120000
     min_source_count: int = 1
+    token_budget_per_run: int = 12000
     homepage_repo_path: Path | None = None
     homepage_public_base_url: str = "https://zemeng2015.github.io/zack-ai-homepage"

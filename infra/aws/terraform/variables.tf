@@ -109,6 +109,12 @@ variable "min_source_count" {
   default     = 1
 }
 
+variable "token_budget_per_run" {
+  description = "Per-run estimated token budget for cost reports."
+  type        = number
+  default     = 12000
+}
+
 variable "homepage_repo_path" {
   description = "Optional mounted path for homepage publisher in container deployments."
   type        = string

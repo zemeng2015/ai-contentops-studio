@@ -128,6 +128,8 @@ contentops publish-plan <run_id>
 contentops metrics <run_id>
 contentops scorecard <run_id>
 contentops scorecards --status needs_review --json
+contentops cost-report <run_id>
+contentops cost-reports --status needs_review --json
 contentops source-audit <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
@@ -153,6 +155,7 @@ GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/scorecard
+GET  /runs/{run_id}/cost-report
 GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
@@ -162,6 +165,7 @@ GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
+GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -236,6 +240,7 @@ CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 # CONTENTOPS_OPERATOR_API_KEY=
 CONTENTOPS_LATENCY_SLO_MS=120000
 CONTENTOPS_MIN_SOURCE_COUNT=1
+CONTENTOPS_TOKEN_BUDGET_PER_RUN=12000
 ```
 
 Research provider 模式：

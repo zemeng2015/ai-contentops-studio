@@ -136,6 +136,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     metrics_response = client.get(f"/runs/{run['id']}/metrics")
     scorecard_response = client.get(f"/runs/{run['id']}/scorecard")
     scorecards_response = client.get("/scorecards?limit=5")
+    cost_report_response = client.get(f"/runs/{run['id']}/cost-report")
+    cost_reports_response = client.get("/cost-reports?limit=5")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
     approve_response = client.post(f"/runs/{run['id']}/approve?reviewer=zack&notes=ready")
@@ -165,6 +167,11 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert scorecard_response.json()["source_count"] >= 1
     assert scorecards_response.status_code == 200
     assert any(item["run_id"] == run["id"] for item in scorecards_response.json()["items"])
+    assert cost_report_response.status_code == 200
+    assert cost_report_response.json()["estimated_total_tokens"] > 0
+    assert cost_report_response.json()["budget_pass"] is True
+    assert cost_reports_response.status_code == 200
+    assert any(item["run_id"] == run["id"] for item in cost_reports_response.json()["items"])
     assert rerun_response.status_code == 200
     assert rerun_response.json()["id"] != run["id"]
     assert rerun_response.json()["topic"] == run["topic"]
@@ -305,6 +312,7 @@ def test_dashboard_renders() -> None:
     assert "Optional source URLs" in response.text
     assert "Published Content" in response.text
     assert "Quality Scorecards" in response.text
+    assert "Token Budgets" in response.text
 
 
 def test_dashboard_filters_runs() -> None:
@@ -334,6 +342,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Audit Log" in detail_response.text
     assert "Notification Deliveries" in detail_response.text
     assert "Quality Scorecard" in detail_response.text
+    assert "Token Budget" in detail_response.text
     assert "Manifest JSON" in detail_response.text
     assert "Download evidence bundle" in detail_response.text
     assert "Run Timeline" in detail_response.text

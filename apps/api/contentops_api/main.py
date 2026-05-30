@@ -20,6 +20,7 @@ from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
     AuditEvent,
+    CostReportListResponse,
     NotificationDelivery,
     PublishedContentListResponse,
     PublishPlan,
@@ -28,6 +29,7 @@ from contentops_core.models import (
     ReviewBatchRequest,
     ReviewBatchResult,
     RunComparison,
+    RunCostReport,
     RunListResponse,
     RunMetrics,
     RunRecord,
@@ -156,6 +158,7 @@ def dashboard(
     )
     published_content = review_service.published_content(limit=5)
     scorecards = review_service.scorecards(limit=5)
+    cost_reports = review_service.cost_reports(limit=5)
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -247,6 +250,11 @@ def dashboard(
               <p>Operational SLO and quality view for recent AI content runs.</p>
               {_scorecards_html(scorecards)}
             </section>
+            <section class="hero compact">
+              <h2>Token Budgets</h2>
+              <p>Estimated token usage for recent runs, derived from persisted artifacts.</p>
+              {_cost_reports_html(cost_reports)}
+            </section>
             """,
         )
     )
@@ -297,6 +305,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
         eval_report = review_service.read_artifact(run_id, "eval-report.json")
     metrics = review_service.metrics(run_id)
     scorecard = review_service.scorecard(run_id)
+    cost_report = review_service.cost_report(run_id)
     timeline_rows = _timeline_rows(metrics)
     plan_html = ""
     try:
@@ -348,6 +357,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               {plan_html}
               <h3>Quality Scorecard</h3>
               {_scorecard_html(scorecard)}
+              <h3>Token Budget</h3>
+              {_cost_report_html(cost_report)}
               <h3>Approval</h3>
               {approval_html}
               <form method="post" action="{approve_action}">
@@ -654,6 +665,25 @@ def list_scorecards(
 
 
 @app.get(
+    "/cost-reports",
+    response_model=CostReportListResponse,
+    dependencies=[Depends(require_read_access)],
+)
+def list_cost_reports(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=""),
+    q: str = Query(default=""),
+) -> CostReportListResponse:
+    return review_service.cost_reports(
+        limit=limit,
+        offset=offset,
+        status=_parse_status_filter(status),
+        query=q,
+    )
+
+
+@app.get(
     "/runs/{run_id}",
     response_model=RunRecord,
     dependencies=[Depends(require_read_access)],
@@ -888,6 +918,18 @@ def get_run_metrics(run_id: str) -> RunMetrics:
 def get_run_scorecard(run_id: str) -> RunScorecard:
     try:
         return review_service.scorecard(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/runs/{run_id}/cost-report",
+    response_model=RunCostReport,
+    dependencies=[Depends(require_read_access)],
+)
+def get_run_cost_report(run_id: str) -> RunCostReport:
+    try:
+        return review_service.cost_report(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -1348,6 +1390,56 @@ def _scorecard_html(scorecard: RunScorecard) -> str:
           <tr><td>Technical depth</td><td>{_optional_score(scorecard.technical_depth)}</td></tr>
         </tbody>
       </table>
+      <ul>{warnings}</ul>
+    """
+
+
+def _cost_reports_html(cost_reports: CostReportListResponse) -> str:
+    if not cost_reports.items:
+        return "<p>No cost reports recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td>{escape(item.status.value)}</td>
+          <td>{escape(item.topic)}</td>
+          <td>{_pass_label(item.budget_pass)}</td>
+          <td>{item.estimated_total_tokens}</td>
+          <td>{item.token_budget}</td>
+        </tr>
+        """
+        for item in cost_reports.items
+    )
+    return f"""
+      <p>
+        <a href="/cost-reports">Cost reports JSON</a> |
+        Budget pass rate: <strong>{cost_reports.budget_pass_rate:.0%}</strong> |
+        Estimated tokens: <strong>{cost_reports.estimated_total_tokens}</strong>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Status</th><th>Topic</th><th>Budget</th>
+            <th>Est tokens</th><th>Budget tokens</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _cost_report_html(report: RunCostReport) -> str:
+    warnings = "".join(f"<li>{escape(warning)}</li>" for warning in report.warnings)
+    return f"""
+      <p><a href="/runs/{escape(report.run_id)}/cost-report">Cost report JSON</a></p>
+      <div class="metrics">
+        <div><strong>{_pass_label(report.budget_pass)}</strong><span>Budget</span></div>
+        <div><strong>{report.estimated_input_tokens}</strong><span>Input tokens</span></div>
+        <div><strong>{report.estimated_output_tokens}</strong><span>Output tokens</span></div>
+        <div><strong>{report.estimated_total_tokens}</strong><span>Total tokens</span></div>
+        <div><strong>{report.token_budget}</strong><span>Budget tokens</span></div>
+        <div><strong>{escape(report.model)}</strong><span>Model</span></div>
+      </div>
       <ul>{warnings}</ul>
     """
 

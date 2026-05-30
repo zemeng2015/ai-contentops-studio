@@ -219,6 +219,52 @@ def scorecard(run_id: str) -> None:
     typer.echo(item.model_dump_json(indent=2))
 
 
+@app.command("cost-reports")
+def cost_reports(
+    limit: Annotated[int, typer.Option(help="Number of cost reports to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of cost reports to skip.")] = 0,
+    status: Annotated[str, typer.Option(help="Optional run status filter.")] = "",
+    query: Annotated[
+        str,
+        typer.Option("--query", "-q", help="Search run id, slug, or topic."),
+    ] = "",
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    response = service.cost_reports(
+        limit=limit,
+        offset=offset,
+        status=_parse_status(status),
+        query=query,
+    )
+    if json_output:
+        typer.echo(response.model_dump_json(indent=2))
+        return
+    typer.echo(
+        f"Showing {len(response.items)} of {response.total} cost reports "
+        f"(budget pass rate {response.budget_pass_rate:.0%})"
+    )
+    for item in response.items:
+        typer.echo(
+            f"{item.run_id}  {item.status.value:13}  "
+            f"budget={str(item.budget_pass).lower():5}  "
+            f"tokens={item.estimated_total_tokens}/{item.token_budget}  {item.topic}"
+        )
+
+
+@app.command("cost-report")
+def cost_report(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        item = service.cost_report(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(item.model_dump_json(indent=2))
+
+
 @app.command()
 def show(
     run_id: str,
@@ -525,6 +571,7 @@ def init_config(
                 "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5",
                 "CONTENTOPS_LATENCY_SLO_MS=120000",
                 "CONTENTOPS_MIN_SOURCE_COUNT=1",
+                "CONTENTOPS_TOKEN_BUDGET_PER_RUN=12000",
                 "# CONTENTOPS_HOMEPAGE_REPO_PATH=C:\\path\\to\\zack-ai-homepage",
                 "# CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage",
             ]

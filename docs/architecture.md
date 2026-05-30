@@ -65,6 +65,8 @@ to persisted run artifacts rather than transient process logs.
 The review layer also builds operational scorecards from run metadata, `trace.json`, and
 `eval-report.json`. Scorecards expose quality pass/fail, latency SLO pass/fail, source-count SLO
 pass/fail, warnings, and aggregate pass rates through the dashboard, CLI, and `/scorecards` API.
+Cost reports estimate input and output tokens from persisted artifacts, compare the estimate
+against `CONTENTOPS_TOKEN_BUDGET_PER_RUN`, and expose per-run plus aggregate budget pass rates.
 Each research step also writes `source-audit.json`, which grades every source with reviewer-facing
 reasons and recommendations before the draft moves into planning.
 The API also exposes `/ready`, and the CLI exposes `contentops doctor`, to report database,
@@ -72,8 +74,8 @@ artifact store, provider configuration, and operator-key readiness without expos
 
 Each run now persists `request.json`, which enables reproducible reruns through the CLI, API, and
 dashboard without relying on operator memory or external logs.
-The CLI exposes the same review queue, artifact manifest, source audit, and scorecard surfaces as
-the API, so operators can script review checks without scraping dashboard HTML.
+The CLI exposes the same review queue, artifact manifest, source audit, scorecard, and cost-report
+surfaces as the API, so operators can script review checks without scraping dashboard HTML.
 
 Run comparison is part of the review layer. It compares duration, source counts, source overlap,
 publish readiness, and evaluation score deltas between a base run and a candidate run. This makes
