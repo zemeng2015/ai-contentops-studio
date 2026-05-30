@@ -48,6 +48,7 @@ def test_cli_doctor_reports_system_status(
     runner = CliRunner()
 
     result = runner.invoke(app, ["doctor", "--json"])
+    manifest_result = runner.invoke(app, ["deployment-manifest"])
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
@@ -58,6 +59,11 @@ def test_cli_doctor_reports_system_status(
         "provider_config",
         "operator_security",
     }
+    assert manifest_result.exit_code == 0
+    manifest_payload = json.loads(manifest_result.output)
+    assert manifest_payload["status"] in {"ok", "degraded"}
+    assert manifest_payload["runtime"]["database_engine"] == "sqlite"
+    assert "openai_api_key" not in manifest_result.output
 
 
 def test_cli_approve_then_publish(

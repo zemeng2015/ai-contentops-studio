@@ -18,6 +18,7 @@ def test_health_endpoint() -> None:
 
     response = client.get("/health")
     ready_response = client.get("/ready")
+    manifest_response = client.get("/deployment-manifest")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -32,6 +33,11 @@ def test_health_endpoint() -> None:
         "operator_security",
     }
     assert "operator_api_key" not in ready_response.text
+    assert manifest_response.status_code == 200
+    manifest_payload = manifest_response.json()
+    assert manifest_payload["status"] in {"ok", "degraded"}
+    assert manifest_payload["runtime"]["database_engine"] in {"sqlite", "postgresql"}
+    assert "openai_api_key" not in manifest_response.text
 
 
 def test_ready_endpoint_reports_invalid_provider() -> None:

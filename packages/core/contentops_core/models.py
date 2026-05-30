@@ -392,6 +392,22 @@ class SystemStatus(BaseModel):
     checks: list[ComponentCheck]
 
 
+class DeploymentCapability(BaseModel):
+    name: str
+    status: str
+    evidence: list[str] = Field(default_factory=list)
+
+
+class DeploymentManifest(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    runtime: dict[str, Any] = Field(default_factory=dict)
+    security: dict[str, Any] = Field(default_factory=dict)
+    operations: dict[str, Any] = Field(default_factory=dict)
+    capabilities: list[DeploymentCapability] = Field(default_factory=list)
+    checks: list[ComponentCheck] = Field(default_factory=list)
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

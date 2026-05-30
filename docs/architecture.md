@@ -106,6 +106,9 @@ The operations summary composes repository status counts with scorecards, cost r
 incident reports over a recent-run window. This gives operators one API/CLI/dashboard view for
 queue depth, approved-but-unpublished work, failed runs, pass rates, average duration, incident
 severity, and estimated token usage.
+The deployment manifest reuses readiness checks and adds redacted runtime, security, operations,
+and capability evidence. It is intended for release reviews, interview walkthroughs, and
+automation that needs to understand deployment posture without exposing secrets.
 Rollback uses that receipt to restore backed-up files or delete files created by the publish, then
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,

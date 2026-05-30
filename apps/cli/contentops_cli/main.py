@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from contentops_core.diagnostics import system_status
+from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     get_job_execution_report,
@@ -70,6 +70,13 @@ def doctor(
     for check in report.checks:
         typer.echo(f"- {check.name}: {check.status} - {check.message}")
     raise typer.Exit(0 if report.status != "fail" else 1)
+
+
+@app.command("deployment-manifest")
+def show_deployment_manifest() -> None:
+    settings = Settings()
+    manifest = deployment_manifest(settings, RunRepository(settings.database_url))
+    typer.echo(manifest.model_dump_json(indent=2))
 
 
 @app.command("ops-summary")

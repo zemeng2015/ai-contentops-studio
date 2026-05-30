@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contentops_core.models import ComponentCheck, SystemStatus
+from contentops_core.models import (
+    ComponentCheck,
+    DeploymentCapability,
+    DeploymentManifest,
+    SystemStatus,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -20,6 +25,21 @@ def system_status(settings: Settings, repository: RunRepository) -> SystemStatus
         _operator_security_check(settings),
     ]
     return SystemStatus(status=_overall_status(checks), checks=checks)
+
+
+def deployment_manifest(
+    settings: Settings,
+    repository: RunRepository,
+) -> DeploymentManifest:
+    status = system_status(settings, repository)
+    return DeploymentManifest(
+        status=status.status,
+        runtime=_runtime_fields(settings),
+        security=_security_fields(settings),
+        operations=_operations_fields(settings),
+        capabilities=_capabilities(settings, status),
+        checks=status.checks,
+    )
 
 
 def _database_check(repository: RunRepository) -> ComponentCheck:
@@ -201,3 +221,94 @@ def _overall_status(checks: list[ComponentCheck]) -> str:
     if "degraded" in statuses:
         return "degraded"
     return "ok"
+
+
+def _runtime_fields(settings: Settings) -> dict[str, object]:
+    return {
+        "database_engine": _database_engine(settings.database_url),
+        "artifact_store_provider": settings.artifact_store_provider,
+        "artifact_s3_bucket_configured": settings.artifact_s3_bucket is not None,
+        "research_provider": settings.research_provider,
+        "generator_provider": settings.generator_provider,
+        "publisher_provider": settings.publisher_provider,
+        "public_base_url": settings.public_base_url,
+        "homepage_public_base_url": settings.homepage_public_base_url,
+    }
+
+
+def _security_fields(settings: Settings) -> dict[str, object]:
+    return {
+        "operator_credentials_configured": settings.operator_api_key is not None,
+        "read_credentials_configured": settings.read_api_key is not None,
+        "read_routes_protected": settings.require_read_api_key,
+        "model_credentials_configured": settings.openai_api_key is not None,
+        "search_credentials_configured": settings.research_search_api_key is not None,
+        "notification_webhook_configured": settings.notification_webhook_url is not None,
+    }
+
+
+def _operations_fields(settings: Settings) -> dict[str, object]:
+    return {
+        "latency_slo_ms": settings.latency_slo_ms,
+        "min_source_count": settings.min_source_count,
+        "token_budget_per_run": settings.token_budget_per_run,
+        "research_retry_attempts": settings.research_retry_attempts,
+        "openai_retry_attempts": settings.openai_retry_attempts,
+        "openai_fallback_on_failure": settings.openai_fallback_on_failure,
+        "notification_timeout_seconds": settings.notification_timeout_seconds,
+    }
+
+
+def _capabilities(
+    settings: Settings,
+    status: SystemStatus,
+) -> list[DeploymentCapability]:
+    cloud_status = "ok"
+    if settings.database_url.startswith("sqlite"):
+        cloud_status = "degraded"
+    if status.status == "fail":
+        cloud_status = "fail"
+    return [
+        DeploymentCapability(
+            name="run_orchestration",
+            status="ok",
+            evidence=["POST /runs", "contentops run", "contentops-worker run-pipeline"],
+        ),
+        DeploymentCapability(
+            name="review_governance",
+            status="ok",
+            evidence=[
+                "approval.json",
+                "audit-log.json",
+                "scorecard approval gate",
+                "token budget approval gate",
+            ],
+        ),
+        DeploymentCapability(
+            name="publishing_recovery",
+            status="ok",
+            evidence=[
+                "publish-receipt.json",
+                "publish-verification.json",
+                "publish-rollback.json",
+            ],
+        ),
+        DeploymentCapability(
+            name="incident_operations",
+            status="ok",
+            evidence=["/incident-reports", "/ops-summary", "contentops incident-report"],
+        ),
+        DeploymentCapability(
+            name="aws_deployment_ready",
+            status=cloud_status,
+            evidence=["Terraform ECS/RDS/S3/EventBridge baseline", "Docker API image"],
+        ),
+    ]
+
+
+def _database_engine(database_url: str) -> str:
+    if database_url.startswith("sqlite"):
+        return "sqlite"
+    if database_url.startswith("postgresql"):
+        return "postgresql"
+    return database_url.split(":", 1)[0] or "unknown"

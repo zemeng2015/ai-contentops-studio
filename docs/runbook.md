@@ -10,6 +10,7 @@ Run these checks before a scheduled worker or manual publish window:
 ```powershell
 contentops doctor --json
 contentops ops-summary --json
+contentops deployment-manifest
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 ```
 
@@ -17,6 +18,7 @@ Expected result:
 
 - `doctor` is `ok` or `degraded` with only intentional local-development warnings.
 - `ops-summary` shows no unexpected failed runs or action-required incidents.
+- `deployment-manifest` contains no secret values and shows expected runtime providers.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 
@@ -114,6 +116,7 @@ GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
 GET /incident-reports?limit=20&offset=0
 GET /ops-summary?window_size=100
+GET /deployment-manifest
 ```
 
 Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,

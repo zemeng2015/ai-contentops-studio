@@ -26,6 +26,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - publish verification reports that prove target files still match their receipt hashes
 - incident reports that aggregate failed, degraded, drifted, and notification-failed runs
 - operations summary for queue depth, incident severity, pass rates, and budget posture
+- redacted deployment manifest for runtime config, security posture, and capability evidence
 - optional operator API key protection for mutating API and dashboard actions
 - readiness checks and CLI diagnostics for production deployments
 - API, CLI, worker, and publisher boundaries
@@ -154,6 +155,7 @@ contentops cost-reports --status needs_review --json
 contentops generation-receipt <run_id>
 contentops source-audit <run_id>
 contentops ops-summary --json
+contentops deployment-manifest
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
@@ -201,6 +203,7 @@ GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
 GET  /incident-reports?status=published&q=rag&limit=20&offset=0
 GET  /ops-summary?window_size=100
+GET  /deployment-manifest
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -253,6 +256,8 @@ Incident reports combine run failures, scorecard warnings, budget warnings, publ
 drift, and notification delivery failures into one action-oriented health summary per run.
 The operations summary rolls queue depth, status counts, incident severity, pass rates, average
 duration, and estimated token usage into one dashboard/API/CLI surface for daily operations.
+The deployment manifest exposes redacted runtime, security, operations, and capability evidence so
+reviewers can inspect production readiness without seeing secrets.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
 They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
 the same events are delivered to an external webhook without blocking the review workflow.
