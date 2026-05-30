@@ -20,16 +20,17 @@ docker run --rm -p 8000:8000 ai-contentops-studio
 - API: ECS Fargate service behind ALB, or Lambda behind API Gateway
 - Worker: ECS scheduled task or Lambda invoked by EventBridge
 - Artifacts: S3 bucket partitioned by run date
-- Metadata: RDS Postgres
+- Metadata: RDS Postgres, exposed to tasks through a Secrets Manager
+  `CONTENTOPS_DATABASE_URL`
 - Secrets: AWS Secrets Manager
 - Logs and metrics: CloudWatch
 
 The code uses provider and publisher boundaries so local filesystem/SQLite can be replaced by
 S3/Postgres without changing the pipeline contract.
 
-The AWS Terraform skeleton lives in `infra/aws/terraform`. It defines the artifact bucket, ECS task
-definitions, IAM roles, log groups, and scheduler group needed for the first production deployment
-shape.
+The AWS Terraform skeleton lives in `infra/aws/terraform`. It defines the artifact bucket, RDS
+Postgres metadata database, database URL secret, ECS task definitions, IAM roles, log groups, and
+scheduler group needed for the first production deployment shape.
 
 ## Provider environment variables
 
@@ -40,6 +41,7 @@ CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_ARTIFACT_STORE_PROVIDER=local
 CONTENTOPS_ARTIFACT_S3_BUCKET=
 CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
+CONTENTOPS_DATABASE_URL=sqlite:///contentops.db
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 CONTENTOPS_OPENAI_MODEL=gpt-5-mini
@@ -53,4 +55,11 @@ write is mirrored to S3 under:
 
 ```text
 s3://$CONTENTOPS_ARTIFACT_S3_BUCKET/$CONTENTOPS_ARTIFACT_S3_PREFIX/<run_id>/<artifact>
+```
+
+For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy can use the
+`postgresql+psycopg://` URL:
+
+```powershell
+pip install -e ".[aws]"
 ```

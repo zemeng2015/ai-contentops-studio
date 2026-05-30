@@ -18,6 +18,8 @@ before Terraform or CDK resources are added.
 `terraform/` now contains an AWS-ready baseline for:
 
 - S3 artifact storage with versioning and encryption
+- RDS Postgres run metadata storage
+- Secrets Manager storage for `CONTENTOPS_DATABASE_URL`
 - ECS Fargate task definitions for API and worker
 - task execution and artifact access IAM roles
 - CloudWatch log groups
@@ -29,5 +31,8 @@ choice is finalized.
 ```bash
 cd infra/aws/terraform
 terraform init
-terraform plan -var='container_image=<account>.dkr.ecr.<region>.amazonaws.com/ai-contentops-studio:latest'
+terraform plan \
+  -var='container_image=<account>.dkr.ecr.<region>.amazonaws.com/ai-contentops-studio:latest' \
+  -var='vpc_id=vpc-...' \
+  -var='private_subnet_ids=["subnet-...","subnet-..."]'
 ```

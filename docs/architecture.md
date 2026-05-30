@@ -116,6 +116,11 @@ AWS-ready equivalents:
 - CloudWatch for logs and metrics
 - Secrets Manager for provider credentials
 
+The Terraform baseline now provisions an RDS Postgres metadata database and writes a
+`postgresql+psycopg://` `CONTENTOPS_DATABASE_URL` into Secrets Manager for ECS task injection.
+This keeps local SQLite useful for development while proving the production metadata path has a
+real cloud target.
+
 ## Stage 2 provider boundaries
 
 Research providers:

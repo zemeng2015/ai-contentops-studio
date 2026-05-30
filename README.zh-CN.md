@@ -195,9 +195,16 @@ CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```
 
 启用 S3 镜像前需要安装可选 AWS 依赖：
+该依赖也会安装 RDS/Postgres 部署所需的 Postgres driver。
 
 ```powershell
 pip install -e ".[aws]"
+```
+
+使用 Postgres/RDS 存储 run metadata：
+
+```text
+CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
 ```
 
 使用真实网页来源：

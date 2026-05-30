@@ -4,6 +4,7 @@ locals {
     Project = var.project_name
     System  = "ai-contentops-studio"
   }
+  database_url = "postgresql+psycopg://${var.db_username}:${random_password.db.result}@${aws_db_instance.metadata.address}:${aws_db_instance.metadata.port}/${var.db_name}"
 }
 
 data "aws_caller_identity" "current" {}
@@ -41,6 +42,69 @@ resource "aws_cloudwatch_log_group" "worker" {
   tags              = local.tags
 }
 
+resource "random_password" "db" {
+  length  = 32
+  special = false
+}
+
+resource "aws_db_subnet_group" "metadata" {
+  name       = "${local.name}-metadata"
+  subnet_ids = var.private_subnet_ids
+  tags       = local.tags
+}
+
+resource "aws_security_group" "metadata_db" {
+  name        = "${local.name}-metadata-db"
+  description = "Postgres access for AI ContentOps metadata."
+  vpc_id      = var.vpc_id
+  tags        = local.tags
+}
+
+resource "aws_vpc_security_group_ingress_rule" "metadata_db_cidr" {
+  for_each          = toset(var.db_allowed_cidr_blocks)
+  security_group_id = aws_security_group.metadata_db.id
+  cidr_ipv4         = each.value
+  from_port         = 5432
+  ip_protocol       = "tcp"
+  to_port           = 5432
+  description       = "Allow Postgres metadata access."
+}
+
+resource "aws_vpc_security_group_egress_rule" "metadata_db" {
+  security_group_id = aws_security_group.metadata_db.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+  description       = "Allow database maintenance egress."
+}
+
+resource "aws_db_instance" "metadata" {
+  identifier             = "${local.name}-metadata"
+  engine                 = "postgres"
+  engine_version         = "16"
+  instance_class         = var.db_instance_class
+  allocated_storage      = var.db_allocated_storage
+  db_name                = var.db_name
+  username               = var.db_username
+  password               = random_password.db.result
+  db_subnet_group_name   = aws_db_subnet_group.metadata.name
+  vpc_security_group_ids = [aws_security_group.metadata_db.id]
+  storage_encrypted      = true
+  publicly_accessible    = false
+  skip_final_snapshot    = !var.db_deletion_protection
+  deletion_protection    = var.db_deletion_protection
+  tags                   = local.tags
+}
+
+resource "aws_secretsmanager_secret" "database_url" {
+  name = "${local.name}/database-url"
+  tags = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "database_url" {
+  secret_id     = aws_secretsmanager_secret.database_url.id
+  secret_string = local.database_url
+}
+
 resource "aws_ecs_cluster" "main" {
   name = local.name
   tags = local.tags
@@ -64,6 +128,24 @@ resource "aws_iam_role" "task_execution" {
 resource "aws_iam_role_policy_attachment" "task_execution" {
   role       = aws_iam_role.task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy" "task_execution_secrets" {
+  name = "${local.name}-execution-secrets"
+  role = aws_iam_role.task_execution.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = [
+        "secretsmanager:GetSecretValue"
+      ]
+      Effect = "Allow"
+      Resource = compact([
+        aws_secretsmanager_secret.database_url.arn,
+        var.openai_api_key_secret_arn
+      ])
+    }]
+  })
 }
 
 resource "aws_iam_role" "task" {
@@ -125,8 +207,11 @@ resource "aws_ecs_task_definition" "api" {
         { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
         { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
         { name = "CONTENTOPS_GENERATOR_PROVIDER", value = "template" },
-        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "hybrid" },
+        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" },
         { name = "CONTENTOPS_HOMEPAGE_REPO_PATH", value = var.homepage_repo_path }
+      ]
+      secrets = [
+        { name = "CONTENTOPS_DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -161,7 +246,10 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
         { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
         { name = "CONTENTOPS_GENERATOR_PROVIDER", value = "template" },
-        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "hybrid" }
+        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" }
+      ]
+      secrets = [
+        { name = "CONTENTOPS_DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -180,4 +268,3 @@ resource "aws_scheduler_schedule_group" "contentops" {
   name = local.name
   tags = local.tags
 }
-

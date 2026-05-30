@@ -8,7 +8,9 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     main = (root / "main.tf").read_text(encoding="utf-8")
 
     assert "aws_s3_bucket" in main
+    assert "aws_db_instance" in main
+    assert "aws_secretsmanager_secret" in main
     assert "aws_ecs_task_definition" in main
     assert "aws_cloudwatch_log_group" in main
     assert "aws_scheduler_schedule_group" in main
-
+    assert "CONTENTOPS_DATABASE_URL" in main

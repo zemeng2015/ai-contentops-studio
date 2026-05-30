@@ -207,9 +207,16 @@ CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```
 
 Install the optional AWS dependency before enabling S3 mirroring:
+It also installs the Postgres driver used by RDS deployments.
 
 ```powershell
 pip install -e ".[aws]"
+```
+
+Use Postgres/RDS for run metadata:
+
+```text
+CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
 ```
 
 Use real source URLs:
