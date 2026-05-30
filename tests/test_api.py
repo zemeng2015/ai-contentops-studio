@@ -38,3 +38,15 @@ def test_dashboard_renders() -> None:
     assert response.status_code == 200
     assert "AI ContentOps Studio" in response.text
     assert "Create run" in response.text
+
+
+def test_dashboard_run_detail_shows_source_review() -> None:
+    client = TestClient(app)
+
+    create_response = client.post("/runs", json={"topic": "Dashboard source review"})
+    run = create_response.json()
+    detail_response = client.get(f"/dashboard/runs/{run['id']}")
+
+    assert detail_response.status_code == 200
+    assert "Source Review" in detail_response.text
+    assert "extraction" not in detail_response.text.lower()

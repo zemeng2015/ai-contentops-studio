@@ -29,6 +29,7 @@ def test_hybrid_research_includes_url_and_local_context(monkeypatch: pytest.Monk
     )
 
     assert packet.sources[0].title == "Fetched source"
+    assert len(packet.sources) == 4
     assert any(source.title == "Portfolio project map" for source in packet.sources)
     assert any("Fetched source" in claim.source_title for claim in packet.claims)
 
@@ -82,3 +83,45 @@ def test_openai_provider_requires_api_key(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="CONTENTOPS_OPENAI_API_KEY"):
         build_pipeline(settings)
+
+
+def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        headers = {"content-type": "text/html"}
+        text = (
+            "<html><head><title>Useful AI Source</title>"
+            '<meta name="description" content="A long enough source summary about AI '
+            'workflow evaluation, artifact review, source grounding, and publication gates.">'
+            "</head><body><main>"
+            + ("technical article content " * 120)
+            + "</main></body></html>"
+        )
+        encoding = "utf-8"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str) -> FakeResponse:
+            return FakeResponse()
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = URLResearchProvider().collect(
+        RunRequest(topic="Source quality", source_urls=["https://example.com/post?ref=x#top"])
+    )
+
+    assert packet.sources[0].title == "Useful AI Source"
+    assert packet.sources[0].canonical_url == "https://example.com/post"
+    assert packet.sources[0].extraction_status == "ok"
+    assert packet.sources[0].extraction_quality >= 0.85
+    assert packet.sources[0].content_length > 1000

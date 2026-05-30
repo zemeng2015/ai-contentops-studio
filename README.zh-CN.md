@@ -84,6 +84,7 @@ tests/                     单元测试和集成测试
 
 - 本地 research provider 和 deterministic source packet
 - URL research provider：可以抓取并标准化用户提供的网页来源
+- Source 去重，以及 extraction status、quality、content length 元数据
 - 可选 OpenAI Responses API generator，并且放在 provider 边界后面
 - 可选 homepage publisher：可以发布到 Zack 的 GitHub Pages 个人主页仓库
 - Markdown 与 HTML 文章生成
@@ -121,6 +122,8 @@ API 同时提供一个轻量 dashboard：
 ```text
 GET /dashboard
 ```
+
+Run detail 页面包含 Source Review 表，方便在发布前检查来源状态和抽取质量。
 
 ## Provider 配置
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from html import escape
 from typing import Annotated
 
@@ -85,6 +86,9 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
     eval_report = "{}"
     if "eval-report.json" in artifacts:
         eval_report = review_service.read_artifact(run_id, "eval-report.json")
+    source_rows = ""
+    if "research.json" in artifacts:
+        source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
     publish_action = (
         f'<form method="post" action="/dashboard/runs/{escape(run_id)}/publish">'
         '<button type="submit">Publish run</button></form>'
@@ -109,6 +113,20 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
                 <h3>Evaluation</h3>
                 <pre>{escape(eval_report)}</pre>
               </div>
+            </section>
+            <section class="hero">
+              <h3>Source Review</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th>Quality</th>
+                    <th>Summary</th>
+                  </tr>
+                </thead>
+                <tbody>{source_rows}</tbody>
+              </table>
             </section>
             """,
         )
@@ -230,3 +248,26 @@ def _page(title: str, body: str) -> str:
       </body>
     </html>
     """
+
+
+def _source_review_rows(research_json: str) -> str:
+    data = json.loads(research_json)
+    rows: list[str] = []
+    for source in data.get("sources", []):
+        title = escape(str(source.get("title", "Untitled source")))
+        url = source.get("url")
+        source_label = f'<a href="{escape(str(url))}">{title}</a>' if url else title
+        status = escape(str(source.get("extraction_status", "unknown")))
+        quality = float(source.get("extraction_quality", 0))
+        summary = escape(str(source.get("summary", ""))[:260])
+        rows.append(
+            f"""
+            <tr>
+              <td>{source_label}</td>
+              <td>{status}</td>
+              <td>{quality:.2f}</td>
+              <td>{summary}</td>
+            </tr>
+            """
+        )
+    return "\n".join(rows)

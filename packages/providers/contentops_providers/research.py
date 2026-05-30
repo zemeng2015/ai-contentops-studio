@@ -114,7 +114,7 @@ class URLResearchProvider:
         self.timeout_seconds = timeout_seconds
 
     def collect(self, request: RunRequest) -> ResearchPacket:
-        sources = [self._fetch_source(url) for url in request.source_urls]
+        sources = dedupe_sources([self._fetch_source(url) for url in request.source_urls])
         claims = [
             Claim(
                 text=f"{source.title} is relevant to {request.topic} because {source.summary}",
@@ -162,17 +162,25 @@ class URLResearchProvider:
             return Source(
                 title=title[:180],
                 url=url,
+                canonical_url=_normalize_url(url),
                 publisher=self._publisher_from_url(url),
                 summary=summary,
                 credibility=0.78,
+                extraction_status="ok",
+                extraction_quality=self._score_extraction(title, summary, html),
+                content_length=len(_strip_tags(html)),
             )
         except Exception as exc:
             return Source(
                 title=f"Unavailable source: {url}",
                 url=url,
+                canonical_url=_normalize_url(url),
                 publisher=self._publisher_from_url(url),
                 summary=f"Fetch failed: {exc}",
                 credibility=0.25,
+                extraction_status="failed",
+                extraction_quality=0.15,
+                content_length=0,
             )
 
     @staticmethod
@@ -200,6 +208,22 @@ class URLResearchProvider:
         match = re.match(r"https?://([^/]+)", url)
         return match.group(1).removeprefix("www.") if match else "web"
 
+    @staticmethod
+    def _score_extraction(title: str, summary: str, html: str) -> float:
+        text_length = len(_strip_tags(html))
+        score = 0.35
+        if title and not title.startswith("http"):
+            score += 0.2
+        if len(summary) >= 120:
+            score += 0.25
+        elif len(summary) >= 40:
+            score += 0.12
+        if text_length >= 1500:
+            score += 0.2
+        elif text_length >= 400:
+            score += 0.1
+        return min(round(score, 3), 1.0)
+
 
 class HybridResearchProvider:
     def __init__(self) -> None:
@@ -211,10 +235,17 @@ class HybridResearchProvider:
         if not request.source_urls:
             return local_packet
         url_packet = self.url.collect(request)
+        sources = dedupe_sources(url_packet.sources + local_packet.sources)
+        source_titles = {source.title for source in sources}
+        claims = [
+            claim
+            for claim in url_packet.claims + local_packet.claims
+            if claim.source_title in source_titles
+        ]
         return ResearchPacket(
             topic=local_packet.topic,
-            sources=url_packet.sources + local_packet.sources,
-            claims=url_packet.claims + local_packet.claims,
+            sources=sources,
+            claims=claims,
             engineering_signals=url_packet.engineering_signals + local_packet.engineering_signals,
             risks=url_packet.risks + local_packet.risks,
             project_implications=(
@@ -231,3 +262,26 @@ def _strip_tags(html: str) -> str:
         flags=re.IGNORECASE | re.DOTALL,
     )
     return re.sub(r"<[^>]+>", " ", without_scripts)
+
+
+def _normalize_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    normalized = url.strip().lower().split("#", 1)[0].split("?", 1)[0]
+    return normalized.rstrip("/")
+
+
+def dedupe_sources(sources: list[Source]) -> list[Source]:
+    by_key: dict[str, Source] = {}
+    for source in sources:
+        key = source.canonical_url or _normalize_url(source.url)
+        if not key:
+            key = f"{source.publisher}:{source.title}".lower()
+        existing = by_key.get(key)
+        if existing is None or _source_rank(source) > _source_rank(existing):
+            by_key[key] = source.model_copy(update={"canonical_url": key if source.url else None})
+    return list(by_key.values())
+
+
+def _source_rank(source: Source) -> tuple[float, float, int]:
+    return (source.extraction_quality, source.credibility, source.content_length)

@@ -87,6 +87,7 @@ tests/                     Unit and integration tests
 
 - Local research provider with deterministic source packets
 - URL research provider that fetches and normalizes operator-supplied sources
+- Source deduplication plus extraction status, quality, and content-length metadata
 - Optional OpenAI Responses API generator behind a provider boundary
 - Optional homepage publisher for Zack's GitHub Pages portfolio
 - Markdown and HTML article generation
@@ -124,6 +125,9 @@ The API also serves a lightweight dashboard at:
 ```text
 GET /dashboard
 ```
+
+Run details include a Source Review table so reviewers can inspect source status and extraction
+quality before publishing.
 
 ## Provider configuration
 

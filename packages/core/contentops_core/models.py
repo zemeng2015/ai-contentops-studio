@@ -25,9 +25,13 @@ class RunStatus(StrEnum):
 class Source(BaseModel):
     title: str
     url: str | None = None
+    canonical_url: str | None = None
     publisher: str = "unknown"
     summary: str
     credibility: float = Field(ge=0, le=1, default=0.75)
+    extraction_status: str = "synthetic"
+    extraction_quality: float = Field(ge=0, le=1, default=0.75)
+    content_length: int = Field(ge=0, default=0)
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
@@ -65,6 +69,7 @@ class Draft(BaseModel):
 class EvaluationReport(BaseModel):
     groundedness: float = Field(ge=0, le=1)
     source_coverage: float = Field(ge=0, le=1)
+    source_quality: float = Field(ge=0, le=1, default=1.0)
     career_relevance: float = Field(ge=0, le=1)
     technical_depth: float = Field(ge=0, le=1)
     publish_ready: bool
