@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from collections.abc import Iterable
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -22,6 +23,8 @@ from contentops_core.models import (
     Draft,
     EvaluationReport,
     GenerationReceipt,
+    IncidentReportListResponse,
+    IncidentSeverity,
     NotificationDelivery,
     PublishedContentItem,
     PublishedContentListResponse,
@@ -36,6 +39,8 @@ from contentops_core.models import (
     ReviewBatchResult,
     RunComparison,
     RunCostReport,
+    RunIncidentReport,
+    RunIncidentSignal,
     RunMetrics,
     RunRecord,
     RunRequest,
@@ -454,6 +459,26 @@ class ReviewService:
             estimated_total_tokens=sum(item.estimated_total_tokens for item in items),
         )
 
+    def incident_report(self, run_id: str) -> RunIncidentReport:
+        return self._incident_report_for_run(self._get_run(run_id))
+
+    def incident_reports(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        status: RunStatus | None = None,
+        query: str = "",
+    ) -> IncidentReportListResponse:
+        runs = self.repository.list(limit=limit, offset=offset, status=status, query=query)
+        items = [self._incident_report_for_run(run) for run in runs]
+        return IncidentReportListResponse(
+            items=items,
+            total=self.repository.count(status=status, query=query),
+            limit=limit,
+            offset=offset,
+            action_required=sum(1 for item in items if item.requires_action),
+        )
+
     def compare(self, base_run_id: str, candidate_run_id: str) -> RunComparison:
         base = self._get_run(base_run_id)
         candidate = self._get_run(candidate_run_id)
@@ -733,6 +758,105 @@ class ReviewService:
             warnings=warnings,
         )
 
+    def _incident_report_for_run(self, run: RunRecord) -> RunIncidentReport:
+        signals: list[RunIncidentSignal] = []
+        if run.status == RunStatus.FAILED:
+            signals.append(
+                RunIncidentSignal(
+                    severity=IncidentSeverity.CRITICAL,
+                    category="run",
+                    message=run.error or "Run failed without a recorded error.",
+                    artifact="trace.json",
+                )
+            )
+        scorecard = self._scorecard_for_run(run)
+        if not scorecard.overall_pass:
+            signals.append(
+                RunIncidentSignal(
+                    severity=IncidentSeverity.WARNING,
+                    category="quality",
+                    message="Run scorecard did not pass.",
+                    artifact="eval-report.json",
+                )
+            )
+            for warning in scorecard.warnings:
+                signals.append(
+                    RunIncidentSignal(
+                        severity=IncidentSeverity.WARNING,
+                        category="quality",
+                        message=warning,
+                        artifact="eval-report.json",
+                    )
+                )
+        cost_report = self._cost_report_for_run(run)
+        if not cost_report.budget_pass:
+            signals.append(
+                RunIncidentSignal(
+                    severity=IncidentSeverity.WARNING,
+                    category="cost",
+                    message="Run exceeded the configured token budget.",
+                    artifact="generation-receipt.json",
+                )
+            )
+        for warning in cost_report.warnings:
+            signals.append(
+                RunIncidentSignal(
+                    severity=IncidentSeverity.WARNING,
+                    category="cost",
+                    message=warning,
+                    artifact="generation-receipt.json",
+                )
+            )
+        if run.status == RunStatus.PUBLISHED:
+            try:
+                verification = self.verify_publish(run.id)
+            except ValueError as exc:
+                signals.append(
+                    RunIncidentSignal(
+                        severity=IncidentSeverity.CRITICAL,
+                        category="publish",
+                        message=str(exc),
+                        artifact="publish-receipt.json",
+                    )
+                )
+            else:
+                if not verification.verified:
+                    signals.append(
+                        RunIncidentSignal(
+                            severity=IncidentSeverity.CRITICAL,
+                            category="publish",
+                            message="Published files do not match the publish receipt.",
+                            artifact="publish-verification.json",
+                        )
+                    )
+        for delivery in self.notification_log(run.id):
+            if delivery.status == "failed":
+                signals.append(
+                    RunIncidentSignal(
+                        severity=IncidentSeverity.WARNING,
+                        category="notification",
+                        message=delivery.error or "Notification delivery failed.",
+                        artifact="notification-log.json",
+                    )
+                )
+        if not signals:
+            signals.append(
+                RunIncidentSignal(
+                    severity=IncidentSeverity.INFO,
+                    category="run",
+                    message="No incident signals detected.",
+                )
+            )
+        severity = _max_severity(signal.severity for signal in signals)
+        return RunIncidentReport(
+            run_id=run.id,
+            status=run.status,
+            topic=run.topic,
+            severity=severity,
+            requires_action=severity != IncidentSeverity.INFO,
+            signals=signals,
+        )
+
     def _record_audit_event(self, run: RunRecord, event: AuditEvent) -> None:
         self._append_audit_event(run, event)
         delivery = self.notifier.notify(run, event)
@@ -938,3 +1062,16 @@ def _rollback_hint(action: str, backup_artifact: str | None) -> str:
     if action == "unchanged":
         return "No rollback action needed."
     return "No backup artifact is available; inspect version control or deployment history."
+
+
+def _max_severity(severities: Iterable[IncidentSeverity]) -> IncidentSeverity:
+    rank = {
+        IncidentSeverity.INFO: 0,
+        IncidentSeverity.WARNING: 1,
+        IncidentSeverity.CRITICAL: 2,
+    }
+    selected = IncidentSeverity.INFO
+    for severity in severities:
+        if isinstance(severity, IncidentSeverity) and rank[severity] > rank[selected]:
+            selected = severity
+    return selected

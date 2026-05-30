@@ -131,6 +131,11 @@ def test_cli_queue_and_manifest_commands(
     scorecards_result = runner.invoke(app, ["scorecards", "--query", "searchable", "--json"])
     cost_report_result = runner.invoke(app, ["cost-report", run_id])
     cost_reports_result = runner.invoke(app, ["cost-reports", "--query", "searchable", "--json"])
+    incident_report_result = runner.invoke(app, ["incident-report", run_id])
+    incident_reports_result = runner.invoke(
+        app,
+        ["incident-reports", "--query", "searchable", "--json"],
+    )
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
@@ -158,6 +163,13 @@ def test_cli_queue_and_manifest_commands(
     cost_reports_payload = json.loads(cost_reports_result.output)
     assert cost_reports_payload["total"] == 1
     assert cost_reports_payload["items"][0]["run_id"] == run_id
+    assert incident_report_result.exit_code == 0
+    incident_report_payload = json.loads(incident_report_result.output)
+    assert incident_report_payload["run_id"] == run_id
+    assert incident_reports_result.exit_code == 0
+    incident_reports_payload = json.loads(incident_reports_result.output)
+    assert incident_reports_payload["total"] == 1
+    assert incident_reports_payload["items"][0]["run_id"] == run_id
     assert generation_receipt_result.exit_code == 0
     generation_receipt_payload = json.loads(generation_receipt_result.output)
     assert generation_receipt_payload["provider"] == "template"

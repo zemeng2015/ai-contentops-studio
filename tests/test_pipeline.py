@@ -120,6 +120,8 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     approval = review_service.approval(result.run.id)
     receipt = review_service.publish_receipt(result.run.id)
     verification = review_service.verify_publish(result.run.id)
+    incident_report = review_service.incident_report(result.run.id)
+    incident_reports = review_service.incident_reports(limit=5)
     audit_events = review_service.audit_log(result.run.id)
     notifications = review_service.notification_log(result.run.id)
 
@@ -172,6 +174,9 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert all(item.exists for item in verification.items)
     assert all(item.matches_receipt for item in verification.items)
     assert (result.run.artifact_dir / "publish-verification.json").exists()
+    assert incident_report.severity.value == "info"
+    assert incident_report.requires_action is False
+    assert incident_reports.action_required >= 0
     assert [event.action for event in audit_events] == ["approve", "publish"]
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED
@@ -238,6 +243,36 @@ def test_review_service_blocks_approval_when_token_budget_fails(tmp_path: Path) 
 
     with pytest.raises(ValueError, match="token budget did not pass"):
         review_service.approve(result.run.id)
+
+
+def test_incident_report_marks_failed_runs_critical(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        generator_provider="openai",
+        openai_api_key=None,
+    )
+    repo = RunRepository(settings.database_url)
+    pipeline = build_pipeline(
+        Settings(
+            artifact_root=tmp_path / "artifacts",
+            database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+            site_output_dir=tmp_path / "site",
+        )
+    )
+    result = pipeline.run(RunRequest(topic="Incident failed run seed"))
+    failed = result.run
+    failed.touch(RunStatus.FAILED)
+    failed.error = "simulated incident"
+    repo.save(failed)
+    review_service = build_review_service(settings)
+
+    incident = review_service.incident_report(failed.id)
+
+    assert incident.severity.value == "critical"
+    assert incident.requires_action is True
+    assert any(signal.category == "run" for signal in incident.signals)
 
 
 def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
@@ -327,9 +362,13 @@ def test_publish_verification_detects_modified_files(tmp_path: Path) -> None:
     Path(receipt.file_changes[0].path).write_text("tampered", encoding="utf-8")
 
     verification = review_service.verify_publish(result.run.id)
+    incident = review_service.incident_report(result.run.id)
 
     assert verification.verified is False
     assert any(not item.matches_receipt for item in verification.items)
+    assert incident.severity.value == "critical"
+    assert incident.requires_action is True
+    assert any(signal.category == "publish" for signal in incident.signals)
 
 
 def test_review_service_rejects_run(tmp_path: Path) -> None:

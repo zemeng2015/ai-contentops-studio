@@ -174,6 +174,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     scorecards_response = client.get("/scorecards?limit=5")
     cost_report_response = client.get(f"/runs/{run['id']}/cost-report")
     cost_reports_response = client.get("/cost-reports?limit=5")
+    incident_report_response = client.get(f"/runs/{run['id']}/incident-report")
+    incident_reports_response = client.get("/incident-reports?limit=5")
     generation_receipt_response = client.get(f"/runs/{run['id']}/generation-receipt")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
@@ -210,6 +212,10 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert cost_report_response.json()["budget_pass"] is True
     assert cost_reports_response.status_code == 200
     assert any(item["run_id"] == run["id"] for item in cost_reports_response.json()["items"])
+    assert incident_report_response.status_code == 200
+    assert incident_report_response.json()["severity"] in {"info", "warning", "critical"}
+    assert incident_reports_response.status_code == 200
+    assert any(item["run_id"] == run["id"] for item in incident_reports_response.json()["items"])
     assert generation_receipt_response.status_code == 200
     assert generation_receipt_response.json()["provider"] == "template"
     assert generation_receipt_response.json()["total_tokens"] > 0
@@ -357,6 +363,7 @@ def test_dashboard_renders() -> None:
     assert "Published Content" in response.text
     assert "Quality Scorecards" in response.text
     assert "Token Budgets" in response.text
+    assert "Incident Reports" in response.text
 
 
 def test_dashboard_filters_runs() -> None:
@@ -389,6 +396,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Quality Scorecard" in detail_response.text
     assert "Token Budget" in detail_response.text
     assert "Generation Receipt" in detail_response.text
+    assert "Incident Report" in detail_response.text
     assert "Manifest JSON" in detail_response.text
     assert "Download evidence bundle" in detail_response.text
     assert "Run Timeline" in detail_response.text

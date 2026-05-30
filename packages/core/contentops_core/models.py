@@ -331,6 +331,37 @@ class CostReportListResponse(BaseModel):
     estimated_total_tokens: int = Field(ge=0)
 
 
+class IncidentSeverity(StrEnum):
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class RunIncidentSignal(BaseModel):
+    severity: IncidentSeverity
+    category: str
+    message: str
+    artifact: str | None = None
+
+
+class RunIncidentReport(BaseModel):
+    run_id: str
+    status: RunStatus
+    topic: str
+    severity: IncidentSeverity
+    requires_action: bool
+    signals: list[RunIncidentSignal] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class IncidentReportListResponse(BaseModel):
+    items: list[RunIncidentReport]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    action_required: int = Field(ge=0)
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str

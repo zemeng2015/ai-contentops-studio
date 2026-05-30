@@ -265,6 +265,52 @@ def cost_report(run_id: str) -> None:
     typer.echo(item.model_dump_json(indent=2))
 
 
+@app.command("incident-reports")
+def incident_reports(
+    limit: Annotated[int, typer.Option(help="Number of incident reports to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of incident reports to skip.")] = 0,
+    status: Annotated[str, typer.Option(help="Optional run status filter.")] = "",
+    query: Annotated[
+        str,
+        typer.Option("--query", "-q", help="Search run id, slug, or topic."),
+    ] = "",
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    response = service.incident_reports(
+        limit=limit,
+        offset=offset,
+        status=_parse_status(status),
+        query=query,
+    )
+    if json_output:
+        typer.echo(response.model_dump_json(indent=2))
+        return
+    typer.echo(
+        f"Showing {len(response.items)} of {response.total} incident reports "
+        f"({response.action_required} require action)"
+    )
+    for item in response.items:
+        typer.echo(
+            f"{item.run_id}  {item.status.value:13}  "
+            f"{item.severity.value:8}  action={str(item.requires_action).lower():5}  "
+            f"{item.topic}"
+        )
+
+
+@app.command("incident-report")
+def incident_report(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        report = service.incident_report(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(report.model_dump_json(indent=2))
+
+
 @app.command()
 def show(
     run_id: str,

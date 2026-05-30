@@ -22,6 +22,7 @@ from contentops_core.models import (
     AuditEvent,
     CostReportListResponse,
     GenerationReceipt,
+    IncidentReportListResponse,
     NotificationDelivery,
     PublishedContentListResponse,
     PublishPlan,
@@ -32,6 +33,7 @@ from contentops_core.models import (
     ReviewBatchResult,
     RunComparison,
     RunCostReport,
+    RunIncidentReport,
     RunListResponse,
     RunMetrics,
     RunRecord,
@@ -168,6 +170,7 @@ def dashboard(
     published_content = review_service.published_content(limit=5)
     scorecards = review_service.scorecards(limit=5)
     cost_reports = review_service.cost_reports(limit=5)
+    incident_reports = review_service.incident_reports(limit=5)
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -264,6 +267,11 @@ def dashboard(
               <p>Estimated token usage for recent runs, derived from persisted artifacts.</p>
               {_cost_reports_html(cost_reports)}
             </section>
+            <section class="hero compact">
+              <h2>Incident Reports</h2>
+              <p>Recent run health signals for failed, drifting, or degraded content runs.</p>
+              {_incident_reports_html(incident_reports)}
+            </section>
             """,
         )
     )
@@ -316,6 +324,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     scorecard = review_service.scorecard(run_id)
     cost_report = review_service.cost_report(run_id)
     generation_receipt = review_service.generation_receipt(run_id)
+    incident_report = review_service.incident_report(run_id)
     timeline_rows = _timeline_rows(metrics)
     plan_html = ""
     try:
@@ -379,6 +388,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               {_cost_report_html(cost_report)}
               <h3>Generation Receipt</h3>
               {_generation_receipt_html(run_id, generation_receipt)}
+              <h3>Incident Report</h3>
+              {_incident_report_html(incident_report)}
               <h3>Approval</h3>
               {approval_html}
               <form method="post" action="{approve_action}">
@@ -706,6 +717,25 @@ def list_cost_reports(
 
 
 @app.get(
+    "/incident-reports",
+    response_model=IncidentReportListResponse,
+    dependencies=[Depends(require_read_access)],
+)
+def list_incident_reports(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=""),
+    q: str = Query(default=""),
+) -> IncidentReportListResponse:
+    return review_service.incident_reports(
+        limit=limit,
+        offset=offset,
+        status=_parse_status_filter(status),
+        query=q,
+    )
+
+
+@app.get(
     "/runs/{run_id}",
     response_model=RunRecord,
     dependencies=[Depends(require_read_access)],
@@ -978,6 +1008,18 @@ def get_run_scorecard(run_id: str) -> RunScorecard:
 def get_run_cost_report(run_id: str) -> RunCostReport:
     try:
         return review_service.cost_report(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/runs/{run_id}/incident-report",
+    response_model=RunIncidentReport,
+    dependencies=[Depends(require_read_access)],
+)
+def get_run_incident_report(run_id: str) -> RunIncidentReport:
+    try:
+        return review_service.incident_report(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -1526,6 +1568,60 @@ def _cost_report_html(report: RunCostReport) -> str:
         <div><strong>{escape(report.model)}</strong><span>Model</span></div>
       </div>
       <ul>{warnings}</ul>
+    """
+
+
+def _incident_reports_html(reports: IncidentReportListResponse) -> str:
+    if not reports.items:
+        return "<p>No incident reports recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td>{escape(item.status.value)}</td>
+          <td>{escape(item.severity.value)}</td>
+          <td>{_pass_label(not item.requires_action)}</td>
+          <td>{escape(item.topic)}</td>
+        </tr>
+        """
+        for item in reports.items
+    )
+    return f"""
+      <p>
+        <a href="/incident-reports">Incident reports JSON</a> |
+        Action required: <strong>{reports.action_required}</strong>
+      </p>
+      <table>
+        <thead>
+          <tr><th>Run</th><th>Status</th><th>Severity</th><th>Healthy</th><th>Topic</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _incident_report_html(report: RunIncidentReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(signal.severity.value)}</td>
+          <td>{escape(signal.category)}</td>
+          <td>{escape(signal.message)}</td>
+          <td>{escape(signal.artifact or "n/a")}</td>
+        </tr>
+        """
+        for signal in report.signals
+    )
+    return f"""
+      <p><a href="/runs/{escape(report.run_id)}/incident-report">Incident report JSON</a></p>
+      <p>
+        Severity: <strong>{escape(report.severity.value)}</strong> |
+        Requires action: <strong>{str(report.requires_action).lower()}</strong>
+      </p>
+      <table>
+        <thead><tr><th>Severity</th><th>Category</th><th>Message</th><th>Artifact</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
     """
 
 

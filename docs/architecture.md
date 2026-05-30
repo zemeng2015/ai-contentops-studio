@@ -98,6 +98,10 @@ hints. Existing publish targets are backed up under the run artifact directory b
 overwritten.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
+Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,
+budget warnings, publish drift, and notification delivery failures into a single severity and
+action-required flag. They are exposed through the dashboard, CLI, and API so operational triage
+does not require manually opening every JSON artifact first.
 Rollback uses that receipt to restore backed-up files or delete files created by the publish, then
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,

@@ -24,6 +24,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - generation receipts that audit model provider, retry attempts, fallback, and usage tokens
 - publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
 - publish verification reports that prove target files still match their receipt hashes
+- incident reports that aggregate failed, degraded, drifted, and notification-failed runs
 - optional operator API key protection for mutating API and dashboard actions
 - readiness checks and CLI diagnostics for production deployments
 - API, CLI, worker, and publisher boundaries
@@ -165,6 +166,8 @@ contentops rerun <run_id>
 contentops publish <run_id>
 contentops publish-receipt <run_id>
 contentops verify-publish <run_id>
+contentops incident-report <run_id>
+contentops incident-reports --status published --json
 contentops rollback-publish <run_id> --actor "Zack"
 ```
 
@@ -184,6 +187,7 @@ GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
+GET  /runs/{run_id}/incident-report
 GET  /runs/{run_id}/audit-log
 GET  /runs/{run_id}/notifications
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
@@ -193,6 +197,7 @@ GET  /job-executions/{execution_id}
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
+GET  /incident-reports?status=published&q=rag&limit=20&offset=0
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -241,6 +246,8 @@ directory before they are overwritten. Operators can run `contentops rollback-pu
 publish.
 Operators can run `contentops verify-publish` or call `GET /runs/{run_id}/publish-verification`
 to confirm current publish target files still match the receipt hashes.
+Incident reports combine run failures, scorecard warnings, budget warnings, publish verification
+drift, and notification delivery failures into one action-oriented health summary per run.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
 They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
 the same events are delivered to an external webhook without blocking the review workflow.

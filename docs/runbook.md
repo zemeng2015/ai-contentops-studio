@@ -48,6 +48,7 @@ For each candidate:
 
 ```powershell
 contentops manifest <run_id>
+contentops incident-report <run_id>
 contentops source-audit <run_id> --json
 contentops metrics <run_id>
 contentops scorecard <run_id>
@@ -108,6 +109,7 @@ The same catalog is available from:
 GET /content?limit=20&offset=0
 GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
+GET /incident-reports?limit=20&offset=0
 ```
 
 Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,
@@ -146,12 +148,13 @@ When a scheduled job fails:
 
 1. Inspect `contentops job-executions --json`.
 2. Open the failed `contentops job-execution <execution_id>` receipt.
-3. Check whether failures are research, generation, evaluation, publish, or storage related.
-4. Run `contentops doctor --json`.
-5. Export the affected run with `contentops export-run <run_id> --output incident.zip`.
-6. Run `contentops verify-publish <run_id>` for published runs to detect target drift.
-7. Fix provider credentials, source URLs, publish target state, or approval status.
-8. Rerun from the prior request:
+3. Run `contentops incident-reports --json` and `contentops incident-report <run_id>`.
+4. Check whether failures are research, generation, evaluation, publish, notification, or storage related.
+5. Run `contentops doctor --json`.
+6. Export the affected run with `contentops export-run <run_id> --output incident.zip`.
+7. Run `contentops verify-publish <run_id>` for published runs to detect target drift.
+8. Fix provider credentials, source URLs, publish target state, webhook state, or approval status.
+9. Rerun from the prior request:
 
 ```powershell
 contentops rerun <run_id>

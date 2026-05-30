@@ -19,6 +19,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - source audit reports，包含来源评分、风险原因和 reviewer 建议
 - publish receipts record file hashes, backup artifacts, and rollback hints
 - publish receipt 会审计 provider、URL、approval 和变更文件
+- incident reports 汇总失败、质量退化、预算超限、发布漂移和通知失败的运行信号
 - 可选 operator API key，用于保护 API 和 Dashboard 的写操作
 - `/ready` 和 `contentops doctor` 用于生产部署前诊断
 - API、CLI、worker、publisher 清晰分层
@@ -110,6 +111,7 @@ tests/                     单元测试和集成测试
 - Static site publisher
 - FastAPI `POST /runs`、`GET /runs` 和 `GET /review-queue`
 - FastAPI artifact、metrics、rerun、publish-plan、publish、compare endpoints
+- FastAPI incident report endpoints，用于运维排障和发布健康检查
 - Worker 支持单任务或批量 YAML content calendar
 - CLI `contentops run`、`contentops runs`、`contentops show`、`contentops artifacts`
 - CLI review 命令包括 `publish`、`metrics`、`rerun`、`publish-plan`、`compare`
@@ -142,6 +144,8 @@ contentops rerun <run_id>
 contentops publish <run_id>
 contentops publish-receipt <run_id>
 contentops verify-publish <run_id>
+contentops incident-report <run_id>
+contentops incident-reports --status published --json
 contentops rollback-publish <run_id> --actor "Zack"
 ```
 
@@ -163,6 +167,7 @@ GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
+GET  /runs/{run_id}/incident-report
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /job-executions?limit=20&offset=0
@@ -170,6 +175,7 @@ GET  /job-executions/{execution_id}
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
+GET  /incident-reports?status=published&q=rag&limit=20&offset=0
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
