@@ -6,7 +6,7 @@ from typing import Annotated
 
 import typer
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import RunRequest
+from contentops_core.models import RunRequest, RunStatus
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -35,9 +35,55 @@ def run(
 @app.command("runs")
 def list_runs(
     limit: Annotated[int, typer.Option(help="Number of recent runs to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of matching runs to skip.")] = 0,
+    status: Annotated[str, typer.Option(help="Optional run status filter.")] = "",
+    query: Annotated[
+        str,
+        typer.Option("--query", "-q", help="Search run id, slug, or topic."),
+    ] = "",
 ) -> None:
     repo = RunRepository(Settings().database_url)
-    for record in repo.list(limit=limit):
+    status_filter = _parse_status(status)
+    for record in repo.list(limit=limit, offset=offset, status=status_filter, query=query):
+        typer.echo(f"{record.id}  {record.status.value:13}  {record.topic}")
+
+
+@app.command("queue")
+def review_queue(
+    limit: Annotated[int, typer.Option(help="Number of queue items to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of matching items to skip.")] = 0,
+    status: Annotated[
+        str,
+        typer.Option(help="Run status to inspect. Empty shows all statuses."),
+    ] = RunStatus.NEEDS_REVIEW.value,
+    query: Annotated[
+        str,
+        typer.Option("--query", "-q", help="Search run id, slug, or topic."),
+    ] = "",
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    repo = RunRepository(Settings().database_url)
+    status_filter = _parse_status(status)
+    runs = repo.list(limit=limit, offset=offset, status=status_filter, query=query)
+    total = repo.count(status=status_filter, query=query)
+    if json_output:
+        typer.echo(
+            json.dumps(
+                {
+                    "items": [run.model_dump(mode="json") for run in runs],
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                },
+                indent=2,
+            )
+        )
+        return
+    typer.echo(f"Showing {len(runs)} of {total} matching runs")
+    for record in runs:
         typer.echo(f"{record.id}  {record.status.value:13}  {record.topic}")
 
 
@@ -67,6 +113,16 @@ def artifacts(run_id: str) -> None:
     service = build_review_service(Settings())
     for artifact in service.list_artifacts(run_id):
         typer.echo(artifact)
+
+
+@app.command()
+def manifest(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        artifact_manifest = service.artifact_manifest(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(artifact_manifest.model_dump_json(indent=2))
 
 
 @app.command()
@@ -218,3 +274,13 @@ def init_config(
         encoding="utf-8",
     )
     typer.echo(f"Created {path}")
+
+
+def _parse_status(status: str) -> RunStatus | None:
+    normalized = status.strip().casefold()
+    if not normalized:
+        return None
+    try:
+        return RunStatus(normalized)
+    except ValueError as exc:
+        raise typer.BadParameter(f"Unknown run status: {status}") from exc
