@@ -107,6 +107,7 @@ Track shipped content as an operational catalog:
 contentops content --json
 contentops scorecards --json
 contentops cost-reports --json
+contentops audit-events --json
 contentops ops-summary --json
 contentops release-readiness --json
 ```
@@ -117,6 +118,7 @@ The same catalog is available from:
 GET /content?limit=20&offset=0
 GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
+GET /audit-events?limit=20&offset=0
 GET /incident-reports?limit=20&offset=0
 GET /ops-summary?window_size=100
 GET /deployment-manifest
@@ -147,6 +149,7 @@ If a publish needs to be undone:
 ```powershell
 contentops rollback-publish <run_id> --actor "Zack"
 contentops audit-log <run_id>
+contentops audit-events --action rollback_publish --json
 ```
 
 Rollback restores backed-up files or deletes newly created files according to the publish receipt.

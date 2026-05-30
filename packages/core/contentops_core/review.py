@@ -19,6 +19,7 @@ from contentops_core.models import (
     ArtifactManifest,
     ArtifactMetadata,
     AuditEvent,
+    AuditEventListResponse,
     CostReportListResponse,
     Draft,
     EvaluationReport,
@@ -305,6 +306,27 @@ class ReviewService:
             return []
         data = json.loads(path.read_text(encoding="utf-8"))
         return [AuditEvent.model_validate(item) for item in data]
+
+    def audit_events(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        status: RunStatus | None = None,
+        query: str = "",
+        action: str = "",
+    ) -> AuditEventListResponse:
+        events = self._audit_events(status=status, query=query, action=action)
+        page = events[offset : offset + limit]
+        action_counts: dict[str, int] = {}
+        for event in events:
+            action_counts[event.action] = action_counts.get(event.action, 0) + 1
+        return AuditEventListResponse(
+            items=page,
+            total=len(events),
+            limit=limit,
+            offset=offset,
+            action_counts=action_counts,
+        )
 
     def notification_log(self, run_id: str) -> list[NotificationDelivery]:
         run = self._get_run(run_id)
@@ -904,6 +926,22 @@ class ReviewService:
             requires_action=severity != IncidentSeverity.INFO,
             signals=signals,
         )
+
+    def _audit_events(
+        self,
+        status: RunStatus | None,
+        query: str,
+        action: str,
+    ) -> list[AuditEvent]:
+        normalized_action = action.strip()
+        events: list[AuditEvent] = []
+        for run in self.repository.list(limit=1000, status=status, query=query):
+            events.extend(
+                event
+                for event in self.audit_log(run.id)
+                if not normalized_action or event.action == normalized_action
+            )
+        return sorted(events, key=lambda event: event.occurred_at, reverse=True)
 
     def _record_audit_event(self, run: RunRecord, event: AuditEvent) -> None:
         self._append_audit_event(run, event)

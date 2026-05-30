@@ -205,6 +205,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     notifications_response = client.get(f"/runs/{run['id']}/notifications")
     content_response = client.get("/content?limit=5")
     audit_response = client.get(f"/runs/{run['id']}/audit-log")
+    audit_events_response = client.get("/audit-events?action=publish")
 
     assert create_response.status_code == 200
     assert artifacts_response.status_code == 200
@@ -265,6 +266,11 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert any(item["run_id"] == run["id"] for item in content_response.json()["items"])
     assert audit_response.status_code == 200
     assert [event["action"] for event in audit_response.json()] == ["approve", "publish"]
+    assert audit_events_response.status_code == 200
+    audit_events_payload = audit_events_response.json()
+    assert audit_events_payload["total"] >= 1
+    assert audit_events_payload["action_counts"]["publish"] >= 1
+    assert any(item["run_id"] == run["id"] for item in audit_events_payload["items"])
 
 
 def test_publish_rollback_endpoint_restores_run_state() -> None:
@@ -388,6 +394,7 @@ def test_dashboard_renders() -> None:
     assert "Token Budgets" in response.text
     assert "Incident Reports" in response.text
     assert "Operations Summary" in response.text
+    assert "Audit Events" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

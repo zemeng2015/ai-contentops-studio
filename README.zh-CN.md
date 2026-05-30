@@ -16,6 +16,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - Artifact manifest 记录文件大小、类型、更新时间和内容哈希
 - reviewed run 发布前必须有显式 approval record
 - approve、reject、publish 等操作会追加写入 audit log
+- 全局 audit event 查询可跨 run 检索 approve、reject、publish 和 rollback 动作
 - source audit reports，包含来源评分、风险原因和 reviewer 建议
 - publish receipts record file hashes, backup artifacts, and rollback hints
 - publish receipt 会审计 provider、URL、approval 和变更文件
@@ -144,6 +145,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
+contentops audit-events --action publish --json
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
@@ -175,6 +177,7 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/incident-report
 GET  /runs/{run_id}/audit-log
+GET  /audit-events?action=publish&limit=20&offset=0
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}

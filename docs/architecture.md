@@ -117,6 +117,9 @@ Rollback uses that receipt to restore backed-up files or delete files created by
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,
 and publish transitions in addition to the latest run state.
+The review service also exposes a global audit event view by scanning recent run audit logs and
+sorting events by occurrence time. Operators can filter by run status, topic query, or action
+without opening individual run artifact folders first.
 The same review and publishing actions produce `notification-log.json` delivery receipts. By
 default the local provider records skipped deliveries for auditability; when
 `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, events are posted to an external webhook and

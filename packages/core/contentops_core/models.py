@@ -241,6 +241,14 @@ class AuditEvent(BaseModel):
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class AuditEventListResponse(BaseModel):
+    items: list[AuditEvent]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    action_counts: dict[str, int] = Field(default_factory=dict)
+
+
 class NotificationDelivery(BaseModel):
     delivery_id: str = Field(default_factory=lambda: uuid4().hex[:12])
     run_id: str

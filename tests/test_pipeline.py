@@ -124,6 +124,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     incident_reports = review_service.incident_reports(limit=5)
     operations_summary = review_service.operations_summary()
     audit_events = review_service.audit_log(result.run.id)
+    global_audit_events = review_service.audit_events(action="publish")
     notifications = review_service.notification_log(result.run.id)
 
     assert "draft.json" in artifacts
@@ -184,6 +185,9 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert operations_summary.quality_pass_rate == 1
     assert operations_summary.budget_pass_rate == 1
     assert [event.action for event in audit_events] == ["approve", "publish"]
+    assert global_audit_events.total == 1
+    assert global_audit_events.items[0].run_id == result.run.id
+    assert global_audit_events.action_counts["publish"] == 1
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED
     assert audit_events[1].fields["changed_files"] == 3

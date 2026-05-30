@@ -19,6 +19,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - batch approve/reject workflow for review queues
 - explicit approval records before reviewed runs are published
 - append-only audit logs for review and publishing actions
+- global audit event queries across approve, reject, publish, and rollback actions
 - notification delivery logs for review and publishing events, with optional webhook delivery
 - source audit reports with scoring, risk reasons, and reviewer recommendations
 - generation receipts that audit model provider, retry attempts, fallback, and usage tokens
@@ -162,6 +163,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
+contentops audit-events --action publish --json
 contentops notifications <run_id>
 contentops job-executions --json
 contentops job-execution <execution_id>
@@ -195,6 +197,7 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/incident-report
 GET  /runs/{run_id}/audit-log
+GET  /audit-events?action=publish&limit=20&offset=0
 GET  /runs/{run_id}/notifications
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
@@ -264,6 +267,8 @@ reviewers can inspect production readiness without seeing secrets.
 The release readiness gate combines readiness checks, deployment capabilities, incident posture,
 quality pass rates, budget pass rates, and operator security into a `can_release` decision.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
+The global audit event view scans recent run audit logs and exposes filterable approve, reject,
+publish, and rollback history for release review.
 They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
 the same events are delivered to an external webhook without blocking the review workflow.
 

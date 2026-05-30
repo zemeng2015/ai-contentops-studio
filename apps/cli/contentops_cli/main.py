@@ -369,6 +369,42 @@ def incident_reports(
         )
 
 
+@app.command("audit-events")
+def audit_events(
+    limit: Annotated[int, typer.Option(help="Number of audit events to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of audit events to skip.")] = 0,
+    status: Annotated[str, typer.Option(help="Optional run status filter.")] = "",
+    action: Annotated[str, typer.Option(help="Optional audit action filter.")] = "",
+    query: Annotated[
+        str,
+        typer.Option("--query", "-q", help="Search run id, slug, or topic."),
+    ] = "",
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    response = service.audit_events(
+        limit=limit,
+        offset=offset,
+        status=_parse_status(status),
+        query=query,
+        action=action,
+    )
+    if json_output:
+        typer.echo(response.model_dump_json(indent=2))
+        return
+    typer.echo(f"Showing {len(response.items)} of {response.total} audit events")
+    for event in response.items:
+        previous = event.previous_status.value if event.previous_status else "n/a"
+        new = event.new_status.value if event.new_status else "n/a"
+        typer.echo(
+            f"{event.occurred_at.isoformat()}  {event.run_id}  "
+            f"{event.action:16}  {event.actor:12}  {previous}->{new}"
+        )
+
+
 @app.command("incident-report")
 def incident_report(run_id: str) -> None:
     service = build_review_service(Settings())

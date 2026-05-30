@@ -24,6 +24,7 @@ from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
     AuditEvent,
+    AuditEventListResponse,
     CostReportListResponse,
     DeploymentManifest,
     GenerationReceipt,
@@ -199,6 +200,7 @@ def dashboard(
     scorecards = review_service.scorecards(limit=5)
     cost_reports = review_service.cost_reports(limit=5)
     incident_reports = review_service.incident_reports(limit=5)
+    audit_events = review_service.audit_events(limit=5)
     operations_summary = review_service.operations_summary()
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
@@ -280,6 +282,11 @@ def dashboard(
               <h2>Operations Summary</h2>
               <p>Portfolio-wide run health, queue depth, incident severity, and cost posture.</p>
               {_operations_summary_html(operations_summary)}
+            </section>
+            <section class="hero compact">
+              <h2>Audit Events</h2>
+              <p>Recent approve, publish, reject, and rollback events across all runs.</p>
+              {_audit_events_html(audit_events)}
             </section>
             <section class="hero compact">
               <h2>Worker Executions</h2>
@@ -766,6 +773,27 @@ def list_incident_reports(
         offset=offset,
         status=_parse_status_filter(status),
         query=q,
+    )
+
+
+@app.get(
+    "/audit-events",
+    response_model=AuditEventListResponse,
+    dependencies=[Depends(require_read_access)],
+)
+def list_audit_events(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=""),
+    q: str = Query(default=""),
+    action: str = Query(default=""),
+) -> AuditEventListResponse:
+    return review_service.audit_events(
+        limit=limit,
+        offset=offset,
+        status=_parse_status_filter(status),
+        query=q,
+        action=action,
     )
 
 
@@ -1492,6 +1520,42 @@ def _operations_summary_html(summary: OperationsSummary) -> str:
         <div><strong>{_duration_label(summary.avg_duration_ms)}</strong><span>Avg run</span></div>
         <div><strong>{summary.estimated_total_tokens}</strong><span>Window tokens</span></div>
       </div>
+    """
+
+
+def _audit_events_html(events: AuditEventListResponse) -> str:
+    if not events.items:
+        return "<p>No audit events recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(event.run_id)}">{escape(event.run_id)}</a></td>
+          <td>{escape(event.action)}</td>
+          <td>{escape(event.actor)}</td>
+          <td>{escape(event.previous_status.value if event.previous_status else "n/a")}</td>
+          <td>{escape(event.new_status.value if event.new_status else "n/a")}</td>
+          <td>{escape(event.occurred_at.isoformat())}</td>
+        </tr>
+        """
+        for event in events.items
+    )
+    counts = ", ".join(
+        f"{escape(action)}={count}" for action, count in sorted(events.action_counts.items())
+    )
+    return f"""
+      <p>
+        <a href="/audit-events">Audit events JSON</a> |
+        Showing <strong>{len(events.items)}</strong> of <strong>{events.total}</strong> |
+        {counts}
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Action</th><th>Actor</th><th>Previous</th><th>New</th><th>Time</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
     """
 
 

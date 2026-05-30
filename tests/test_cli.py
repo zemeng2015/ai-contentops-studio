@@ -94,6 +94,7 @@ def test_cli_approve_then_publish(
     content_result = runner.invoke(app, ["content", "--json"])
     rollback_result = runner.invoke(app, ["rollback-publish", run_id, "--actor", "zack"])
     audit_result = runner.invoke(app, ["audit-log", run_id])
+    audit_events_result = runner.invoke(app, ["audit-events", "--action", "publish", "--json"])
     notifications_result = runner.invoke(app, ["notifications", run_id])
 
     assert approve_result.exit_code == 0
@@ -114,6 +115,10 @@ def test_cli_approve_then_publish(
     assert '"action": "approve"' in audit_result.output
     assert '"action": "publish"' in audit_result.output
     assert '"action": "rollback_publish"' in audit_result.output
+    assert audit_events_result.exit_code == 0
+    audit_events_payload = json.loads(audit_events_result.output)
+    assert audit_events_payload["action_counts"]["publish"] == 1
+    assert audit_events_payload["items"][0]["run_id"] == run_id
     assert notifications_result.exit_code == 0
     assert '"provider": "local"' in notifications_result.output
     assert '"action": "rollback_publish"' in notifications_result.output
