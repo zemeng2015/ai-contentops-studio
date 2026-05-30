@@ -114,6 +114,28 @@ class RunMetrics(BaseModel):
     step_metrics: list[StepMetric]
 
 
+class SourceOverlap(BaseModel):
+    base_count: int
+    candidate_count: int
+    shared_count: int
+    base_only: list[str] = Field(default_factory=list)
+    candidate_only: list[str] = Field(default_factory=list)
+
+
+class RunComparison(BaseModel):
+    base_run_id: str
+    candidate_run_id: str
+    base_topic: str
+    candidate_topic: str
+    same_topic: bool
+    duration_delta_ms: int | None
+    source_count_delta: int
+    publish_ready_changed: bool
+    evaluation_deltas: dict[str, float | None]
+    source_overlap: SourceOverlap
+    summary: list[str]
+
+
 class RunRequest(BaseModel):
     topic: str
     source_urls: list[str] = Field(default_factory=list)

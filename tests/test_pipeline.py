@@ -95,6 +95,33 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert published.published_url is not None
 
 
+def test_review_service_compares_runs(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    pipeline = build_pipeline(settings)
+    base = pipeline.run(RunRequest(topic="Agent quality review")).run
+    candidate = pipeline.run(
+        RunRequest(
+            topic="Agent quality review",
+            source_urls=["https://example.com/agent-quality-review"],
+        )
+    ).run
+    review_service = build_review_service(settings)
+
+    comparison = review_service.compare(base.id, candidate.id)
+
+    assert comparison.base_run_id == base.id
+    assert comparison.candidate_run_id == candidate.id
+    assert comparison.same_topic is True
+    assert comparison.source_count_delta >= 1
+    assert comparison.source_overlap.base_count >= 1
+    assert "groundedness" in comparison.evaluation_deltas
+    assert comparison.summary
+
+
 def test_s3_artifact_store_requires_bucket(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",

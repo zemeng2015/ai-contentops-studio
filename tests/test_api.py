@@ -40,6 +40,29 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert publish_response.json()["status"] == "published"
 
 
+def test_compare_endpoint() -> None:
+    client = TestClient(app)
+
+    base_response = client.post("/runs", json={"topic": "API comparison workflow"})
+    candidate_response = client.post(
+        "/runs",
+        json={
+            "topic": "API comparison workflow",
+            "source_urls": ["https://example.com/comparison-workflow"],
+        },
+    )
+    base = base_response.json()
+    candidate = candidate_response.json()
+    compare_response = client.get(f"/runs/{base['id']}/compare/{candidate['id']}")
+
+    assert compare_response.status_code == 200
+    payload = compare_response.json()
+    assert payload["base_run_id"] == base["id"]
+    assert payload["candidate_run_id"] == candidate["id"]
+    assert payload["same_topic"] is True
+    assert payload["source_count_delta"] >= 1
+
+
 def test_dashboard_renders() -> None:
     client = TestClient(app)
 
@@ -49,6 +72,17 @@ def test_dashboard_renders() -> None:
     assert "AI ContentOps Studio" in response.text
     assert "Create run" in response.text
     assert "Optional source URLs" in response.text
+
+
+def test_dashboard_filters_runs() -> None:
+    client = TestClient(app)
+
+    client.post("/runs", json={"topic": "Dashboard filter needle"})
+    response = client.get("/dashboard?q=filter%20needle&status=needs_review")
+
+    assert response.status_code == 200
+    assert "Dashboard filter needle" in response.text
+    assert "Filter runs" in response.text
 
 
 def test_dashboard_run_detail_shows_source_review() -> None:
@@ -63,6 +97,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Publish Plan" in detail_response.text
     assert "Run Timeline" in detail_response.text
     assert "Rerun with same request" in detail_response.text
+    assert "Compare runs" in detail_response.text
     assert "extraction" not in detail_response.text.lower()
 
 

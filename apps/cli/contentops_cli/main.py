@@ -99,6 +99,13 @@ def metrics(run_id: str) -> None:
 
 
 @app.command()
+def compare(base_run_id: str, candidate_run_id: str) -> None:
+    service = build_review_service(Settings())
+    comparison = service.compare(base_run_id, candidate_run_id)
+    typer.echo(comparison.model_dump_json(indent=2))
+
+
+@app.command()
 def rerun(
     run_id: str,
     publish: Annotated[

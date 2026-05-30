@@ -14,6 +14,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - observable run history and artifacts
 - API, CLI, worker, and publisher boundaries
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
+- run comparison for repeatable quality and source regression review
 - AWS-ready artifact storage and Terraform deployment skeleton
 - local-first development with AWS-ready deployment primitives
 
@@ -99,8 +100,9 @@ tests/                     Unit and integration tests
 - Static site publisher
 - FastAPI `POST /runs` and `GET /runs`
 - FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
+- FastAPI metrics, rerun, publish-plan, and run-comparison endpoints
 - CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
-  `contentops publish`
+  `contentops publish`, plus review commands for metrics, rerun, publish-plan, and compare
 - pytest coverage for pipeline behavior
 
 ## Review workflow
@@ -113,6 +115,7 @@ contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
 contentops metrics <run_id>
+contentops compare <base_run_id> <candidate_run_id>
 contentops rerun <run_id>
 contentops publish <run_id>
 ```
@@ -124,6 +127,7 @@ GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
+GET  /runs/{base_run_id}/compare/{candidate_run_id}
 POST /runs/{run_id}/rerun
 POST /runs/{run_id}/publish
 ```
@@ -139,6 +143,8 @@ quality before publishing.
 Run details also include a Publish Plan that lists file-level changes before the publish action.
 Run details include a timeline derived from `trace.json`, including step durations and fields.
 The dashboard create form accepts optional source URLs, one per line.
+The dashboard list supports status/topic filters, and run detail pages can compare two runs to
+spot evaluation deltas, source-count changes, and source overlap before publishing.
 
 ## Provider configuration
 

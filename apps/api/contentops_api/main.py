@@ -5,10 +5,10 @@ from html import escape
 from typing import Annotated
 
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import PublishPlan, RunMetrics, RunRecord, RunRequest
+from contentops_core.models import PublishPlan, RunComparison, RunMetrics, RunRecord, RunRequest
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
-from fastapi import FastAPI, Form, HTTPException, Response
+from fastapi import FastAPI, Form, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 settings = Settings()
@@ -30,8 +30,12 @@ def health() -> dict[str, str]:
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard() -> HTMLResponse:
-    runs = repository.list(limit=50)
+def dashboard(
+    q: str = Query(default=""),
+    status: str = Query(default=""),
+) -> HTMLResponse:
+    all_runs = repository.list(limit=100)
+    runs = _filter_runs(all_runs, q, status)[:50]
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -69,6 +73,15 @@ def dashboard() -> HTMLResponse:
                 ></textarea>
                 <label><input type="checkbox" name="publish" value="true"> publish if ready</label>
                 <button type="submit">Create run</button>
+              </form>
+            </section>
+            <section class="hero compact">
+              <form method="get" action="/dashboard">
+                <input name="q" placeholder="Filter by topic or run id" value="{escape(q)}">
+                <select name="status">
+                  {_status_options(status)}
+                </select>
+                <button type="submit">Filter runs</button>
               </form>
             </section>
             <table>
@@ -147,6 +160,11 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               <form method="post" action="/dashboard/runs/{escape(run_id)}/rerun">
                 <button type="submit">Rerun with same request</button>
               </form>
+              <form method="get" action="/dashboard/compare">
+                <input type="hidden" name="base_run_id" value="{escape(run_id)}">
+                <input name="candidate_run_id" placeholder="Candidate run id to compare">
+                <button type="submit">Compare runs</button>
+              </form>
             </section>
             <section class="grid">
               <div>
@@ -180,6 +198,25 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
                 </thead>
                 <tbody>{source_rows}</tbody>
               </table>
+            </section>
+            """,
+        )
+    )
+
+
+@app.get("/dashboard/compare", response_class=HTMLResponse)
+def dashboard_compare(base_run_id: str, candidate_run_id: str) -> HTMLResponse:
+    try:
+        comparison = review_service.compare(base_run_id, candidate_run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return HTMLResponse(
+        _page(
+            "Run Comparison",
+            f"""
+            <p><a href="/dashboard/runs/{escape(base_run_id)}">Back to base run</a></p>
+            <section class="hero">
+              {_comparison_html(comparison)}
             </section>
             """,
         )
@@ -275,6 +312,14 @@ def get_run_metrics(run_id: str) -> RunMetrics:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/runs/{base_run_id}/compare/{candidate_run_id}", response_model=RunComparison)
+def compare_runs(base_run_id: str, candidate_run_id: str) -> RunComparison:
+    try:
+        return review_service.compare(base_run_id, candidate_run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 def _page(title: str, body: str) -> str:
     return f"""
     <!doctype html>
@@ -302,6 +347,7 @@ def _page(title: str, body: str) -> str:
             box-shadow: 0 18px 48px rgba(24, 32, 30, 0.08);
           }}
           .hero {{ padding: 24px; margin-bottom: 18px; }}
+          .compact {{ padding: 16px; }}
           form {{ display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }}
           .metrics {{
             display: grid;
@@ -317,12 +363,14 @@ def _page(title: str, body: str) -> str:
           }}
           .metrics strong {{ display: block; font-size: 22px; }}
           .metrics span {{ color: #5f6965; font-size: 13px; font-weight: 800; }}
-          input[type="text"], input[name="topic"], textarea {{
+          input, select, textarea {{
             min-width: min(520px, 100%);
             padding: 12px;
             border: 1px solid #d8ddd7;
             border-radius: 6px;
+            background: #fff;
           }}
+          select {{ min-width: 180px; }}
           textarea {{
             min-height: 92px;
             resize: vertical;
@@ -354,6 +402,75 @@ def _page(title: str, body: str) -> str:
         </main>
       </body>
     </html>
+    """
+
+
+def _filter_runs(runs: list[RunRecord], query: str, status: str) -> list[RunRecord]:
+    normalized_query = query.strip().casefold()
+    normalized_status = status.strip().casefold()
+    filtered: list[RunRecord] = []
+    for run in runs:
+        matches_query = not normalized_query or (
+            normalized_query in run.id.casefold()
+            or normalized_query in run.topic.casefold()
+            or normalized_query in run.slug.casefold()
+        )
+        matches_status = not normalized_status or run.status.value == normalized_status
+        if matches_query and matches_status:
+            filtered.append(run)
+    return filtered
+
+
+def _status_options(selected: str) -> str:
+    statuses = ["", "created", "researching", "planning", "drafting", "evaluating"]
+    statuses += ["needs_review", "publishing", "published", "failed"]
+    rows: list[str] = []
+    normalized = selected.strip().casefold()
+    for status in statuses:
+        label = "all statuses" if not status else status
+        selected_attr = " selected" if status == normalized else ""
+        rows.append(
+            f'<option value="{escape(status)}"{selected_attr}>{escape(label)}</option>'
+        )
+    return "\n".join(rows)
+
+
+def _comparison_html(comparison: RunComparison) -> str:
+    deltas = "".join(
+        f"""
+        <tr>
+          <td>{escape(score)}</td>
+          <td>{delta:+.3f}</td>
+        </tr>
+        """
+        for score, delta in comparison.evaluation_deltas.items()
+        if delta is not None
+    )
+    summary = "".join(f"<li>{escape(item)}</li>" for item in comparison.summary)
+    base_only = ", ".join(comparison.source_overlap.base_only) or "none"
+    candidate_only = ", ".join(comparison.source_overlap.candidate_only) or "none"
+    return f"""
+      <h2>{escape(comparison.base_run_id)} vs {escape(comparison.candidate_run_id)}</h2>
+      <p>{escape(comparison.base_topic)} -> {escape(comparison.candidate_topic)}</p>
+      <div class="metrics">
+        <div><strong>{str(comparison.same_topic).lower()}</strong><span>Same topic</span></div>
+        <div><strong>{comparison.source_count_delta:+d}</strong><span>Source delta</span></div>
+        <div>
+          <strong>{comparison.source_overlap.shared_count}</strong>
+          <span>Shared sources</span>
+        </div>
+        <div>
+          <strong>{_duration_label(comparison.duration_delta_ms)}</strong>
+          <span>Duration delta</span>
+        </div>
+      </div>
+      <ul>{summary}</ul>
+      <table>
+        <thead><tr><th>Evaluation score</th><th>Candidate delta</th></tr></thead>
+        <tbody>{deltas}</tbody>
+      </table>
+      <p><strong>Base-only sources:</strong> {escape(base_only)}</p>
+      <p><strong>Candidate-only sources:</strong> {escape(candidate_only)}</p>
     """
 
 
