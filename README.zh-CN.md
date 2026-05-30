@@ -141,6 +141,7 @@ contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops verify-publish <run_id>
 contentops rollback-publish <run_id> --actor "Zack"
 ```
 
@@ -161,6 +162,7 @@ GET  /runs/{run_id}/generation-receipt
 GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
+GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /job-executions?limit=20&offset=0

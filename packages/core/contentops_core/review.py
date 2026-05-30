@@ -29,6 +29,8 @@ from contentops_core.models import (
     PublishPlan,
     PublishReceipt,
     PublishRollbackResult,
+    PublishVerificationItem,
+    PublishVerificationReport,
     ResearchPacket,
     ReviewActionResult,
     ReviewBatchResult,
@@ -320,6 +322,22 @@ class ReviewService:
             return None
         return PublishReceipt.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
+    def verify_publish(self, run_id: str) -> PublishVerificationReport:
+        run = self._get_run(run_id)
+        receipt = self.publish_receipt(run_id)
+        if receipt is None:
+            raise ValueError("No publish receipt recorded.")
+        items = [self._verify_publish_change(change) for change in receipt.file_changes]
+        report = PublishVerificationReport(
+            run_id=run_id,
+            provider=receipt.provider,
+            url=receipt.url,
+            verified=bool(items) and all(item.matches_receipt for item in items),
+            items=items,
+        )
+        self._write_publish_verification(run, report)
+        return report
+
     def published_content(
         self,
         limit: int = 20,
@@ -567,6 +585,14 @@ class ReviewService:
         path = run.artifact_dir / "publish-rollback.json"
         path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
 
+    @staticmethod
+    def _write_publish_verification(
+        run: RunRecord,
+        report: PublishVerificationReport,
+    ) -> None:
+        path = run.artifact_dir / "publish-verification.json"
+        path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+
     def _published_content_item(self, run: RunRecord) -> PublishedContentItem:
         draft = self._load_json(run, "draft.json", Draft)
         report = self._load_json(run, "eval-report.json", EvaluationReport)
@@ -711,6 +737,28 @@ class ReviewService:
         self._append_audit_event(run, event)
         delivery = self.notifier.notify(run, event)
         self._append_notification_delivery(run, delivery)
+
+    @staticmethod
+    def _verify_publish_change(change: PublishFileChange) -> PublishVerificationItem:
+        path = Path(change.path)
+        if not path.exists():
+            return PublishVerificationItem(
+                path=change.path,
+                expected_sha256=change.after_sha256,
+                exists=False,
+                matches_receipt=False,
+                message="Published file is missing.",
+            )
+        actual_sha = sha256(path.read_bytes()).hexdigest()
+        matches = change.after_sha256 is not None and actual_sha == change.after_sha256
+        return PublishVerificationItem(
+            path=change.path,
+            expected_sha256=change.after_sha256,
+            actual_sha256=actual_sha,
+            exists=True,
+            matches_receipt=matches,
+            message="File hash matches receipt." if matches else "File hash differs from receipt.",
+        )
 
     @staticmethod
     def _append_audit_event(run: RunRecord, event: AuditEvent) -> None:

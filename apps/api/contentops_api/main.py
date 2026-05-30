@@ -27,6 +27,7 @@ from contentops_core.models import (
     PublishPlan,
     PublishReceipt,
     PublishRollbackResult,
+    PublishVerificationReport,
     ReviewBatchRequest,
     ReviewBatchResult,
     RunComparison,
@@ -332,6 +333,14 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
         )
     approval_html = _approval_html(review_service.approval(run_id))
     receipt_html = _publish_receipt_html(review_service.publish_receipt(run_id))
+    verification_html = ""
+    if run.status == RunStatus.PUBLISHED:
+        try:
+            verification_html = _publish_verification_html(
+                review_service.verify_publish(run_id)
+            )
+        except (FileNotFoundError, ValueError):
+            verification_html = "<p>Publish verification unavailable.</p>"
     audit_html = _audit_log_html(review_service.audit_log(run_id))
     notification_html = _notification_log_html(review_service.notification_log(run_id))
     approve_action = f"/dashboard/runs/{escape(run_id)}/approve{_api_key_query(api_key)}"
@@ -385,6 +394,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               {publish_action}
               <h3>Publish Receipt</h3>
               {receipt_html}
+              <h3>Publish Verification</h3>
+              {verification_html}
               <form method="post" action="{rollback_action}">
                 <input name="actor" placeholder="Actor" value="operator">
                 <button type="submit">Rollback publish</button>
@@ -849,6 +860,20 @@ def get_publish_receipt(run_id: str) -> PublishReceipt | None:
 
 
 @app.get(
+    "/runs/{run_id}/publish-verification",
+    response_model=PublishVerificationReport,
+    dependencies=[Depends(require_read_access)],
+)
+def get_publish_verification(run_id: str) -> PublishVerificationReport:
+    try:
+        return review_service.verify_publish(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get(
     "/runs/{run_id}/generation-receipt",
     response_model=GenerationReceipt | None,
     dependencies=[Depends(require_read_access)],
@@ -1282,6 +1307,43 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
           </tr>
         </thead>
         <tbody>{change_rows}</tbody>
+      </table>
+    """
+
+
+def _publish_verification_html(report: PublishVerificationReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.path)}</td>
+          <td>{_pass_label(item.exists)}</td>
+          <td>{_pass_label(item.matches_receipt)}</td>
+          <td><code>{escape((item.expected_sha256 or "none")[:12])}</code></td>
+          <td><code>{escape((item.actual_sha256 or "none")[:12])}</code></td>
+          <td>{escape(item.message)}</td>
+        </tr>
+        """
+        for item in report.items
+    )
+    return f"""
+      <p>
+        <a href="/runs/{escape(report.run_id)}/publish-verification">
+          Publish verification JSON
+        </a>
+      </p>
+      <p>
+        Provider: <strong>{escape(report.provider)}</strong> |
+        Verified: <strong>{_pass_label(report.verified)}</strong> |
+        URL: <a href="{escape(report.url)}">{escape(report.url)}</a>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th><th>Exists</th><th>Hash match</th>
+            <th>Expected</th><th>Actual</th><th>Message</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 

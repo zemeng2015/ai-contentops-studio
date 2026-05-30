@@ -190,6 +190,24 @@ class PublishRollbackResult(BaseModel):
     rolled_back_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PublishVerificationItem(BaseModel):
+    path: str
+    expected_sha256: str | None = None
+    actual_sha256: str | None = None
+    exists: bool
+    matches_receipt: bool
+    message: str
+
+
+class PublishVerificationReport(BaseModel):
+    run_id: str
+    provider: str
+    url: str
+    verified: bool
+    items: list[PublishVerificationItem]
+    verified_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class PublishedContentItem(BaseModel):
     run_id: str
     topic: str

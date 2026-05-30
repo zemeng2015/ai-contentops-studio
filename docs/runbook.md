@@ -83,12 +83,14 @@ Publish only approved runs:
 ```powershell
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops verify-publish <run_id>
 contentops notifications <run_id>
 ```
 
 Confirm that `publish-receipt.json` includes provider, URL, approval, file changes, backup
 artifacts, and rollback hints. Confirm that `notification-log.json` recorded local skipped
-deliveries or webhook delivery status for approve/publish events.
+deliveries or webhook delivery status for approve/publish events. Confirm that publish
+verification passes so current target files still match the receipt hashes.
 
 ## 5. Published Content Inventory
 
@@ -147,8 +149,9 @@ When a scheduled job fails:
 3. Check whether failures are research, generation, evaluation, publish, or storage related.
 4. Run `contentops doctor --json`.
 5. Export the affected run with `contentops export-run <run_id> --output incident.zip`.
-6. Fix provider credentials, source URLs, publish target state, or approval status.
-7. Rerun from the prior request:
+6. Run `contentops verify-publish <run_id>` for published runs to detect target drift.
+7. Fix provider credentials, source URLs, publish target state, or approval status.
+8. Rerun from the prior request:
 
 ```powershell
 contentops rerun <run_id>

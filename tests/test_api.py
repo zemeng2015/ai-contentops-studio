@@ -181,6 +181,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     approval_response = client.get(f"/runs/{run['id']}/approval")
     publish_response = client.post(f"/runs/{run['id']}/publish")
     receipt_response = client.get(f"/runs/{run['id']}/publish-receipt")
+    verification_response = client.get(f"/runs/{run['id']}/publish-verification")
     notifications_response = client.get(f"/runs/{run['id']}/notifications")
     content_response = client.get("/content?limit=5")
     audit_response = client.get(f"/runs/{run['id']}/audit-log")
@@ -226,6 +227,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert receipt_response.json()["url"] == publish_response.json()["published_url"]
     assert receipt_response.json()["approval"]["reviewer"] == "zack"
     assert len(receipt_response.json()["file_changes"]) == 3
+    assert verification_response.status_code == 200
+    assert verification_response.json()["verified"] is True
+    assert len(verification_response.json()["items"]) == 3
     assert notifications_response.status_code == 200
     assert [item["action"] for item in notifications_response.json()] == ["approve", "publish"]
     assert content_response.status_code == 200
@@ -379,6 +383,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Publish Plan" in detail_response.text
     assert "Approval" in detail_response.text
     assert "Publish Receipt" in detail_response.text
+    assert "Publish Verification" in detail_response.text
     assert "Audit Log" in detail_response.text
     assert "Notification Deliveries" in detail_response.text
     assert "Quality Scorecard" in detail_response.text

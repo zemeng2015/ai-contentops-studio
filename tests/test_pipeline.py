@@ -119,6 +119,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     published = review_service.publish(result.run.id)
     approval = review_service.approval(result.run.id)
     receipt = review_service.publish_receipt(result.run.id)
+    verification = review_service.verify_publish(result.run.id)
     audit_events = review_service.audit_log(result.run.id)
     notifications = review_service.notification_log(result.run.id)
 
@@ -166,6 +167,11 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert {change.action for change in receipt.file_changes} == {"created"}
     assert all(change.after_sha256 for change in receipt.file_changes)
     assert all("roll back" in change.rollback_hint for change in receipt.file_changes)
+    assert verification.verified is True
+    assert len(verification.items) == 3
+    assert all(item.exists for item in verification.items)
+    assert all(item.matches_receipt for item in verification.items)
+    assert (result.run.artifact_dir / "publish-verification.json").exists()
     assert [event.action for event in audit_events] == ["approve", "publish"]
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED
@@ -301,6 +307,29 @@ def test_publish_rollback_deletes_created_files(tmp_path: Path) -> None:
     assert rollback.errors == []
     assert len(rollback.deleted_files) == 3
     assert all(not Path(path).exists() for path in rollback.deleted_files)
+
+
+def test_publish_verification_detects_modified_files(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        public_base_url="https://example.com",
+        min_publish_score=0.5,
+    )
+    pipeline = build_pipeline(settings)
+    review_service = build_review_service(settings)
+    result = pipeline.run(RunRequest(topic="Publish verification drift"))
+    review_service.approve(result.run.id, reviewer="zack")
+    review_service.publish(result.run.id)
+    receipt = review_service.publish_receipt(result.run.id)
+    assert receipt is not None
+    Path(receipt.file_changes[0].path).write_text("tampered", encoding="utf-8")
+
+    verification = review_service.verify_publish(result.run.id)
+
+    assert verification.verified is False
+    assert any(not item.matches_receipt for item in verification.items)
 
 
 def test_review_service_rejects_run(tmp_path: Path) -> None:

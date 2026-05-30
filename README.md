@@ -23,6 +23,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - source audit reports with scoring, risk reasons, and reviewer recommendations
 - generation receipts that audit model provider, retry attempts, fallback, and usage tokens
 - publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
+- publish verification reports that prove target files still match their receipt hashes
 - optional operator API key protection for mutating API and dashboard actions
 - readiness checks and CLI diagnostics for production deployments
 - API, CLI, worker, and publisher boundaries
@@ -163,6 +164,7 @@ contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops verify-publish <run_id>
 contentops rollback-publish <run_id> --actor "Zack"
 ```
 
@@ -181,6 +183,7 @@ GET  /runs/{run_id}/generation-receipt
 GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
+GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/audit-log
 GET  /runs/{run_id}/notifications
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
@@ -236,6 +239,8 @@ hints. Existing publish targets are copied into `publish-backups/` under the run
 directory before they are overwritten. Operators can run `contentops rollback-publish` or call
 `POST /runs/{run_id}/rollback-publish` to restore backed-up files or delete files created by the
 publish.
+Operators can run `contentops verify-publish` or call `GET /runs/{run_id}/publish-verification`
+to confirm current publish target files still match the receipt hashes.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
 They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
 the same events are delivered to an external webhook without blocking the review workflow.
