@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from contentops_core.factory import build_pipeline
+from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRequest
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -60,6 +60,28 @@ def show(
         typer.echo(json.dumps(json.loads(path.read_text(encoding="utf-8")), indent=2))
     else:
         typer.echo(path.read_text(encoding="utf-8"))
+
+
+@app.command()
+def artifacts(run_id: str) -> None:
+    service = build_review_service(Settings())
+    for artifact in service.list_artifacts(run_id):
+        typer.echo(artifact)
+
+
+@app.command()
+def publish(
+    run_id: str,
+    force: Annotated[
+        bool,
+        typer.Option(help="Publish even if eval report is not ready."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    record = service.publish(run_id, force=force)
+    typer.echo(f"Status: {record.status.value}")
+    if record.published_url:
+        typer.echo(f"Published: {record.published_url}")
 
 
 @app.command()

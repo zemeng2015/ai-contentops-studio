@@ -15,6 +15,7 @@ from contentops_core.generator import ContentGenerator, DraftGenerator
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.planner import ContentPlanner
 from contentops_core.repository import RunRepository
+from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
 
 
@@ -60,3 +61,11 @@ def _build_publisher(settings: Settings) -> StaticSitePublisher | HomepagePublis
             raise ValueError("CONTENTOPS_HOMEPAGE_REPO_PATH is required for homepage publishing.")
         return HomepagePublisher(settings.homepage_repo_path, settings.homepage_public_base_url)
     return StaticSitePublisher(settings.site_output_dir, settings.public_base_url)
+
+
+def build_review_service(settings: Settings | None = None) -> ReviewService:
+    settings = settings or Settings()
+    return ReviewService(
+        repository=RunRepository(settings.database_url),
+        publisher=_build_publisher(settings),
+    )

@@ -40,6 +40,18 @@ failed
 Publishing is only allowed after evaluation. In production, `needs_review` becomes the handoff
 point for a dashboard review workflow.
 
+## Review workflow
+
+The review service lets an operator inspect artifacts from an existing run and publish that run
+later:
+
+- list artifact names for a run
+- read individual artifacts such as `research.json`, `draft.md`, or `eval-report.json`
+- publish an existing run after evaluation, with an explicit force option for overrides
+
+This separates generation from publication and creates a natural seam for a dashboard or approval
+queue.
+
 ## Production path
 
 Local defaults:

@@ -95,8 +95,29 @@ tests/                     Unit and integration tests
 - Filesystem artifact store
 - Static site publisher
 - FastAPI `POST /runs` and `GET /runs`
-- CLI `contentops run`, `contentops runs`, and `contentops show`
+- FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
+- CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
+  `contentops publish`
 - pytest coverage for pipeline behavior
+
+## Review workflow
+
+Generate first, inspect artifacts, then publish:
+
+```powershell
+contentops run --topic "AI quality gates for RAG systems"
+contentops artifacts <run_id>
+contentops show <run_id> --artifact eval-report.json
+contentops publish <run_id>
+```
+
+The API exposes the same lifecycle:
+
+```text
+GET  /runs/{run_id}/artifacts
+GET  /runs/{run_id}/artifacts/{artifact_name}
+POST /runs/{run_id}/publish
+```
 
 ## Provider configuration
 

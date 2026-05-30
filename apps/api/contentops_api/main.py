@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from contentops_core.factory import build_pipeline
+from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRecord, RunRequest
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 
 settings = Settings()
 pipeline = build_pipeline(settings)
 repository = RunRepository(settings.database_url)
+review_service = build_review_service(settings)
 
 app = FastAPI(
     title="AI ContentOps Studio",
@@ -40,3 +41,32 @@ def get_run(run_id: str) -> RunRecord:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
 
+
+@app.get("/runs/{run_id}/artifacts", response_model=list[str])
+def list_artifacts(run_id: str) -> list[str]:
+    try:
+        return review_service.list_artifacts(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/artifacts/{artifact_name}")
+def get_artifact(run_id: str, artifact_name: str) -> Response:
+    try:
+        content = review_service.read_artifact(run_id, artifact_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    media_type = "application/json" if artifact_name.endswith(".json") else "text/plain"
+    return Response(content=content, media_type=media_type)
+
+
+@app.post("/runs/{run_id}/publish", response_model=RunRecord)
+def publish_run(run_id: str, force: bool = False) -> RunRecord:
+    try:
+        return review_service.publish(run_id, force=force)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

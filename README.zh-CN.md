@@ -92,8 +92,29 @@ tests/                     单元测试和集成测试
 - Filesystem artifact store
 - Static site publisher
 - FastAPI `POST /runs` 和 `GET /runs`
-- CLI `contentops run`、`contentops runs`、`contentops show`
+- FastAPI artifact review endpoints 和 `POST /runs/{run_id}/publish`
+- CLI `contentops run`、`contentops runs`、`contentops show`、`contentops artifacts`、
+  `contentops publish`
 - 覆盖核心 pipeline 行为的 pytest 测试
+
+## Review workflow
+
+先生成，检查 artifacts，再发布：
+
+```powershell
+contentops run --topic "AI quality gates for RAG systems"
+contentops artifacts <run_id>
+contentops show <run_id> --artifact eval-report.json
+contentops publish <run_id>
+```
+
+API 也暴露同样的生命周期：
+
+```text
+GET  /runs/{run_id}/artifacts
+GET  /runs/{run_id}/artifacts/{artifact_name}
+POST /runs/{run_id}/publish
+```
 
 ## Provider 配置
 
