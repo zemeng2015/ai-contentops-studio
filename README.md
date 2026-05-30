@@ -21,6 +21,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - append-only audit logs for review and publishing actions
 - notification delivery logs for review and publishing events, with optional webhook delivery
 - source audit reports with scoring, risk reasons, and reviewer recommendations
+- generation receipts that audit model provider, retry attempts, fallback, and usage tokens
 - publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
 - optional operator API key protection for mutating API and dashboard actions
 - readiness checks and CLI diagnostics for production deployments
@@ -124,7 +125,8 @@ Operational docs:
 - FastAPI `POST /runs` and `GET /runs`
 - FastAPI `GET /review-queue` with status/search filters and pagination metadata
 - FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
-- FastAPI metrics, scorecard, cost-report, rerun, publish-plan, and run-comparison endpoints
+- FastAPI metrics, scorecard, cost-report, generation-receipt, rerun, publish-plan, and
+  run-comparison endpoints
 - Worker entrypoint for single-job or batch YAML content calendars
 - CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
   `contentops publish`, plus review commands for metrics, source-audit, rerun, publish-plan,
@@ -146,6 +148,7 @@ contentops scorecard <run_id>
 contentops scorecards --status needs_review --json
 contentops cost-report <run_id>
 contentops cost-reports --status needs_review --json
+contentops generation-receipt <run_id>
 contentops source-audit <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
@@ -174,6 +177,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/scorecard
 GET  /runs/{run_id}/cost-report
+GET  /runs/{run_id}/generation-receipt
 GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
@@ -218,6 +222,8 @@ It also includes Quality Scorecards that combine evaluation readiness, run durat
 source-count thresholds for production-style operational review.
 Token Budget reports estimate input/output tokens from persisted run artifacts and flag runs that
 exceed the configured per-run budget.
+Generation receipts record the model provider, model, retry attempts, fallback state, and token
+usage when the provider returns it.
 Run detail pages can compare two runs to spot evaluation deltas, source-count changes, and source
 overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.

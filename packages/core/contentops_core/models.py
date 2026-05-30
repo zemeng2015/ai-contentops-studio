@@ -89,6 +89,19 @@ class Draft(BaseModel):
     html: str
 
 
+class GenerationReceipt(BaseModel):
+    provider: str
+    model: str
+    status: str
+    attempts: int = Field(ge=0, default=1)
+    fallback_used: bool = False
+    input_tokens: int | None = Field(ge=0, default=None)
+    output_tokens: int | None = Field(ge=0, default=None)
+    total_tokens: int | None = Field(ge=0, default=None)
+    error: str | None = None
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class EvaluationReport(BaseModel):
     groundedness: float = Field(ge=0, le=1)
     source_coverage: float = Field(ge=0, le=1)

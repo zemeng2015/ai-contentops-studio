@@ -21,6 +21,7 @@ from contentops_core.models import (
     CostReportListResponse,
     Draft,
     EvaluationReport,
+    GenerationReceipt,
     NotificationDelivery,
     PublishedContentItem,
     PublishedContentListResponse,
@@ -412,6 +413,10 @@ class ReviewService:
     def cost_report(self, run_id: str) -> RunCostReport:
         return self._cost_report_for_run(self._get_run(run_id))
 
+    def generation_receipt(self, run_id: str) -> GenerationReceipt | None:
+        run = self._get_run(run_id)
+        return self._load_optional_json(run, "generation-receipt.json", GenerationReceipt)
+
     def cost_reports(
         self,
         limit: int = 20,
@@ -635,6 +640,41 @@ class ReviewService:
 
     def _cost_report_for_run(self, run: RunRecord) -> RunCostReport:
         warnings: list[str] = []
+        receipt = self._load_optional_json(run, "generation-receipt.json", GenerationReceipt)
+        if (
+            receipt is not None
+            and receipt.input_tokens is not None
+            and receipt.output_tokens is not None
+        ):
+            input_tokens = receipt.input_tokens
+            output_tokens = receipt.output_tokens
+            total_tokens = receipt.total_tokens or input_tokens + output_tokens
+            if receipt.fallback_used:
+                warnings.append("Generation used fallback output.")
+            budget_pass = total_tokens <= self.token_budget_per_run
+            if not budget_pass:
+                warnings.append(
+                    f"Estimated token usage exceeds budget of {self.token_budget_per_run}."
+                )
+            return RunCostReport(
+                run_id=run.id,
+                status=run.status,
+                topic=run.topic,
+                slug=run.slug,
+                model=receipt.model,
+                estimated_input_tokens=input_tokens,
+                estimated_output_tokens=output_tokens,
+                estimated_total_tokens=total_tokens,
+                token_budget=self.token_budget_per_run,
+                budget_pass=budget_pass,
+                warnings=warnings,
+            )
+        if receipt is None:
+            warnings.append("Generation receipt is missing; using artifact-based estimate.")
+        else:
+            warnings.append(
+                "Generation receipt has no usage tokens; using artifact-based estimate."
+            )
         input_text = self._artifact_text(
             run,
             ["request.json", "research.json", "source-audit.json", "outline.md"],
@@ -658,7 +698,7 @@ class ReviewService:
             status=run.status,
             topic=run.topic,
             slug=run.slug,
-            model=self.model,
+            model=receipt.model if receipt is not None else self.model,
             estimated_input_tokens=input_tokens,
             estimated_output_tokens=output_tokens,
             estimated_total_tokens=total_tokens,

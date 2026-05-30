@@ -21,6 +21,7 @@ from contentops_core.models import (
     ArtifactManifest,
     AuditEvent,
     CostReportListResponse,
+    GenerationReceipt,
     NotificationDelivery,
     PublishedContentListResponse,
     PublishPlan,
@@ -306,6 +307,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     metrics = review_service.metrics(run_id)
     scorecard = review_service.scorecard(run_id)
     cost_report = review_service.cost_report(run_id)
+    generation_receipt = review_service.generation_receipt(run_id)
     timeline_rows = _timeline_rows(metrics)
     plan_html = ""
     try:
@@ -359,6 +361,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               {_scorecard_html(scorecard)}
               <h3>Token Budget</h3>
               {_cost_report_html(cost_report)}
+              <h3>Generation Receipt</h3>
+              {_generation_receipt_html(run_id, generation_receipt)}
               <h3>Approval</h3>
               {approval_html}
               <form method="post" action="{approve_action}">
@@ -833,6 +837,18 @@ def get_approval(run_id: str) -> ApprovalRecord | None:
 def get_publish_receipt(run_id: str) -> PublishReceipt | None:
     try:
         return review_service.publish_receipt(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/runs/{run_id}/generation-receipt",
+    response_model=GenerationReceipt | None,
+    dependencies=[Depends(require_read_access)],
+)
+def get_generation_receipt(run_id: str) -> GenerationReceipt | None:
+    try:
+        return review_service.generation_receipt(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -1441,6 +1457,29 @@ def _cost_report_html(report: RunCostReport) -> str:
         <div><strong>{escape(report.model)}</strong><span>Model</span></div>
       </div>
       <ul>{warnings}</ul>
+    """
+
+
+def _generation_receipt_html(
+    run_id: str,
+    receipt: GenerationReceipt | None,
+) -> str:
+    if receipt is None:
+        return "<p>No generation receipt recorded.</p>"
+    error = receipt.error or "none"
+    return f"""
+      <p>
+        <a href="/runs/{escape(run_id)}/generation-receipt">Generation receipt JSON</a>
+      </p>
+      <div class="metrics">
+        <div><strong>{escape(receipt.provider)}</strong><span>Provider</span></div>
+        <div><strong>{escape(receipt.model)}</strong><span>Model</span></div>
+        <div><strong>{escape(receipt.status)}</strong><span>Status</span></div>
+        <div><strong>{receipt.attempts}</strong><span>Attempts</span></div>
+        <div><strong>{_pass_label(not receipt.fallback_used)}</strong><span>No fallback</span></div>
+        <div><strong>{receipt.total_tokens or "n/a"}</strong><span>Total tokens</span></div>
+      </div>
+      <p>Error: {escape(error)}</p>
     """
 
 

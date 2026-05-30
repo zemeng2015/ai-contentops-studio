@@ -3,12 +3,15 @@ from __future__ import annotations
 from html import escape
 from typing import Protocol
 
-from contentops_core.models import ContentPlan, Draft, ResearchPacket
+from contentops_core.models import ContentPlan, Draft, GenerationReceipt, ResearchPacket
 
 
 class DraftGenerator(Protocol):
     def generate(self, packet: ResearchPacket, plan: ContentPlan) -> Draft:
         """Generate a draft from research and planning artifacts."""
+
+    def generation_receipt(self) -> GenerationReceipt | None:
+        """Return metadata for the most recent generation call."""
 
 
 class ContentGenerator:
@@ -17,6 +20,9 @@ class ContentGenerator:
     This keeps the system useful and testable without API keys. A future LLM generator can
     implement the same interface and still write the same artifacts.
     """
+
+    def __init__(self) -> None:
+        self._last_receipt: GenerationReceipt | None = None
 
     def generate(self, packet: ResearchPacket, plan: ContentPlan) -> Draft:
         sections = [
@@ -62,7 +68,23 @@ class ContentGenerator:
         ]
         markdown = "\n".join(sections)
         html = self._markdown_to_html(plan.title, markdown)
+        self._last_receipt = GenerationReceipt(
+            provider="template",
+            model="template",
+            status="completed",
+            attempts=1,
+            fallback_used=False,
+            input_tokens=self._estimate_tokens(packet.model_dump_json() + plan.model_dump_json()),
+            output_tokens=self._estimate_tokens(markdown),
+        )
+        self._last_receipt.total_tokens = (
+            (self._last_receipt.input_tokens or 0)
+            + (self._last_receipt.output_tokens or 0)
+        )
         return Draft(title=plan.title, slug=plan.slug, markdown=markdown, html=html)
+
+    def generation_receipt(self) -> GenerationReceipt | None:
+        return self._last_receipt
 
     def _markdown_to_html(self, title: str, markdown: str) -> str:
         body: list[str] = []
@@ -106,3 +128,7 @@ class ContentGenerator:
             + "\n".join(body)
             + "</body></html>"
         )
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        return (len(text) + 3) // 4 if text else 0

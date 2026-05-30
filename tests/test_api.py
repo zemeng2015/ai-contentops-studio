@@ -138,6 +138,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     scorecards_response = client.get("/scorecards?limit=5")
     cost_report_response = client.get(f"/runs/{run['id']}/cost-report")
     cost_reports_response = client.get("/cost-reports?limit=5")
+    generation_receipt_response = client.get(f"/runs/{run['id']}/generation-receipt")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
     approve_response = client.post(f"/runs/{run['id']}/approve?reviewer=zack&notes=ready")
@@ -172,6 +173,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert cost_report_response.json()["budget_pass"] is True
     assert cost_reports_response.status_code == 200
     assert any(item["run_id"] == run["id"] for item in cost_reports_response.json()["items"])
+    assert generation_receipt_response.status_code == 200
+    assert generation_receipt_response.json()["provider"] == "template"
+    assert generation_receipt_response.json()["total_tokens"] > 0
     assert rerun_response.status_code == 200
     assert rerun_response.json()["id"] != run["id"]
     assert rerun_response.json()["topic"] == run["topic"]
@@ -343,6 +347,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Notification Deliveries" in detail_response.text
     assert "Quality Scorecard" in detail_response.text
     assert "Token Budget" in detail_response.text
+    assert "Generation Receipt" in detail_response.text
     assert "Manifest JSON" in detail_response.text
     assert "Download evidence bundle" in detail_response.text
     assert "Run Timeline" in detail_response.text

@@ -5,7 +5,7 @@ import time
 
 import httpx
 from contentops_core.generator import ContentGenerator
-from contentops_core.models import ContentPlan, Draft, ResearchPacket
+from contentops_core.models import ContentPlan, Draft, GenerationReceipt, ResearchPacket
 
 
 class OpenAIResponsesGenerator:
@@ -31,6 +31,7 @@ class OpenAIResponsesGenerator:
         self.retry_backoff_seconds = retry_backoff_seconds
         self.fallback_on_failure = fallback_on_failure
         self.fallback = ContentGenerator()
+        self._last_receipt: GenerationReceipt | None = None
 
     def generate(self, packet: ResearchPacket, plan: ContentPlan) -> Draft:
         prompt = self._build_prompt(packet, plan)
@@ -50,22 +51,55 @@ class OpenAIResponsesGenerator:
         }
         try:
             with httpx.Client(timeout=self.timeout_seconds) as client:
-                response = self._post_with_retries(client, payload)
-        except Exception:
+                response, attempts = self._post_with_retries(client, payload)
+        except Exception as exc:
             if self.fallback_on_failure:
-                return self.fallback.generate(packet, plan)
+                draft = self.fallback.generate(packet, plan)
+                self._last_receipt = GenerationReceipt(
+                    provider="openai",
+                    model=self.model,
+                    status="fallback",
+                    attempts=max(self.retry_attempts, 1),
+                    fallback_used=True,
+                    error=str(exc),
+                )
+                return draft
             raise
-        markdown = self._extract_text(response.json()).strip()
+        response_json = response.json()
+        markdown = self._extract_text(response_json).strip()
         if not markdown:
-            return self.fallback.generate(packet, plan)
+            draft = self.fallback.generate(packet, plan)
+            self._last_receipt = GenerationReceipt(
+                provider="openai",
+                model=self.model,
+                status="fallback",
+                attempts=attempts,
+                fallback_used=True,
+                error="OpenAI response did not include output text.",
+            )
+            return draft
         html = self.fallback._markdown_to_html(plan.title, markdown)
+        usage = self._extract_usage(response_json)
+        self._last_receipt = GenerationReceipt(
+            provider="openai",
+            model=self.model,
+            status="completed",
+            attempts=attempts,
+            fallback_used=False,
+            input_tokens=usage.get("input_tokens"),
+            output_tokens=usage.get("output_tokens"),
+            total_tokens=usage.get("total_tokens"),
+        )
         return Draft(title=plan.title, slug=plan.slug, markdown=markdown, html=html)
+
+    def generation_receipt(self) -> GenerationReceipt | None:
+        return self._last_receipt
 
     def _post_with_retries(
         self,
         client: httpx.Client,
         payload: dict[str, object],
-    ) -> httpx.Response:
+    ) -> tuple[httpx.Response, int]:
         attempts = max(self.retry_attempts, 1)
         for attempt in range(attempts):
             try:
@@ -78,7 +112,7 @@ class OpenAIResponsesGenerator:
                     json=payload,
                 )
                 response.raise_for_status()
-                return response
+                return response, attempt + 1
             except Exception as exc:
                 if attempt == attempts - 1 or not _is_retryable_openai_error(exc):
                     raise
@@ -105,6 +139,22 @@ class OpenAIResponsesGenerator:
                     if isinstance(content_item, dict) and isinstance(content_item.get("text"), str):
                         chunks.append(content_item["text"])
         return "\n".join(chunks)
+
+    @staticmethod
+    def _extract_usage(response_json: dict[str, object]) -> dict[str, int]:
+        usage = response_json.get("usage")
+        if not isinstance(usage, dict):
+            return {}
+        result: dict[str, int] = {}
+        for output_key, input_key in {
+            "input_tokens": "input_tokens",
+            "output_tokens": "output_tokens",
+            "total_tokens": "total_tokens",
+        }.items():
+            value = usage.get(input_key)
+            if isinstance(value, int):
+                result[output_key] = value
+        return result
 
     @staticmethod
     def _build_prompt(packet: ResearchPacket, plan: ContentPlan) -> str:

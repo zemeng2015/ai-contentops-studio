@@ -67,6 +67,9 @@ The review layer also builds operational scorecards from run metadata, `trace.js
 pass/fail, warnings, and aggregate pass rates through the dashboard, CLI, and `/scorecards` API.
 Cost reports estimate input and output tokens from persisted artifacts, compare the estimate
 against `CONTENTOPS_TOKEN_BUDGET_PER_RUN`, and expose per-run plus aggregate budget pass rates.
+Each drafting step writes `generation-receipt.json`, recording the generator provider, model,
+retry attempts, fallback state, and provider usage tokens when available. Cost reports prefer
+these provider usage tokens and only fall back to artifact-based estimates when usage is missing.
 Each research step also writes `source-audit.json`, which grades every source with reviewer-facing
 reasons and recommendations before the draft moves into planning.
 The API also exposes `/ready`, and the CLI exposes `contentops doctor`, to report database,

@@ -130,6 +130,7 @@ contentops scorecard <run_id>
 contentops scorecards --status needs_review --json
 contentops cost-report <run_id>
 contentops cost-reports --status needs_review --json
+contentops generation-receipt <run_id>
 contentops source-audit <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
@@ -156,6 +157,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/scorecard
 GET  /runs/{run_id}/cost-report
+GET  /runs/{run_id}/generation-receipt
 GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt

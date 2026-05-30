@@ -421,6 +421,19 @@ def publish_receipt(run_id: str) -> None:
     typer.echo(receipt.model_dump_json(indent=2))
 
 
+@app.command("generation-receipt")
+def generation_receipt(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        receipt = service.generation_receipt(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if receipt is None:
+        typer.echo("No generation receipt recorded.")
+        return
+    typer.echo(receipt.model_dump_json(indent=2))
+
+
 @app.command("rollback-publish")
 def rollback_publish(
     run_id: str,

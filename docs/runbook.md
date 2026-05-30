@@ -52,6 +52,7 @@ contentops source-audit <run_id> --json
 contentops metrics <run_id>
 contentops scorecard <run_id>
 contentops cost-report <run_id>
+contentops generation-receipt <run_id>
 contentops show <run_id> --artifact eval-report.json
 ```
 
@@ -109,8 +110,9 @@ GET /cost-reports?limit=20&offset=0
 
 Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,
 latency SLOs, and source-count SLOs.
-Cost reports are estimates from run artifacts, not provider billing records; use them as a budget
-guardrail and correlate with provider billing dashboards for financial reporting.
+Cost reports prefer provider usage tokens from `generation-receipt.json`. When usage is missing,
+they fall back to artifact-based estimates; use those estimates as a budget guardrail and
+correlate with provider billing dashboards for financial reporting.
 
 ## 6. Evidence Export
 

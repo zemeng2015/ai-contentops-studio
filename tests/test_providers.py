@@ -147,7 +147,10 @@ def test_openai_generator_retries_transient_errors(monkeypatch: pytest.MonkeyPat
             return None
 
         def json(self) -> dict[str, object]:
-            return {"output_text": "# Generated\n\nSources: Test source"}
+            return {
+                "output_text": "# Generated\n\nSources: Test source",
+                "usage": {"input_tokens": 100, "output_tokens": 20, "total_tokens": 120},
+            }
 
     class FakeClient:
         calls = 0
@@ -176,15 +179,24 @@ def test_openai_generator_retries_transient_errors(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr("contentops_providers.openai_generator.httpx.Client", FakeClient)
 
-    draft = OpenAIResponsesGenerator(
+    generator = OpenAIResponsesGenerator(
         api_key="secret",
         model="gpt-5-mini",
         retry_attempts=2,
         retry_backoff_seconds=0,
-    ).generate(_sample_research_packet(), _sample_content_plan())
+    )
+    draft = generator.generate(_sample_research_packet(), _sample_content_plan())
+    receipt = generator.generation_receipt()
 
     assert FakeClient.calls == 2
     assert draft.markdown.startswith("# Generated")
+    assert receipt is not None
+    assert receipt.provider == "openai"
+    assert receipt.model == "gpt-5-mini"
+    assert receipt.status == "completed"
+    assert receipt.attempts == 2
+    assert receipt.fallback_used is False
+    assert receipt.total_tokens == 120
 
 
 def test_openai_generator_can_fallback_after_provider_failure(
@@ -210,16 +222,22 @@ def test_openai_generator_can_fallback_after_provider_failure(
 
     monkeypatch.setattr("contentops_providers.openai_generator.httpx.Client", FakeClient)
 
-    draft = OpenAIResponsesGenerator(
+    generator = OpenAIResponsesGenerator(
         api_key="secret",
         model="gpt-5-mini",
         retry_attempts=2,
         retry_backoff_seconds=0,
         fallback_on_failure=True,
-    ).generate(_sample_research_packet(), _sample_content_plan())
+    )
+    draft = generator.generate(_sample_research_packet(), _sample_content_plan())
+    receipt = generator.generation_receipt()
 
     assert draft.title == "AI Workflow Reliability"
     assert "The useful version of AI automation" in draft.markdown
+    assert receipt is not None
+    assert receipt.status == "fallback"
+    assert receipt.fallback_used is True
+    assert receipt.error is not None
 
 
 def test_search_research_provider_requires_api_key(tmp_path: Path) -> None:

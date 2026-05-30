@@ -77,7 +77,23 @@ class ContentOpsPipeline:
             self.artifact_store.write_json(record, "draft.json", draft)
             self.artifact_store.write_text(record, "draft.md", draft.markdown)
             self.artifact_store.write_text(record, "final.html", draft.html)
-            trace.add("drafting", "completed", characters=len(draft.markdown))
+            generation_receipt = self.generator.generation_receipt()
+            if generation_receipt is not None:
+                self.artifact_store.write_json(
+                    record,
+                    "generation-receipt.json",
+                    generation_receipt,
+                )
+            trace.add(
+                "drafting",
+                "completed",
+                characters=len(draft.markdown),
+                provider=generation_receipt.provider if generation_receipt else "unknown",
+                model=generation_receipt.model if generation_receipt else "unknown",
+                fallback_used=(
+                    generation_receipt.fallback_used if generation_receipt else None
+                ),
+            )
 
             record.touch(RunStatus.EVALUATING)
             self.repository.save(record)

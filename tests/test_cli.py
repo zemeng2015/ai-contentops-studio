@@ -128,6 +128,7 @@ def test_cli_queue_and_manifest_commands(
     scorecards_result = runner.invoke(app, ["scorecards", "--query", "searchable", "--json"])
     cost_report_result = runner.invoke(app, ["cost-report", run_id])
     cost_reports_result = runner.invoke(app, ["cost-reports", "--query", "searchable", "--json"])
+    generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
     bundle_path = tmp_path / "bundle.zip"
@@ -154,6 +155,10 @@ def test_cli_queue_and_manifest_commands(
     cost_reports_payload = json.loads(cost_reports_result.output)
     assert cost_reports_payload["total"] == 1
     assert cost_reports_payload["items"][0]["run_id"] == run_id
+    assert generation_receipt_result.exit_code == 0
+    generation_receipt_payload = json.loads(generation_receipt_result.output)
+    assert generation_receipt_payload["provider"] == "template"
+    assert generation_receipt_payload["total_tokens"] > 0
     assert manifest_result.exit_code == 0
     manifest_payload = json.loads(manifest_result.output)
     assert manifest_payload["run_id"] == run_id

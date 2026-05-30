@@ -27,6 +27,7 @@ def test_pipeline_creates_reviewable_artifacts(tmp_path: Path) -> None:
     assert (result.run.artifact_dir / "source-audit.json").exists()
     assert (result.run.artifact_dir / "outline.md").exists()
     assert (result.run.artifact_dir / "draft.md").exists()
+    assert (result.run.artifact_dir / "generation-receipt.json").exists()
     assert (result.run.artifact_dir / "eval-report.json").exists()
     assert (result.run.artifact_dir / "trace.json").exists()
 
@@ -107,6 +108,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     scorecards = review_service.scorecards(limit=5)
     cost_report = review_service.cost_report(result.run.id)
     cost_reports = review_service.cost_reports(limit=5)
+    generation_receipt = review_service.generation_receipt(result.run.id)
     original_request = review_service.request(result.run.id)
     approved = review_service.approve(
         result.run.id,
@@ -140,6 +142,11 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert cost_report.run_id == result.run.id
     assert cost_report.estimated_total_tokens > 0
     assert cost_report.budget_pass is True
+    assert generation_receipt is not None
+    assert generation_receipt.provider == "template"
+    assert generation_receipt.status == "completed"
+    assert generation_receipt.total_tokens is not None
+    assert cost_report.estimated_total_tokens == generation_receipt.total_tokens
     assert any(item.run_id == result.run.id for item in cost_reports.items)
     assert cost_reports.estimated_total_tokens >= cost_report.estimated_total_tokens
     assert original_request.topic == "Reviewable AI article"
