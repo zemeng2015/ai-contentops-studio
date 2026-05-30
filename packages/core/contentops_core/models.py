@@ -76,6 +76,21 @@ class EvaluationReport(BaseModel):
     findings: list[str]
 
 
+class PublishPlanItem(BaseModel):
+    path: str
+    action: str
+    exists: bool
+    description: str
+
+
+class PublishPlan(BaseModel):
+    provider: str
+    target_url: str
+    ready: bool
+    items: list[PublishPlanItem]
+    warnings: list[str] = Field(default_factory=list)
+
+
 class RunRequest(BaseModel):
     topic: str
     source_urls: list[str] = Field(default_factory=list)

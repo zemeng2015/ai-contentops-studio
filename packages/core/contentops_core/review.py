@@ -7,7 +7,7 @@ from typing import TypeVar
 from contentops_publishing.static_site import Publisher
 from pydantic import BaseModel
 
-from contentops_core.models import Draft, EvaluationReport, RunRecord, RunStatus
+from contentops_core.models import Draft, EvaluationReport, PublishPlan, RunRecord, RunStatus
 from contentops_core.repository import RunRepository
 
 T = TypeVar("T", bound=BaseModel)
@@ -33,12 +33,21 @@ class ReviewService:
         report = self._load_json(run, "eval-report.json", EvaluationReport)
         if not report.publish_ready and not force:
             raise ValueError("Run is not publish-ready. Use force=true to override.")
+        plan = self.publisher.plan(run, draft, report)
+        if not plan.ready and not force:
+            raise ValueError("; ".join(plan.warnings))
         run.touch(RunStatus.PUBLISHING)
         self.repository.save(run)
         run.published_url = self.publisher.publish(run, draft, report)
         run.touch(RunStatus.PUBLISHED)
         self.repository.save(run)
         return run
+
+    def publish_plan(self, run_id: str) -> PublishPlan:
+        run = self._get_run(run_id)
+        draft = self._load_json(run, "draft.json", Draft)
+        report = self._load_json(run, "eval-report.json", EvaluationReport)
+        return self.publisher.plan(run, draft, report)
 
     def _get_run(self, run_id: str) -> RunRecord:
         run = self.repository.get(run_id)

@@ -5,7 +5,7 @@ from html import escape
 from typing import Annotated
 
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import RunRecord, RunRequest
+from contentops_core.models import PublishPlan, RunRecord, RunRequest
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from fastapi import FastAPI, Form, HTTPException, Response
@@ -98,6 +98,11 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
     eval_report = "{}"
     if "eval-report.json" in artifacts:
         eval_report = review_service.read_artifact(run_id, "eval-report.json")
+    plan_html = ""
+    try:
+        plan_html = _publish_plan_html(review_service.publish_plan(run_id))
+    except (FileNotFoundError, ValueError):
+        plan_html = "<p>Publish plan unavailable.</p>"
     source_rows = ""
     if "research.json" in artifacts:
         source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
@@ -114,6 +119,8 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               <h2>{escape(run.topic)}</h2>
               <p>Status: <strong>{escape(run.status.value)}</strong></p>
               <p>Published URL: {escape(run.published_url or "not published")}</p>
+              <h3>Publish Plan</h3>
+              {plan_html}
               {publish_action}
             </section>
             <section class="grid">
@@ -198,6 +205,14 @@ def publish_run(run_id: str, force: bool = False) -> RunRecord:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/publish-plan")
+def get_publish_plan(run_id: str) -> dict[str, object]:
+    try:
+        return review_service.publish_plan(run_id).model_dump(mode="json")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _page(title: str, body: str) -> str:
@@ -287,3 +302,32 @@ def _source_review_rows(research_json: str) -> str:
             """
         )
     return "\n".join(rows)
+
+
+def _publish_plan_html(plan: PublishPlan) -> str:
+    provider = escape(plan.provider)
+    target_url = escape(plan.target_url)
+    ready = escape(str(plan.ready).lower())
+    warnings = plan.warnings
+    items = plan.items
+    warning_html = "".join(f"<li>{escape(str(warning))}</li>" for warning in warnings)
+    item_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.action)}</td>
+          <td>{escape(item.path)}</td>
+          <td>{escape(str(item.exists).lower())}</td>
+          <td>{escape(item.description)}</td>
+        </tr>
+        """
+        for item in items
+    )
+    return f"""
+      <p>Provider: <strong>{provider}</strong> | Ready: <strong>{ready}</strong></p>
+      <p>Target: {target_url}</p>
+      <ul>{warning_html}</ul>
+      <table>
+        <thead><tr><th>Action</th><th>Path</th><th>Exists</th><th>Description</th></tr></thead>
+        <tbody>{item_rows}</tbody>
+      </table>
+    """

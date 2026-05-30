@@ -74,6 +74,45 @@ def test_homepage_publisher_updates_post_grid(tmp_path: Path) -> None:
     )
 
 
+def test_homepage_publisher_plan_describes_file_changes(tmp_path: Path) -> None:
+    homepage = tmp_path / "homepage"
+    (homepage / "posts").mkdir(parents=True)
+    (homepage / "index.html").write_text(
+        '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
+        encoding="utf-8",
+    )
+    artifact_dir = tmp_path / "artifacts"
+    artifact_dir.mkdir()
+    run = RunRecord(
+        topic="Topic",
+        slug="topic",
+        status=RunStatus.NEEDS_REVIEW,
+        artifact_dir=artifact_dir,
+    )
+    draft = Draft(
+        title="Generated Article",
+        slug="generated-article",
+        markdown="# x",
+        html="<html><head></head><body>x</body></html>",
+    )
+    report = EvaluationReport(
+        groundedness=0.9,
+        source_coverage=0.9,
+        source_quality=0.9,
+        career_relevance=0.9,
+        technical_depth=0.9,
+        publish_ready=True,
+        findings=["ready"],
+    )
+
+    plan = HomepagePublisher(homepage, "https://example.com").plan(run, draft, report)
+
+    assert plan.provider == "homepage"
+    assert plan.ready is True
+    assert plan.target_url == "https://example.com/posts/generated-article.html"
+    assert [item.action for item in plan.items] == ["create", "create", "update"]
+
+
 def test_openai_provider_requires_api_key(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",

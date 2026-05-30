@@ -84,6 +84,13 @@ def publish(
         typer.echo(f"Published: {record.published_url}")
 
 
+@app.command("publish-plan")
+def publish_plan(run_id: str) -> None:
+    service = build_review_service(Settings())
+    plan = service.publish_plan(run_id)
+    typer.echo(plan.model_dump_json(indent=2))
+
+
 @app.command()
 def init_config(
     path: Annotated[Path, typer.Option(help="Config file to create.")] = Path(".env"),

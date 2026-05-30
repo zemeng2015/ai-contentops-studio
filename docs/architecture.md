@@ -48,6 +48,7 @@ later:
 - list artifact names for a run
 - read individual artifacts such as `research.json`, `draft.md`, or `eval-report.json`
 - publish an existing run after evaluation, with an explicit force option for overrides
+- preview file-level publish changes through `PublishPlan` before mutating targets
 
 This separates generation from publication and creates a natural seam for a dashboard or approval
 queue.

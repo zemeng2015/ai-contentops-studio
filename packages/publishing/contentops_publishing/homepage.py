@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from shutil import copyfile
 
-from contentops_core.models import Draft, EvaluationReport, RunRecord
+from contentops_core.models import Draft, EvaluationReport, PublishPlan, PublishPlanItem, RunRecord
 
 
 class HomepagePublisher:
@@ -12,6 +12,9 @@ class HomepagePublisher:
         self.public_base_url = public_base_url.rstrip("/")
 
     def publish(self, run: RunRecord, draft: Draft, report: EvaluationReport) -> str:
+        plan = self.plan(run, draft, report)
+        if not plan.ready:
+            raise ValueError("; ".join(plan.warnings))
         posts_dir = self.homepage_repo_path / "posts"
         posts_dir.mkdir(parents=True, exist_ok=True)
         post_path = posts_dir / f"{draft.slug}.html"
@@ -19,6 +22,49 @@ class HomepagePublisher:
         copyfile(run.artifact_dir / "eval-report.json", posts_dir / f"{draft.slug}.eval.json")
         self._update_index(draft, report)
         return f"{self.public_base_url}/posts/{draft.slug}.html"
+
+    def plan(self, run: RunRecord, draft: Draft, report: EvaluationReport) -> PublishPlan:
+        posts_dir = self.homepage_repo_path / "posts"
+        post_path = posts_dir / f"{draft.slug}.html"
+        eval_path = posts_dir / f"{draft.slug}.eval.json"
+        index_path = self.homepage_repo_path / "index.html"
+        warnings: list[str] = []
+        if not report.publish_ready:
+            warnings.append("Evaluation report is not publish-ready.")
+        if not index_path.exists():
+            warnings.append(f"Homepage index not found: {index_path}")
+        else:
+            html = index_path.read_text(encoding="utf-8")
+            if '<div class="post-grid">' not in html:
+                warnings.append(
+                    "Homepage index.html does not contain the expected post-grid marker."
+                )
+        return PublishPlan(
+            provider="homepage",
+            target_url=f"{self.public_base_url}/posts/{draft.slug}.html",
+            ready=len(warnings) == 0,
+            warnings=warnings,
+            items=[
+                PublishPlanItem(
+                    path=str(post_path),
+                    action="create" if not post_path.exists() else "overwrite",
+                    exists=post_path.exists(),
+                    description="Write generated article into homepage posts directory.",
+                ),
+                PublishPlanItem(
+                    path=str(eval_path),
+                    action="create" if not eval_path.exists() else "overwrite",
+                    exists=eval_path.exists(),
+                    description="Copy eval report into homepage posts directory.",
+                ),
+                PublishPlanItem(
+                    path=str(index_path),
+                    action="update",
+                    exists=index_path.exists(),
+                    description="Insert article card into homepage Writing grid.",
+                ),
+            ],
+        )
 
     def _update_index(self, draft: Draft, report: EvaluationReport) -> None:
         index_path = self.homepage_repo_path / "index.html"
