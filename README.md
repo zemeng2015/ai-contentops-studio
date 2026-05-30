@@ -13,6 +13,8 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - deterministic quality evaluation
 - observable run history and artifacts
 - API, CLI, worker, and publisher boundaries
+- review dashboard with artifact, source, evaluation, and publish-plan inspection
+- AWS-ready artifact storage and Terraform deployment skeleton
 - local-first development with AWS-ready deployment primitives
 
 ## What it does

@@ -12,6 +12,8 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 - 可重复、可测试的质量评估
 - 可观测的运行历史和 artifacts
 - API、CLI、worker、publisher 清晰分层
+- Review dashboard：可检查 artifact、source、evaluation 和 publish plan
+- AWS-ready artifact storage 和 Terraform deployment skeleton
 - 本地优先开发，同时预留 AWS 生产化部署边界
 
 ## 项目能做什么
