@@ -11,6 +11,7 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 - 先规划再生成的内容生产流程
 - 可重复、可测试的质量评估
 - 可观测的运行历史、trace 和 artifacts
+- reviewed run 发布前必须有显式 approval record
 - API、CLI、worker、publisher 清晰分层
 - Review dashboard：可检查 artifact、source、evaluation、publish plan 和 run comparison
 - YAML 定义的 worker jobs：可用于每日/每周内容选题计划
@@ -26,7 +27,7 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 3. 规划文章角度和大纲
 4. 生成 Markdown 和 HTML 草稿
 5. 评估 groundedness、source coverage、source quality、career relevance 和 publish readiness
-6. 通过评估后发布到静态站点，或保留为待 review 状态
+6. 保留为待 review 状态，审核批准或拒绝后再发布
 7. 持久化 artifacts、run metadata 和 trace，方便回溯、审查和对比
 
 第一版 pipeline 采用本地 deterministic 模式，因此不需要 API key 也能在 CI 中运行。OpenAI、搜索 API、GitHub、AWS 等外部能力都通过 provider adapter 接入，后续可以扩展而不需要重写核心领域层。
@@ -116,6 +117,7 @@ contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
 contentops metrics <run_id>
 contentops compare <base_run_id> <candidate_run_id>
+contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
 ```
@@ -127,7 +129,10 @@ GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
+GET  /runs/{run_id}/approval
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
+POST /runs/{run_id}/approve
+POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun
 POST /runs/{run_id}/publish
 ```
@@ -139,6 +144,7 @@ GET /dashboard
 ```
 
 Dashboard 支持按 topic、run id 和 status 筛选运行记录。Run detail 页面包含 Source Review、Publish Plan、Run Timeline，以及对比两个 run 的入口。Run comparison 会展示 evaluation delta、source count delta、shared sources 和只存在于某个 run 的 sources，用于判断重新生成是否真的变好。
+待 review 的 run 必须先 approve 才能 publish，除非操作员显式使用 `force=true`。每次 approve/reject 都会写入 `approval.json`，和其他 run artifacts 一起保留。
 
 ## Scheduled worker jobs
 

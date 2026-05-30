@@ -23,6 +23,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
     metrics_response = client.get(f"/runs/{run['id']}/metrics")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
+    blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
+    approve_response = client.post(f"/runs/{run['id']}/approve?reviewer=zack&notes=ready")
+    approval_response = client.get(f"/runs/{run['id']}/approval")
     publish_response = client.post(f"/runs/{run['id']}/publish")
 
     assert create_response.status_code == 200
@@ -36,6 +39,11 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert rerun_response.status_code == 200
     assert rerun_response.json()["id"] != run["id"]
     assert rerun_response.json()["topic"] == run["topic"]
+    assert blocked_publish_response.status_code == 409
+    assert approve_response.status_code == 200
+    assert approve_response.json()["status"] == "approved"
+    assert approval_response.status_code == 200
+    assert approval_response.json()["reviewer"] == "zack"
     assert publish_response.status_code == 200
     assert publish_response.json()["status"] == "published"
 
@@ -95,6 +103,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert detail_response.status_code == 200
     assert "Source Review" in detail_response.text
     assert "Publish Plan" in detail_response.text
+    assert "Approval" in detail_response.text
     assert "Run Timeline" in detail_response.text
     assert "Rerun with same request" in detail_response.text
     assert "Compare runs" in detail_response.text
@@ -114,3 +123,49 @@ def test_dashboard_create_accepts_source_urls() -> None:
     )
 
     assert response.status_code == 303
+
+
+def test_dashboard_can_approve_run() -> None:
+    client = TestClient(app)
+
+    create_response = client.post("/runs", json={"topic": "Dashboard approval workflow"})
+    run = create_response.json()
+    response = client.post(
+        f"/dashboard/runs/{run['id']}/approve",
+        data={"reviewer": "zack", "notes": "Ready."},
+        follow_redirects=False,
+    )
+    approval_response = client.get(f"/runs/{run['id']}/approval")
+
+    assert response.status_code == 303
+    assert approval_response.status_code == 200
+    assert approval_response.json()["decision"] == "approved"
+
+
+def test_dashboard_publish_requires_approval() -> None:
+    client = TestClient(app)
+
+    create_response = client.post("/runs", json={"topic": "Dashboard blocked publish"})
+    run = create_response.json()
+    response = client.post(
+        f"/dashboard/runs/{run['id']}/publish",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 409
+    assert "approved before publishing" in response.text
+
+
+def test_rejected_run_requires_force_to_publish() -> None:
+    client = TestClient(app)
+
+    create_response = client.post("/runs", json={"topic": "Rejected publish workflow"})
+    run = create_response.json()
+    reject_response = client.post(f"/runs/{run['id']}/reject?reviewer=zack&notes=not-ready")
+    publish_response = client.post(f"/runs/{run['id']}/publish")
+    force_publish_response = client.post(f"/runs/{run['id']}/publish?force=true")
+
+    assert reject_response.status_code == 200
+    assert reject_response.json()["status"] == "rejected"
+    assert publish_response.status_code == 409
+    assert force_publish_response.status_code == 200

@@ -17,6 +17,8 @@ class RunStatus(StrEnum):
     DRAFTING = "drafting"
     EVALUATING = "evaluating"
     NEEDS_REVIEW = "needs_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
     PUBLISHING = "publishing"
     PUBLISHED = "published"
     FAILED = "failed"
@@ -89,6 +91,19 @@ class PublishPlan(BaseModel):
     ready: bool
     items: list[PublishPlanItem]
     warnings: list[str] = Field(default_factory=list)
+
+
+class ApprovalDecision(StrEnum):
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class ApprovalRecord(BaseModel):
+    run_id: str
+    decision: ApprovalDecision
+    reviewer: str
+    notes: str = ""
+    decided_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class TraceEvent(BaseModel):

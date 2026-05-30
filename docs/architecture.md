@@ -67,6 +67,16 @@ Run comparison is part of the review layer. It compares duration, source counts,
 publish readiness, and evaluation score deltas between a base run and a candidate run. This makes
 regeneration and prompt/provider changes reviewable instead of subjective.
 
+Approval is also part of the review layer. A generated run normally enters `needs_review`; an
+operator can approve or reject it, and the decision is written to `approval.json`. Publishing a
+reviewed run requires approval unless the operator uses an explicit force override. This gives the
+system a real editorial control point instead of treating publish as a casual button click.
+
+```text
+needs_review -> approved -> publishing -> published
+needs_review -> rejected
+```
+
 ## Worker jobs
 
 The worker accepts YAML job files in either a single-job shape or a batch `jobs:` shape. Batch job

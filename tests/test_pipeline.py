@@ -80,10 +80,17 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     plan = review_service.publish_plan(result.run.id)
     metrics = review_service.metrics(result.run.id)
     original_request = review_service.request(result.run.id)
+    approved = review_service.approve(
+        result.run.id,
+        reviewer="zack",
+        notes="Looks grounded enough to publish.",
+    )
     published = review_service.publish(result.run.id)
+    approval = review_service.approval(result.run.id)
 
     assert "draft.json" in artifacts
     assert "eval-report.json" in artifacts
+    assert "approval.json" not in artifacts
     assert plan.ready is True
     assert len(plan.items) == 3
     assert metrics.run_id == result.run.id
@@ -91,8 +98,51 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert metrics.publish_ready is True
     assert original_request.topic == "Reviewable AI article"
     assert {step.step for step in metrics.step_metrics} >= {"research", "planning", "drafting"}
+    assert approved.status == RunStatus.APPROVED
+    assert approval is not None
+    assert approval.reviewer == "zack"
     assert published.status == RunStatus.PUBLISHED
     assert published.published_url is not None
+
+
+def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        public_base_url="https://example.com",
+        min_publish_score=0.5,
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Approval gate article"))
+    review_service = build_review_service(settings)
+
+    with pytest.raises(ValueError, match="approved before publishing"):
+        review_service.publish(result.run.id)
+
+    review_service.approve(result.run.id)
+    published = review_service.publish(result.run.id)
+
+    assert published.status == RunStatus.PUBLISHED
+
+
+def test_review_service_rejects_run(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Rejected AI article"))
+    review_service = build_review_service(settings)
+
+    rejected = review_service.reject(result.run.id, reviewer="zack", notes="Needs a better angle.")
+    approval = review_service.approval(result.run.id)
+
+    assert rejected.status == RunStatus.REJECTED
+    assert approval is not None
+    assert approval.decision.value == "rejected"
+    assert approval.notes == "Needs a better angle."
 
 
 def test_review_service_compares_runs(tmp_path: Path) -> None:

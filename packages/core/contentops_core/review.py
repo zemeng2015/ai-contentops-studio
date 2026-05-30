@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 from contentops_core.metrics import MetricsService
 from contentops_core.models import (
+    ApprovalDecision,
+    ApprovalRecord,
     Draft,
     EvaluationReport,
     PublishPlan,
@@ -45,6 +47,11 @@ class ReviewService:
         run = self._get_run(run_id)
         draft = self._load_json(run, "draft.json", Draft)
         report = self._load_json(run, "eval-report.json", EvaluationReport)
+        approval = self.approval(run_id)
+        if run.status == RunStatus.NEEDS_REVIEW and approval is None and not force:
+            raise ValueError("Run must be approved before publishing. Use force=true to override.")
+        if approval is not None and approval.decision == ApprovalDecision.REJECTED and not force:
+            raise ValueError("Run was rejected. Use force=true to override.")
         if not report.publish_ready and not force:
             raise ValueError("Run is not publish-ready. Use force=true to override.")
         plan = self.publisher.plan(run, draft, report)
@@ -56,6 +63,49 @@ class ReviewService:
         run.touch(RunStatus.PUBLISHED)
         self.repository.save(run)
         return run
+
+    def approve(self, run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
+        run = self._get_run(run_id)
+        report = self._load_json(run, "eval-report.json", EvaluationReport)
+        if not report.publish_ready:
+            raise ValueError("Run is not publish-ready and cannot be approved.")
+        plan = self.publish_plan(run_id)
+        if not plan.ready:
+            raise ValueError("; ".join(plan.warnings))
+        self._write_approval(
+            run,
+            ApprovalRecord(
+                run_id=run_id,
+                decision=ApprovalDecision.APPROVED,
+                reviewer=reviewer,
+                notes=notes,
+            ),
+        )
+        run.touch(RunStatus.APPROVED)
+        self.repository.save(run)
+        return run
+
+    def reject(self, run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
+        run = self._get_run(run_id)
+        self._write_approval(
+            run,
+            ApprovalRecord(
+                run_id=run_id,
+                decision=ApprovalDecision.REJECTED,
+                reviewer=reviewer,
+                notes=notes,
+            ),
+        )
+        run.touch(RunStatus.REJECTED)
+        self.repository.save(run)
+        return run
+
+    def approval(self, run_id: str) -> ApprovalRecord | None:
+        run = self._get_run(run_id)
+        path = run.artifact_dir / "approval.json"
+        if not path.exists():
+            return None
+        return ApprovalRecord.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
     def publish_plan(self, run_id: str) -> PublishPlan:
         run = self._get_run(run_id)
@@ -150,6 +200,11 @@ class ReviewService:
             raise FileNotFoundError(f"Required artifact not found: {artifact_name}")
         data = json.loads(path.read_text(encoding="utf-8"))
         return model.model_validate(data)
+
+    @staticmethod
+    def _write_approval(run: RunRecord, approval: ApprovalRecord) -> None:
+        path = run.artifact_dir / "approval.json"
+        path.write_text(approval.model_dump_json(indent=2), encoding="utf-8")
 
     @staticmethod
     def _load_sources(run: RunRecord) -> list[Source]:

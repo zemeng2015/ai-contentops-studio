@@ -5,7 +5,14 @@ from html import escape
 from typing import Annotated
 
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import PublishPlan, RunComparison, RunMetrics, RunRecord, RunRequest
+from contentops_core.models import (
+    ApprovalRecord,
+    PublishPlan,
+    RunComparison,
+    RunMetrics,
+    RunRecord,
+    RunRequest,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from fastapi import FastAPI, Form, HTTPException, Query, Response
@@ -133,6 +140,7 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
     source_rows = ""
     if "research.json" in artifacts:
         source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
+    approval_html = _approval_html(review_service.approval(run_id))
     publish_action = (
         f'<form method="post" action="/dashboard/runs/{escape(run_id)}/publish">'
         '<button type="submit">Publish run</button></form>'
@@ -156,6 +164,18 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               </div>
               <h3>Publish Plan</h3>
               {plan_html}
+              <h3>Approval</h3>
+              {approval_html}
+              <form method="post" action="/dashboard/runs/{escape(run_id)}/approve">
+                <input name="reviewer" placeholder="Reviewer" value="operator">
+                <input name="notes" placeholder="Approval notes">
+                <button type="submit">Approve run</button>
+              </form>
+              <form method="post" action="/dashboard/runs/{escape(run_id)}/reject">
+                <input name="reviewer" placeholder="Reviewer" value="operator">
+                <input name="notes" placeholder="Rejection notes">
+                <button type="submit">Reject run</button>
+              </form>
               {publish_action}
               <form method="post" action="/dashboard/runs/{escape(run_id)}/rerun">
                 <button type="submit">Rerun with same request</button>
@@ -225,7 +245,40 @@ def dashboard_compare(base_run_id: str, candidate_run_id: str) -> HTMLResponse:
 
 @app.post("/dashboard/runs/{run_id}/publish")
 def dashboard_publish_run(run_id: str) -> RedirectResponse:
-    review_service.publish(run_id)
+    try:
+        review_service.publish(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
+
+
+@app.post("/dashboard/runs/{run_id}/approve")
+def dashboard_approve_run(
+    run_id: str,
+    reviewer: Annotated[str, Form()] = "operator",
+    notes: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    try:
+        review_service.approve(run_id, reviewer=reviewer, notes=notes)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
+
+
+@app.post("/dashboard/runs/{run_id}/reject")
+def dashboard_reject_run(
+    run_id: str,
+    reviewer: Annotated[str, Form()] = "operator",
+    notes: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    try:
+        review_service.reject(run_id, reviewer=reviewer, notes=notes)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
 
 
@@ -283,6 +336,32 @@ def publish_run(run_id: str, force: bool = False) -> RunRecord:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/runs/{run_id}/approve", response_model=RunRecord)
+def approve_run(run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
+    try:
+        return review_service.approve(run_id, reviewer=reviewer, notes=notes)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/runs/{run_id}/reject", response_model=RunRecord)
+def reject_run(run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
+    try:
+        return review_service.reject(run_id, reviewer=reviewer, notes=notes)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/approval", response_model=ApprovalRecord | None)
+def get_approval(run_id: str) -> ApprovalRecord | None:
+    try:
+        return review_service.approval(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/runs/{run_id}/rerun", response_model=RunRecord)
@@ -471,6 +550,19 @@ def _comparison_html(comparison: RunComparison) -> str:
       </table>
       <p><strong>Base-only sources:</strong> {escape(base_only)}</p>
       <p><strong>Candidate-only sources:</strong> {escape(candidate_only)}</p>
+    """
+
+
+def _approval_html(approval: ApprovalRecord | None) -> str:
+    if approval is None:
+        return "<p>No approval decision recorded.</p>"
+    return f"""
+      <p>
+        Decision: <strong>{escape(approval.decision.value)}</strong> |
+        Reviewer: <strong>{escape(approval.reviewer)}</strong> |
+        At: {escape(approval.decided_at.isoformat())}
+      </p>
+      <p>{escape(approval.notes or "No notes.")}</p>
     """
 
 

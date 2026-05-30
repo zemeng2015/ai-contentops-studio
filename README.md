@@ -12,6 +12,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - content planning before generation
 - deterministic quality evaluation
 - observable run history and artifacts
+- explicit approval records before reviewed runs are published
 - API, CLI, worker, and publisher boundaries
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
 - run comparison for repeatable quality and source regression review
@@ -28,7 +29,7 @@ Given a topic, URL, or repository, the system creates a content run:
 3. plan the article angle and outline
 4. generate markdown and HTML drafts
 5. evaluate groundedness, source coverage, career relevance, and publish readiness
-6. publish to a static site target or keep the run in review
+6. keep the run in review, approve or reject it, then publish approved content
 7. persist artifacts and run trace for inspection
 
 The first pipeline is intentionally local and deterministic so it can run in CI without API keys.
@@ -120,6 +121,7 @@ contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
 contentops metrics <run_id>
 contentops compare <base_run_id> <candidate_run_id>
+contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
 ```
@@ -131,7 +133,10 @@ GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
+GET  /runs/{run_id}/approval
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
+POST /runs/{run_id}/approve
+POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun
 POST /runs/{run_id}/publish
 ```
@@ -149,6 +154,8 @@ Run details include a timeline derived from `trace.json`, including step duratio
 The dashboard create form accepts optional source URLs, one per line.
 The dashboard list supports status/topic filters, and run detail pages can compare two runs to
 spot evaluation deltas, source-count changes, and source overlap before publishing.
+Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
+Each decision is persisted as `approval.json` beside the other run artifacts.
 
 ## Scheduled worker jobs
 

@@ -78,10 +78,54 @@ def publish(
     ] = False,
 ) -> None:
     service = build_review_service(Settings())
-    record = service.publish(run_id, force=force)
+    try:
+        record = service.publish(run_id, force=force)
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
     typer.echo(f"Status: {record.status.value}")
     if record.published_url:
         typer.echo(f"Published: {record.published_url}")
+
+
+@app.command()
+def approve(
+    run_id: str,
+    reviewer: Annotated[str, typer.Option(help="Reviewer name.")] = "operator",
+    notes: Annotated[str, typer.Option(help="Approval notes.")] = "",
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        record = service.approve(run_id, reviewer=reviewer, notes=notes)
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Status: {record.status.value}")
+
+
+@app.command()
+def reject(
+    run_id: str,
+    reviewer: Annotated[str, typer.Option(help="Reviewer name.")] = "operator",
+    notes: Annotated[str, typer.Option(help="Rejection notes.")] = "",
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        record = service.reject(run_id, reviewer=reviewer, notes=notes)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Status: {record.status.value}")
+
+
+@app.command()
+def approval(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        decision = service.approval(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if decision is None:
+        typer.echo("No approval decision recorded.")
+        return
+    typer.echo(decision.model_dump_json(indent=2))
 
 
 @app.command("publish-plan")
