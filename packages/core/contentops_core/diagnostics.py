@@ -99,6 +99,10 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_API_KEY")
     if settings.research_provider == "search" and not settings.research_search_endpoint:
         failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_ENDPOINT")
+    if settings.research_retry_attempts < 1:
+        failures.append("research retry attempts must be at least 1")
+    if settings.research_retry_backoff_seconds < 0:
+        failures.append("research retry backoff cannot be negative")
     if settings.publisher_provider == "homepage" and settings.homepage_repo_path is None:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
@@ -118,6 +122,8 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         message=message,
         fields={
             "research_provider": settings.research_provider,
+            "research_retry_attempts": settings.research_retry_attempts,
+            "research_retry_backoff_seconds": settings.research_retry_backoff_seconds,
             "research_search_enrich": settings.research_search_enrich,
             "generator_provider": settings.generator_provider,
             "publisher_provider": settings.publisher_provider,

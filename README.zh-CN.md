@@ -199,6 +199,8 @@ jobs:
 CONTENTOPS_RESEARCH_PROVIDER=discovery
 CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
+CONTENTOPS_RESEARCH_RETRY_ATTEMPTS=2
+CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS=0.1
 CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search
 # CONTENTOPS_RESEARCH_SEARCH_API_KEY=
 CONTENTOPS_RESEARCH_SEARCH_ENRICH=true
@@ -217,6 +219,10 @@ Research provider 模式：
 - `discovery`：feed discovery、用户 URL 和本地 portfolio context 组合模式
 
 在 AWS 部署中将 artifacts 镜像到 S3：
+
+Network-backed research providers retry transient timeouts, connection errors, `429`, and `5xx`
+responses according to `CONTENTOPS_RESEARCH_RETRY_ATTEMPTS` and
+`CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS`.
 
 ```text
 CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3

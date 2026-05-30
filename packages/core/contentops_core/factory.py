@@ -50,11 +50,16 @@ def _build_research_provider(
     if settings.research_provider == "local":
         return LocalResearchProvider()
     if settings.research_provider == "url":
-        return URLResearchProvider()
+        return URLResearchProvider(
+            retry_attempts=settings.research_retry_attempts,
+            retry_backoff_seconds=settings.research_retry_backoff_seconds,
+        )
     if settings.research_provider == "feed":
         return FeedResearchProvider(
             feeds=_research_feeds(settings),
             max_sources=settings.research_max_sources,
+            retry_attempts=settings.research_retry_attempts,
+            retry_backoff_seconds=settings.research_retry_backoff_seconds,
         )
     if settings.research_provider == "search":
         if not settings.research_search_api_key:
@@ -64,13 +69,20 @@ def _build_research_provider(
             api_key=settings.research_search_api_key,
             max_sources=settings.research_max_sources,
             enrich_results=settings.research_search_enrich,
+            retry_attempts=settings.research_retry_attempts,
+            retry_backoff_seconds=settings.research_retry_backoff_seconds,
         )
     if settings.research_provider == "discovery":
         return DiscoveryResearchProvider(
             feeds=_research_feeds(settings),
             max_sources=settings.research_max_sources,
+            retry_attempts=settings.research_retry_attempts,
+            retry_backoff_seconds=settings.research_retry_backoff_seconds,
         )
-    return HybridResearchProvider()
+    return HybridResearchProvider(
+        retry_attempts=settings.research_retry_attempts,
+        retry_backoff_seconds=settings.research_retry_backoff_seconds,
+    )
 
 
 def _research_feeds(settings: Settings) -> list[str]:

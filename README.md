@@ -216,6 +216,8 @@ provided; `discovery` also fetches configured RSS/Atom feeds for scheduled resea
 CONTENTOPS_RESEARCH_PROVIDER=discovery
 CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
+CONTENTOPS_RESEARCH_RETRY_ATTEMPTS=2
+CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS=0.1
 CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search
 # CONTENTOPS_RESEARCH_SEARCH_API_KEY=
 CONTENTOPS_RESEARCH_SEARCH_ENRICH=true
@@ -232,6 +234,10 @@ Research provider modes:
 - `feed`: discover sources from RSS/Atom feeds or Atom search endpoints
 - `search`: discover sources from a Brave-compatible web search API and enrich result URLs
 - `discovery`: feed discovery plus operator URLs plus local portfolio context
+
+Network-backed research providers retry transient timeouts, connection errors, `429`, and `5xx`
+responses according to `CONTENTOPS_RESEARCH_RETRY_ATTEMPTS` and
+`CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS`.
 
 Mirror artifacts to S3 in AWS deployments:
 

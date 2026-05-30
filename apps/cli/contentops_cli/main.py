@@ -352,6 +352,8 @@ def init_config(
                     "&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending"
                 ),
                 "CONTENTOPS_RESEARCH_MAX_SOURCES=6",
+                "CONTENTOPS_RESEARCH_RETRY_ATTEMPTS=2",
+                "CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS=0.1",
                 "CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search",
                 "# CONTENTOPS_RESEARCH_SEARCH_API_KEY=",
                 "CONTENTOPS_RESEARCH_SEARCH_ENRICH=true",

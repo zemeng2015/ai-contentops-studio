@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from typing import Protocol
@@ -8,6 +9,8 @@ from urllib.parse import urlparse
 
 import httpx
 from contentops_core.models import Claim, ResearchPacket, RunRequest, Source
+
+QueryParams = dict[str, str | int | float | bool | None]
 
 
 class ResearchProvider(Protocol):
@@ -113,8 +116,15 @@ class LocalResearchProvider:
 
 
 class URLResearchProvider:
-    def __init__(self, timeout_seconds: float = 12.0) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float = 12.0,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
+    ) -> None:
         self.timeout_seconds = timeout_seconds
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         sources = dedupe_sources([self.fetch_source(url) for url in request.source_urls])
@@ -158,8 +168,12 @@ class URLResearchProvider:
                 follow_redirects=True,
                 headers={"User-Agent": "ai-contentops-studio/0.1"},
             ) as client:
-                response = client.get(url)
-                response.raise_for_status()
+                response = _get_with_retries(
+                    client,
+                    url,
+                    retry_attempts=self.retry_attempts,
+                    retry_backoff_seconds=self.retry_backoff_seconds,
+                )
                 if "charset=" not in response.headers.get("content-type", "").lower():
                     response.encoding = "utf-8"
             html = response.text
@@ -252,10 +266,14 @@ class FeedResearchProvider:
         feeds: list[str],
         max_sources: int = 6,
         timeout_seconds: float = 12.0,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
     ) -> None:
         self.feeds = feeds
         self.max_sources = max_sources
         self.timeout_seconds = timeout_seconds
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         entries = self._discover_entries()
@@ -308,8 +326,12 @@ class FeedResearchProvider:
                     follow_redirects=True,
                     headers={"User-Agent": "ai-contentops-studio/0.1"},
                 ) as client:
-                    response = client.get(feed_url)
-                    response.raise_for_status()
+                    response = _get_with_retries(
+                        client,
+                        feed_url,
+                        retry_attempts=self.retry_attempts,
+                        retry_backoff_seconds=self.retry_backoff_seconds,
+                    )
                 entries.extend(self._parse_feed(response.text, feed_url))
             except Exception:
                 entries.append(
@@ -411,13 +433,21 @@ class SearchResearchProvider:
         max_sources: int = 6,
         timeout_seconds: float = 12.0,
         enrich_results: bool = True,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
     ) -> None:
         self.endpoint = endpoint
         self.api_key = api_key
         self.max_sources = max_sources
         self.timeout_seconds = timeout_seconds
         self.enrich_results = enrich_results
-        self.url_provider = URLResearchProvider(timeout_seconds=timeout_seconds)
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
+        self.url_provider = URLResearchProvider(
+            timeout_seconds=timeout_seconds,
+            retry_attempts=retry_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
+        )
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         results = self._search(request.topic)
@@ -481,11 +511,13 @@ class SearchResearchProvider:
                     "X-Subscription-Token": self.api_key,
                 },
             ) as client:
-                response = client.get(
+                response = _get_with_retries(
+                    client,
                     self.endpoint,
                     params={"q": topic, "count": self.max_sources},
+                    retry_attempts=self.retry_attempts,
+                    retry_backoff_seconds=self.retry_backoff_seconds,
                 )
-                response.raise_for_status()
                 payload = response.json()
         except Exception as exc:
             return [
@@ -539,10 +571,24 @@ class SearchResearchProvider:
 
 
 class DiscoveryResearchProvider:
-    def __init__(self, feeds: list[str], max_sources: int = 6) -> None:
+    def __init__(
+        self,
+        feeds: list[str],
+        max_sources: int = 6,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
+    ) -> None:
         self.local = LocalResearchProvider()
-        self.url = URLResearchProvider()
-        self.feed = FeedResearchProvider(feeds=feeds, max_sources=max_sources)
+        self.url = URLResearchProvider(
+            retry_attempts=retry_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
+        )
+        self.feed = FeedResearchProvider(
+            feeds=feeds,
+            max_sources=max_sources,
+            retry_attempts=retry_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
+        )
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         local_packet = self.local.collect(request)
@@ -574,9 +620,16 @@ class DiscoveryResearchProvider:
 
 
 class HybridResearchProvider:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
+    ) -> None:
         self.local = LocalResearchProvider()
-        self.url = URLResearchProvider()
+        self.url = URLResearchProvider(
+            retry_attempts=retry_attempts,
+            retry_backoff_seconds=retry_backoff_seconds,
+        )
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         local_packet = self.local.collect(request)
@@ -651,6 +704,44 @@ def _xml_link(element: ET.Element) -> str | None:
 
 def _xml_local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+
+
+def _get_with_retries(
+    client: httpx.Client,
+    url: str,
+    *,
+    params: QueryParams | None = None,
+    retry_attempts: int,
+    retry_backoff_seconds: float,
+) -> httpx.Response:
+    attempts = max(retry_attempts, 1)
+    for attempt in range(attempts):
+        try:
+            response = client.get(url, params=params) if params is not None else client.get(url)
+            response.raise_for_status()
+            return response
+        except Exception as exc:
+            if attempt == attempts - 1 or not _is_retryable_http_error(exc):
+                raise
+            delay = max(retry_backoff_seconds, 0) * (2**attempt)
+            if delay:
+                time.sleep(delay)
+    raise RuntimeError(f"Unable to fetch {url}")
+
+
+def _is_retryable_http_error(exc: Exception) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        return status_code == 429 or status_code >= 500
+    return isinstance(
+        exc,
+        (
+            TimeoutError,
+            ConnectionError,
+            httpx.TimeoutException,
+            httpx.TransportError,
+        ),
+    )
 
 
 def _search_result_items(payload: dict[str, object]) -> list[object]:

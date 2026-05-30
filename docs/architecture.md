@@ -157,6 +157,9 @@ provider is the low-cost recurring path for curated feeds and operator URLs. Bot
 start from a topic, retrieve current entries, rank them by topic relevance and AI engineering
 keywords, enrich reachable search results with page content, deduplicate canonical URLs, and
 persist the discovered sources into `research.json`.
+Network-backed research providers share a bounded retry policy for transient timeouts,
+connection errors, `429`, and `5xx` responses so scheduled workers degrade gracefully when an
+upstream source is briefly unavailable.
 
 Generation providers:
 

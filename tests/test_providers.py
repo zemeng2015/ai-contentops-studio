@@ -329,6 +329,53 @@ def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch
     assert packet.sources[0].content_length > 1000
 
 
+def test_url_research_retries_transient_fetch_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        headers = {"content-type": "text/html; charset=utf-8"}
+        text = (
+            "<html><head><title>Retry recovered source</title>"
+            '<meta name="description" content="Recovered after a transient timeout.">'
+            "</head><body>"
+            + ("recovered source content " * 30)
+            + "</body></html>"
+        )
+        encoding = "utf-8"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeClient:
+        calls = 0
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str) -> FakeResponse:
+            FakeClient.calls += 1
+            if FakeClient.calls == 1:
+                raise TimeoutError("temporary timeout")
+            return FakeResponse()
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = URLResearchProvider(
+        retry_attempts=2,
+        retry_backoff_seconds=0,
+    ).collect(RunRequest(topic="Retry", source_urls=["https://example.com/retry"]))
+
+    assert FakeClient.calls == 2
+    assert packet.sources[0].title == "Retry recovered source"
+    assert packet.sources[0].extraction_status == "ok"
+
+
 def test_feed_research_discovers_and_ranks_sources(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeResponse:
         text = """
