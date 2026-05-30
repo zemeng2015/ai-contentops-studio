@@ -86,6 +86,8 @@ Successful publishes write `publish-receipt.json`, which links the public URL ba
 publisher, approval record, force flag, publish plan items, before/after file hashes, and rollback
 hints. Existing publish targets are backed up under the run artifact directory before they are
 overwritten.
+Rollback uses that receipt to restore backed-up files or delete files created by the publish, then
+records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,
 and publish transitions in addition to the latest run state.
 

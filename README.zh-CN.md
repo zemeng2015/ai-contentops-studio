@@ -136,6 +136,7 @@ contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops rollback-publish <run_id> --actor "Zack"
 ```
 
 API 暴露同样的生命周期：
@@ -160,6 +161,7 @@ POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun
 POST /runs/{run_id}/publish
+POST /runs/{run_id}/rollback-publish
 ```
 
 Dashboard 地址：

@@ -14,6 +14,7 @@ from contentops_core.models import (
     AuditEvent,
     PublishPlan,
     PublishReceipt,
+    PublishRollbackResult,
     ReviewBatchRequest,
     ReviewBatchResult,
     RunComparison,
@@ -219,6 +220,9 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     approve_action = f"/dashboard/runs/{escape(run_id)}/approve{_api_key_query(api_key)}"
     reject_action = f"/dashboard/runs/{escape(run_id)}/reject{_api_key_query(api_key)}"
     rerun_action = f"/dashboard/runs/{escape(run_id)}/rerun{_api_key_query(api_key)}"
+    rollback_action = (
+        f"/dashboard/runs/{escape(run_id)}/rollback-publish{_api_key_query(api_key)}"
+    )
     publish_action = (
         f'<form method="post" action="/dashboard/runs/{escape(run_id)}/publish'
         f'{_api_key_query(api_key)}">'
@@ -258,6 +262,10 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               {publish_action}
               <h3>Publish Receipt</h3>
               {receipt_html}
+              <form method="post" action="{rollback_action}">
+                <input name="actor" placeholder="Actor" value="operator">
+                <button type="submit">Rollback publish</button>
+              </form>
               <h3>Audit Log</h3>
               {audit_html}
               <form method="post" action="{rerun_action}">
@@ -338,6 +346,21 @@ def dashboard_publish_run(
 ) -> RedirectResponse:
     try:
         review_service.publish(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
+
+
+@app.post("/dashboard/runs/{run_id}/rollback-publish")
+def dashboard_rollback_publish(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+    actor: Annotated[str, Form()] = "operator",
+) -> RedirectResponse:
+    try:
+        review_service.rollback_publish(run_id, actor=actor)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -572,6 +595,20 @@ def get_publish_receipt(run_id: str) -> PublishReceipt | None:
         return review_service.publish_receipt(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/runs/{run_id}/rollback-publish", response_model=PublishRollbackResult)
+def rollback_published_run(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+    actor: str = "operator",
+) -> PublishRollbackResult:
+    try:
+        return review_service.rollback_publish(run_id, actor=actor)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/runs/{run_id}/audit-log", response_model=list[AuditEvent])

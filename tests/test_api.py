@@ -93,6 +93,29 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert [event["action"] for event in audit_response.json()] == ["approve", "publish"]
 
 
+def test_publish_rollback_endpoint_restores_run_state() -> None:
+    client = TestClient(app)
+
+    create_response = client.post("/runs", json={"topic": "API rollback workflow"})
+    run = create_response.json()
+    client.post(f"/runs/{run['id']}/approve?reviewer=zack&notes=ready")
+    client.post(f"/runs/{run['id']}/publish")
+    rollback_response = client.post(f"/runs/{run['id']}/rollback-publish?actor=zack")
+    audit_response = client.get(f"/runs/{run['id']}/audit-log")
+
+    assert rollback_response.status_code == 200
+    assert rollback_response.json()["errors"] == []
+    rollback_payload = rollback_response.json()
+    changed_count = len(rollback_payload["deleted_files"]) + len(rollback_payload["restored_files"])
+    assert changed_count == 3
+    assert audit_response.status_code == 200
+    assert [event["action"] for event in audit_response.json()] == [
+        "approve",
+        "publish",
+        "rollback_publish",
+    ]
+
+
 def test_compare_endpoint() -> None:
     client = TestClient(app)
 

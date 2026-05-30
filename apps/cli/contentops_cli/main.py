@@ -246,6 +246,19 @@ def publish_receipt(run_id: str) -> None:
     typer.echo(receipt.model_dump_json(indent=2))
 
 
+@app.command("rollback-publish")
+def rollback_publish(
+    run_id: str,
+    actor: Annotated[str, typer.Option(help="Operator name for audit log.")] = "operator",
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        result = service.rollback_publish(run_id, actor=actor)
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(result.model_dump_json(indent=2))
+
+
 @app.command("audit-log")
 def audit_log(run_id: str) -> None:
     service = build_review_service(Settings())

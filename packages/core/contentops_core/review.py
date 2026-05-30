@@ -22,6 +22,7 @@ from contentops_core.models import (
     PublishFileChange,
     PublishPlan,
     PublishReceipt,
+    PublishRollbackResult,
     ResearchPacket,
     ReviewActionResult,
     ReviewBatchResult,
@@ -245,6 +246,40 @@ class ReviewService:
             return None
         return PublishReceipt.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
+    def rollback_publish(
+        self,
+        run_id: str,
+        actor: str = "operator",
+    ) -> PublishRollbackResult:
+        run = self._get_run(run_id)
+        receipt = self.publish_receipt(run_id)
+        if receipt is None:
+            raise ValueError("No publish receipt recorded.")
+        previous_status = run.status
+        result = self._restore_publish_changes(run, receipt)
+        self._write_publish_rollback(run, result)
+        if result.errors:
+            raise ValueError("; ".join(result.errors))
+        run.published_url = None
+        run.touch(RunStatus.APPROVED if receipt.approval is not None else RunStatus.NEEDS_REVIEW)
+        self.repository.save(run)
+        self._append_audit_event(
+            run,
+            AuditEvent(
+                run_id=run_id,
+                action="rollback_publish",
+                actor=actor,
+                previous_status=previous_status,
+                new_status=run.status,
+                fields={
+                    "restored_files": len(result.restored_files),
+                    "deleted_files": len(result.deleted_files),
+                    "skipped_files": len(result.skipped_files),
+                },
+            ),
+        )
+        return result
+
     def publish_plan(self, run_id: str) -> PublishPlan:
         run = self._get_run(run_id)
         draft = self._load_json(run, "draft.json", Draft)
@@ -384,6 +419,11 @@ class ReviewService:
         path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
 
     @staticmethod
+    def _write_publish_rollback(run: RunRecord, result: PublishRollbackResult) -> None:
+        path = run.artifact_dir / "publish-rollback.json"
+        path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+    @staticmethod
     def _append_audit_event(run: RunRecord, event: AuditEvent) -> None:
         path = run.artifact_dir / "audit-log.json"
         if path.exists():
@@ -481,6 +521,41 @@ class ReviewService:
                 )
             )
         return changes
+
+    @classmethod
+    def _restore_publish_changes(
+        cls,
+        run: RunRecord,
+        receipt: PublishReceipt,
+    ) -> PublishRollbackResult:
+        result = PublishRollbackResult(run_id=run.id)
+        for change in receipt.file_changes:
+            target_path = Path(change.path)
+            try:
+                if change.backup_artifact:
+                    backup_path = cls._safe_backup_path(run.artifact_dir, change.backup_artifact)
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    target_path.write_bytes(backup_path.read_bytes())
+                    result.restored_files.append(change.path)
+                elif change.action == "created":
+                    if target_path.exists():
+                        target_path.unlink()
+                    result.deleted_files.append(change.path)
+                else:
+                    result.skipped_files.append(change.path)
+            except (OSError, ValueError) as exc:
+                result.errors.append(f"{change.path}: {exc}")
+        return result
+
+    @staticmethod
+    def _safe_backup_path(artifact_dir: Path, backup_artifact: str) -> Path:
+        path = (artifact_dir / backup_artifact).resolve()
+        root = artifact_dir.resolve()
+        if root not in path.parents and path != root:
+            raise ValueError("Backup artifact path escapes the run directory.")
+        if not path.is_file():
+            raise FileNotFoundError(f"Backup artifact not found: {backup_artifact}")
+        return path
 
 
 def _rollback_hint(action: str, backup_artifact: str | None) -> str:

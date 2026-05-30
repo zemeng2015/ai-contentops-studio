@@ -142,6 +142,7 @@ contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops rollback-publish <run_id> --actor "Zack"
 ```
 
 The API exposes the same lifecycle:
@@ -165,6 +166,7 @@ POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun
 POST /runs/{run_id}/publish
+POST /runs/{run_id}/rollback-publish
 ```
 
 The API also serves a lightweight dashboard at:
@@ -186,7 +188,9 @@ Each decision is persisted as `approval.json` beside the other run artifacts.
 Each successful publish writes `publish-receipt.json`, which records the provider, target URL,
 publish plan items, approval record, force flag, timestamp, before/after file hashes, and rollback
 hints. Existing publish targets are copied into `publish-backups/` under the run artifact
-directory before they are overwritten.
+directory before they are overwritten. Operators can run `contentops rollback-publish` or call
+`POST /runs/{run_id}/rollback-publish` to restore backed-up files or delete files created by the
+publish.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
 
 ## Scheduled worker jobs

@@ -168,6 +168,15 @@ class PublishReceipt(BaseModel):
     published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PublishRollbackResult(BaseModel):
+    run_id: str
+    restored_files: list[str] = Field(default_factory=list)
+    deleted_files: list[str] = Field(default_factory=list)
+    skipped_files: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    rolled_back_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class AuditEvent(BaseModel):
     run_id: str
     action: str

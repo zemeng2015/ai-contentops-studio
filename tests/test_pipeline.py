@@ -202,6 +202,43 @@ def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
         assert change.backup_artifact is not None
         assert (second.artifact_dir / change.backup_artifact).exists()
 
+    rollback = review_service.rollback_publish(second.id, actor="zack")
+    rolled_back = review_service.repository.get(second.id)
+    audit_events = review_service.audit_log(second.id)
+
+    assert rollback.errors == []
+    assert len(rollback.restored_files) == 3
+    assert rolled_back is not None
+    assert rolled_back.status == RunStatus.APPROVED
+    assert rolled_back.published_url is None
+    assert (second.artifact_dir / "publish-rollback.json").exists()
+    assert audit_events[-1].action == "rollback_publish"
+    assert audit_events[-1].actor == "zack"
+
+
+def test_publish_rollback_deletes_created_files(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        public_base_url="https://example.com",
+        min_publish_score=0.5,
+    )
+    pipeline = build_pipeline(settings)
+    review_service = build_review_service(settings)
+    result = pipeline.run(RunRequest(topic="Rollback created files"))
+    review_service.approve(result.run.id, reviewer="zack")
+    review_service.publish(result.run.id)
+    receipt = review_service.publish_receipt(result.run.id)
+
+    rollback = review_service.rollback_publish(result.run.id, actor="zack")
+
+    assert receipt is not None
+    assert {change.action for change in receipt.file_changes} == {"created"}
+    assert rollback.errors == []
+    assert len(rollback.deleted_files) == 3
+    assert all(not Path(path).exists() for path in rollback.deleted_files)
+
 
 def test_review_service_rejects_run(tmp_path: Path) -> None:
     settings = Settings(

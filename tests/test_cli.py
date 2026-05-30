@@ -71,6 +71,7 @@ def test_cli_approve_then_publish(
     approve_result = runner.invoke(app, ["approve", run_id, "--reviewer", "zack"])
     publish_result = runner.invoke(app, ["publish", run_id])
     receipt_result = runner.invoke(app, ["publish-receipt", run_id])
+    rollback_result = runner.invoke(app, ["rollback-publish", run_id, "--actor", "zack"])
     audit_result = runner.invoke(app, ["audit-log", run_id])
 
     assert approve_result.exit_code == 0
@@ -80,9 +81,12 @@ def test_cli_approve_then_publish(
     assert receipt_result.exit_code == 0
     assert '"provider": "static"' in receipt_result.output
     assert '"reviewer": "zack"' in receipt_result.output
+    assert rollback_result.exit_code == 0
+    assert '"deleted_files"' in rollback_result.output
     assert audit_result.exit_code == 0
     assert '"action": "approve"' in audit_result.output
     assert '"action": "publish"' in audit_result.output
+    assert '"action": "rollback_publish"' in audit_result.output
 
 
 def test_cli_queue_and_manifest_commands(
