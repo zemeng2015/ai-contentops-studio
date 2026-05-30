@@ -14,6 +14,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - observable run history and artifacts
 - artifact manifests with size, type, timestamp, and content hash metadata
 - queryable review queue with status/search filters and pagination
+- batch approve/reject workflow for review queues
 - explicit approval records before reviewed runs are published
 - append-only audit logs for review and publishing actions
 - publish receipts that audit provider, URL, approval, and changed files
@@ -132,6 +133,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
+contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
@@ -152,6 +154,8 @@ GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /ready
+POST /review-queue/batch-approve
+POST /review-queue/batch-reject
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun

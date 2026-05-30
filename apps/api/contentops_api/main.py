@@ -14,6 +14,8 @@ from contentops_core.models import (
     AuditEvent,
     PublishPlan,
     PublishReceipt,
+    ReviewBatchRequest,
+    ReviewBatchResult,
     RunComparison,
     RunListResponse,
     RunMetrics,
@@ -86,6 +88,7 @@ def dashboard(
     rows = "\n".join(
         f"""
         <tr>
+          <td><input type="checkbox" name="run_ids" value="{escape(run.id)}"></td>
           <td><a href="/dashboard/runs/{escape(run.id)}">{escape(run.id)}</a></td>
           <td>{escape(run.status.value)}</td>
           <td>{escape(run.topic)}</td>
@@ -129,10 +132,25 @@ def dashboard(
                 <button type="submit">Filter runs</button>
               </form>
             </section>
-            <table>
-              <thead><tr><th>Run</th><th>Status</th><th>Topic</th><th>Updated</th></tr></thead>
-              <tbody>{rows}</tbody>
-            </table>
+            <form method="post" action="/dashboard/runs/batch-approve{_api_key_query(api_key)}">
+              <div class="bulk-actions">
+                <input name="reviewer" placeholder="Reviewer" value="operator">
+                <input name="notes" placeholder="Batch review notes">
+                <button type="submit">Approve selected</button>
+                <button
+                  type="submit"
+                  formaction="/dashboard/runs/batch-reject{_api_key_query(api_key)}"
+                >Reject selected</button>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Select</th><th>Run</th><th>Status</th><th>Topic</th><th>Updated</th>
+                  </tr>
+                </thead>
+                <tbody>{rows}</tbody>
+              </table>
+            </form>
             {pagination}
             """,
         )
@@ -349,6 +367,32 @@ def dashboard_reject_run(
     return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
 
 
+@app.post("/dashboard/runs/batch-approve")
+def dashboard_batch_approve(
+    _: Annotated[None, Depends(require_operator)],
+    run_ids: Annotated[list[str] | None, Form()] = None,
+    reviewer: Annotated[str, Form()] = "operator",
+    notes: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    selected_run_ids = run_ids or []
+    if selected_run_ids:
+        review_service.approve_many(selected_run_ids, reviewer=reviewer, notes=notes)
+    return RedirectResponse("/dashboard?status=approved", status_code=303)
+
+
+@app.post("/dashboard/runs/batch-reject")
+def dashboard_batch_reject(
+    _: Annotated[None, Depends(require_operator)],
+    run_ids: Annotated[list[str] | None, Form()] = None,
+    reviewer: Annotated[str, Form()] = "operator",
+    notes: Annotated[str, Form()] = "",
+) -> RedirectResponse:
+    selected_run_ids = run_ids or []
+    if selected_run_ids:
+        review_service.reject_many(selected_run_ids, reviewer=reviewer, notes=notes)
+    return RedirectResponse("/dashboard?status=rejected", status_code=303)
+
+
 @app.post("/dashboard/runs/{run_id}/rerun")
 def dashboard_rerun(
     run_id: str,
@@ -480,6 +524,30 @@ def reject_run(
         return review_service.reject(run_id, reviewer=reviewer, notes=notes)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/review-queue/batch-approve", response_model=ReviewBatchResult)
+def batch_approve_runs(
+    request: ReviewBatchRequest,
+    _: Annotated[None, Depends(require_operator)],
+) -> ReviewBatchResult:
+    return review_service.approve_many(
+        request.run_ids,
+        reviewer=request.reviewer,
+        notes=request.notes,
+    )
+
+
+@app.post("/review-queue/batch-reject", response_model=ReviewBatchResult)
+def batch_reject_runs(
+    request: ReviewBatchRequest,
+    _: Annotated[None, Depends(require_operator)],
+) -> ReviewBatchResult:
+    return review_service.reject_many(
+        request.run_ids,
+        reviewer=request.reviewer,
+        notes=request.notes,
+    )
 
 
 @app.get("/runs/{run_id}/approval", response_model=ApprovalRecord | None)
@@ -626,6 +694,13 @@ def _page(title: str, body: str) -> str:
             border-radius: 6px;
             padding: 8px 12px;
             background: #fff;
+          }}
+          .bulk-actions {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin: 14px 0;
           }}
           .grid {{ display: grid; grid-template-columns: 0.4fr 0.6fr; gap: 18px; }}
           .grid > div {{ padding: 22px; min-width: 0; }}

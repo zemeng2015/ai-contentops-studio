@@ -128,6 +128,28 @@ def test_review_queue_filters_and_paginates() -> None:
     assert "searchable" in payload["items"][0]["topic"].lower()
 
 
+def test_review_queue_batch_approve_returns_per_run_results() -> None:
+    client = TestClient(app)
+
+    first = client.post("/runs", json={"topic": "Batch approve first"}).json()
+    second = client.post("/runs", json={"topic": "Batch approve second"}).json()
+    response = client.post(
+        "/review-queue/batch-approve",
+        json={
+            "run_ids": [first["id"], second["id"], "missing-run"],
+            "reviewer": "zack",
+            "notes": "Batch ready.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "approve"
+    assert [item["status"] for item in payload["results"]] == ["ok", "ok", "failed"]
+    assert payload["results"][0]["new_status"] == "approved"
+    assert "Run not found" in payload["results"][2]["error"]
+
+
 def test_dashboard_renders() -> None:
     client = TestClient(app)
 
@@ -201,6 +223,28 @@ def test_dashboard_can_approve_run() -> None:
     assert response.status_code == 303
     assert approval_response.status_code == 200
     assert approval_response.json()["decision"] == "approved"
+
+
+def test_dashboard_can_batch_reject_runs() -> None:
+    client = TestClient(app)
+
+    first = client.post("/runs", json={"topic": "Dashboard batch reject first"}).json()
+    second = client.post("/runs", json={"topic": "Dashboard batch reject second"}).json()
+    response = client.post(
+        "/dashboard/runs/batch-reject",
+        data={
+            "run_ids": [first["id"], second["id"]],
+            "reviewer": "zack",
+            "notes": "Not ready as a set.",
+        },
+        follow_redirects=False,
+    )
+    first_record = client.get(f"/runs/{first['id']}").json()
+    second_record = client.get(f"/runs/{second['id']}").json()
+
+    assert response.status_code == 303
+    assert first_record["status"] == "rejected"
+    assert second_record["status"] == "rejected"
 
 
 def test_dashboard_publish_requires_approval() -> None:

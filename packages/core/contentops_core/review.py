@@ -22,6 +22,8 @@ from contentops_core.models import (
     PublishPlan,
     PublishReceipt,
     ResearchPacket,
+    ReviewActionResult,
+    ReviewBatchResult,
     RunComparison,
     RunMetrics,
     RunRecord,
@@ -156,6 +158,19 @@ class ReviewService:
         )
         return run
 
+    def approve_many(
+        self,
+        run_ids: list[str],
+        reviewer: str = "operator",
+        notes: str = "",
+    ) -> ReviewBatchResult:
+        return self._batch_review(
+            action="approve",
+            run_ids=run_ids,
+            reviewer=reviewer,
+            notes=notes,
+        )
+
     def reject(self, run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
         run = self._get_run(run_id)
         previous_status = run.status
@@ -182,6 +197,19 @@ class ReviewService:
             ),
         )
         return run
+
+    def reject_many(
+        self,
+        run_ids: list[str],
+        reviewer: str = "operator",
+        notes: str = "",
+    ) -> ReviewBatchResult:
+        return self._batch_review(
+            action="reject",
+            run_ids=run_ids,
+            reviewer=reviewer,
+            notes=notes,
+        )
 
     def audit_log(self, run_id: str) -> list[AuditEvent]:
         run = self._get_run(run_id)
@@ -280,6 +308,40 @@ class ReviewService:
         if run is None:
             raise FileNotFoundError(f"Run not found: {run_id}")
         return run
+
+    def _batch_review(
+        self,
+        action: str,
+        run_ids: list[str],
+        reviewer: str,
+        notes: str,
+    ) -> ReviewBatchResult:
+        results: list[ReviewActionResult] = []
+        for run_id in run_ids:
+            try:
+                if action == "approve":
+                    run = self.approve(run_id, reviewer=reviewer, notes=notes)
+                else:
+                    run = self.reject(run_id, reviewer=reviewer, notes=notes)
+            except (FileNotFoundError, ValueError) as exc:
+                results.append(
+                    ReviewActionResult(
+                        run_id=run_id,
+                        action=action,
+                        status="failed",
+                        error=str(exc),
+                    )
+                )
+                continue
+            results.append(
+                ReviewActionResult(
+                    run_id=run_id,
+                    action=action,
+                    status="ok",
+                    new_status=run.status,
+                )
+            )
+        return ReviewBatchResult(action=action, results=results)
 
     @staticmethod
     def _safe_artifact_path(artifact_dir: Path, artifact_name: str) -> Path:

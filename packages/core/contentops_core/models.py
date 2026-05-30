@@ -106,6 +106,25 @@ class ApprovalRecord(BaseModel):
     decided_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class ReviewBatchRequest(BaseModel):
+    run_ids: list[str] = Field(min_length=1)
+    reviewer: str = "operator"
+    notes: str = ""
+
+
+class ReviewActionResult(BaseModel):
+    run_id: str
+    action: str
+    status: str
+    new_status: RunStatus | None = None
+    error: str | None = None
+
+
+class ReviewBatchResult(BaseModel):
+    action: str
+    results: list[ReviewActionResult]
+
+
 class PublishReceipt(BaseModel):
     run_id: str
     provider: str

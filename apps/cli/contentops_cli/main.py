@@ -176,6 +176,21 @@ def approve(
     typer.echo(f"Status: {record.status.value}")
 
 
+@app.command("approve-many")
+def approve_many(
+    run_ids: list[str],
+    reviewer: Annotated[str, typer.Option(help="Reviewer name.")] = "operator",
+    notes: Annotated[str, typer.Option(help="Approval notes.")] = "",
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    result = service.approve_many(run_ids, reviewer=reviewer, notes=notes)
+    _echo_batch_result(result.model_dump(mode="json"), json_output=json_output)
+
+
 @app.command()
 def reject(
     run_id: str,
@@ -188,6 +203,21 @@ def reject(
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(f"Status: {record.status.value}")
+
+
+@app.command("reject-many")
+def reject_many(
+    run_ids: list[str],
+    reviewer: Annotated[str, typer.Option(help="Reviewer name.")] = "operator",
+    notes: Annotated[str, typer.Option(help="Rejection notes.")] = "",
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    result = service.reject_many(run_ids, reviewer=reviewer, notes=notes)
+    _echo_batch_result(result.model_dump(mode="json"), json_output=json_output)
 
 
 @app.command()
@@ -313,3 +343,15 @@ def _parse_status(status: str) -> RunStatus | None:
         return RunStatus(normalized)
     except ValueError as exc:
         raise typer.BadParameter(f"Unknown run status: {status}") from exc
+
+
+def _echo_batch_result(payload: dict[str, object], json_output: bool) -> None:
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    results = payload.get("results", [])
+    if isinstance(results, list):
+        for item in results:
+            if isinstance(item, dict):
+                label = item.get("new_status") or item.get("error") or item.get("status")
+                typer.echo(f"{item.get('run_id')}: {label}")

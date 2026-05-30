@@ -190,6 +190,30 @@ def test_review_service_rejects_run(tmp_path: Path) -> None:
     assert audit_events[0].actor == "zack"
 
 
+def test_review_service_batch_approve_records_partial_results(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    pipeline = build_pipeline(settings)
+    first = pipeline.run(RunRequest(topic="Batch service first")).run
+    second = pipeline.run(RunRequest(topic="Batch service second")).run
+    review_service = build_review_service(settings)
+
+    result = review_service.approve_many(
+        [first.id, second.id, "missing-run"],
+        reviewer="zack",
+        notes="Batch reviewed.",
+    )
+
+    assert result.action == "approve"
+    assert [item.status for item in result.results] == ["ok", "ok", "failed"]
+    assert result.results[0].new_status == RunStatus.APPROVED
+    assert result.results[2].error is not None
+    assert review_service.approval(first.id) is not None
+
+
 def test_review_service_records_forced_publish_receipt(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",

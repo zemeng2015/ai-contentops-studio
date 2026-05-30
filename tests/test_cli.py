@@ -115,3 +115,36 @@ def test_cli_queue_and_manifest_commands(
     manifest_payload = json.loads(manifest_result.output)
     assert manifest_payload["run_id"] == run_id
     assert manifest_payload["artifacts"]["eval-report.json"]["size_bytes"] > 0
+
+
+def test_cli_approve_many_returns_per_run_results(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+
+    first = runner.invoke(app, ["run", "--topic", "CLI batch first"])
+    second = runner.invoke(app, ["run", "--topic", "CLI batch second"])
+    first_id = _run_id(first.output)
+    second_id = _run_id(second.output)
+    approve_result = runner.invoke(
+        app,
+        ["approve-many", first_id, second_id, "missing-run", "--reviewer", "zack", "--json"],
+    )
+
+    assert approve_result.exit_code == 0
+    payload = json.loads(approve_result.output)
+    assert payload["action"] == "approve"
+    assert [item["status"] for item in payload["results"]] == ["ok", "ok", "failed"]
+    assert payload["results"][0]["new_status"] == "approved"
+
+
+def _run_id(output: str) -> str:
+    return next(
+        line.split(":", 1)[1].strip()
+        for line in output.splitlines()
+        if line.startswith("Run:")
+    )

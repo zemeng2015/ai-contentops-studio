@@ -11,6 +11,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - 先规划再生成的内容生产流程
 - 可重复、可测试的质量评估
 - 可查询的 review queue，支持状态、关键词筛选和分页
+- Review queue 支持批量 approve/reject
 - 可观测的运行历史、trace 和 artifacts
 - Artifact manifest 记录文件大小、类型、更新时间和内容哈希
 - reviewed run 发布前必须有显式 approval record
@@ -126,6 +127,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
+contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
@@ -147,6 +149,8 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /ready
+POST /review-queue/batch-approve
+POST /review-queue/batch-reject
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun
