@@ -46,6 +46,7 @@ The review service lets an operator inspect artifacts from an existing run and p
 later:
 
 - list artifact names for a run
+- inspect an artifact manifest with size, media type, timestamp, and sha256 metadata
 - read individual artifacts such as `research.json`, `draft.md`, or `eval-report.json`
 - publish an existing run after evaluation, with an explicit force option for overrides
 - preview file-level publish changes through `PublishPlan` before mutating targets

@@ -202,7 +202,15 @@ class RunListResponse(BaseModel):
     offset: int = Field(ge=0)
 
 
+class ArtifactMetadata(BaseModel):
+    name: str
+    size_bytes: int = Field(ge=0)
+    media_type: str
+    sha256: str
+    updated_at: datetime
+
+
 class ArtifactManifest(BaseModel):
     run_id: str
-    artifacts: dict[str, str] = Field(default_factory=dict)
+    artifacts: dict[str, ArtifactMetadata] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)

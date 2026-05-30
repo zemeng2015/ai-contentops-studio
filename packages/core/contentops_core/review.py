@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import mimetypes
+from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import TypeVar
 
@@ -11,6 +14,8 @@ from contentops_core.metrics import MetricsService
 from contentops_core.models import (
     ApprovalDecision,
     ApprovalRecord,
+    ArtifactManifest,
+    ArtifactMetadata,
     Draft,
     EvaluationReport,
     PublishPlan,
@@ -38,6 +43,30 @@ class ReviewService:
     def list_artifacts(self, run_id: str) -> list[str]:
         run = self._get_run(run_id)
         return sorted(path.name for path in run.artifact_dir.iterdir() if path.is_file())
+
+    def artifact_manifest(self, run_id: str) -> ArtifactManifest:
+        run = self._get_run(run_id)
+        artifacts: dict[str, ArtifactMetadata] = {}
+        for path in sorted(run.artifact_dir.iterdir()):
+            if not path.is_file():
+                continue
+            stat = path.stat()
+            media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            artifacts[path.name] = ArtifactMetadata(
+                name=path.name,
+                size_bytes=stat.st_size,
+                media_type=media_type,
+                sha256=sha256(path.read_bytes()).hexdigest(),
+                updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
+            )
+        return ArtifactManifest(
+            run_id=run.id,
+            artifacts=artifacts,
+            metadata={
+                "artifact_dir": str(run.artifact_dir),
+                "status": run.status.value,
+            },
+        )
 
     def read_artifact(self, run_id: str, artifact_name: str) -> str:
         run = self._get_run(run_id)

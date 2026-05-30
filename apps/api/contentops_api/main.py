@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
     ApprovalRecord,
+    ArtifactManifest,
     PublishPlan,
     PublishReceipt,
     RunComparison,
@@ -150,9 +151,17 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     run = repository.get(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
-    artifacts = review_service.list_artifacts(run_id)
-    artifact_links = "\n".join(
-        f'<li><a href="/runs/{escape(run_id)}/artifacts/{escape(name)}">{escape(name)}</a></li>'
+    manifest = review_service.artifact_manifest(run_id)
+    artifacts = sorted(manifest.artifacts)
+    artifact_rows = "\n".join(
+        f"""
+        <tr>
+          <td><a href="/runs/{escape(run_id)}/artifacts/{escape(name)}">{escape(name)}</a></td>
+          <td>{manifest.artifacts[name].size_bytes}</td>
+          <td>{escape(manifest.artifacts[name].media_type)}</td>
+          <td><code>{escape(manifest.artifacts[name].sha256[:12])}</code></td>
+        </tr>
+        """
         for name in artifacts
     )
     eval_report = "{}"
@@ -224,7 +233,11 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
             <section class="grid">
               <div>
                 <h3>Artifacts</h3>
-                <ul>{artifact_links}</ul>
+                <p><a href="/runs/{escape(run_id)}/artifact-manifest">Manifest JSON</a></p>
+                <table>
+                  <thead><tr><th>Name</th><th>Bytes</th><th>Type</th><th>SHA</th></tr></thead>
+                  <tbody>{artifact_rows}</tbody>
+                </table>
               </div>
               <div>
                 <h3>Evaluation</h3>
@@ -389,6 +402,14 @@ def get_run(run_id: str) -> RunRecord:
 def list_artifacts(run_id: str) -> list[str]:
     try:
         return review_service.list_artifacts(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/artifact-manifest", response_model=ArtifactManifest)
+def get_artifact_manifest(run_id: str) -> ArtifactManifest:
+    try:
+        return review_service.artifact_manifest(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -586,6 +607,7 @@ def _page(title: str, body: str) -> str:
           }}
           .grid {{ display: grid; grid-template-columns: 0.4fr 0.6fr; gap: 18px; }}
           .grid > div {{ padding: 22px; min-width: 0; }}
+          .grid table {{ border-radius: 0; box-shadow: none; }}
           pre {{ overflow: auto; padding: 16px; background: #101816; color: #e6f0ec; }}
           @media (max-width: 800px) {{
             .grid, .metrics {{ grid-template-columns: 1fr; }}

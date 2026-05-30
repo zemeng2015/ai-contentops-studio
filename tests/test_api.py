@@ -20,6 +20,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     create_response = client.post("/runs", json={"topic": "API review workflow"})
     run = create_response.json()
     artifacts_response = client.get(f"/runs/{run['id']}/artifacts")
+    manifest_response = client.get(f"/runs/{run['id']}/artifact-manifest")
     artifact_response = client.get(f"/runs/{run['id']}/artifacts/eval-report.json")
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
     metrics_response = client.get(f"/runs/{run['id']}/metrics")
@@ -33,6 +34,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert create_response.status_code == 200
     assert artifacts_response.status_code == 200
     assert "eval-report.json" in artifacts_response.json()
+    assert manifest_response.status_code == 200
+    assert manifest_response.json()["artifacts"]["eval-report.json"]["size_bytes"] > 0
     assert artifact_response.status_code == 200
     assert plan_response.status_code == 200
     assert plan_response.json()["ready"] is True
@@ -127,6 +130,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Publish Plan" in detail_response.text
     assert "Approval" in detail_response.text
     assert "Publish Receipt" in detail_response.text
+    assert "Manifest JSON" in detail_response.text
     assert "Run Timeline" in detail_response.text
     assert "Rerun with same request" in detail_response.text
     assert "Compare runs" in detail_response.text

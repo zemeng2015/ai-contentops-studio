@@ -12,6 +12,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - content planning before generation
 - deterministic quality evaluation
 - observable run history and artifacts
+- artifact manifests with size, type, timestamp, and content hash metadata
 - queryable review queue with status/search filters and pagination
 - explicit approval records before reviewed runs are published
 - publish receipts that audit provider, URL, approval, and changed files
@@ -135,6 +136,7 @@ The API exposes the same lifecycle:
 
 ```text
 GET  /runs/{run_id}/artifacts
+GET  /runs/{run_id}/artifact-manifest
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics

@@ -98,6 +98,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     review_service = build_review_service(settings)
 
     artifacts = review_service.list_artifacts(result.run.id)
+    manifest = review_service.artifact_manifest(result.run.id)
     plan = review_service.publish_plan(result.run.id)
     metrics = review_service.metrics(result.run.id)
     original_request = review_service.request(result.run.id)
@@ -113,6 +114,9 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert "draft.json" in artifacts
     assert "eval-report.json" in artifacts
     assert "approval.json" not in artifacts
+    assert manifest.run_id == result.run.id
+    assert manifest.artifacts["draft.json"].size_bytes > 0
+    assert len(manifest.artifacts["draft.json"].sha256) == 64
     assert plan.ready is True
     assert len(plan.items) == 3
     assert metrics.run_id == result.run.id
