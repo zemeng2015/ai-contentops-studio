@@ -116,6 +116,16 @@ class PublishReceipt(BaseModel):
     published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class AuditEvent(BaseModel):
+    run_id: str
+    action: str
+    actor: str = "system"
+    previous_status: RunStatus | None = None
+    new_status: RunStatus | None = None
+    fields: dict[str, Any] = Field(default_factory=dict)
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class TraceEvent(BaseModel):
     timestamp: datetime
     step: str

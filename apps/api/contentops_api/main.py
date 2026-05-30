@@ -10,6 +10,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
+    AuditEvent,
     PublishPlan,
     PublishReceipt,
     RunComparison,
@@ -179,6 +180,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
         source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
     approval_html = _approval_html(review_service.approval(run_id))
     receipt_html = _publish_receipt_html(review_service.publish_receipt(run_id))
+    audit_html = _audit_log_html(review_service.audit_log(run_id))
     approve_action = f"/dashboard/runs/{escape(run_id)}/approve{_api_key_query(api_key)}"
     reject_action = f"/dashboard/runs/{escape(run_id)}/reject{_api_key_query(api_key)}"
     rerun_action = f"/dashboard/runs/{escape(run_id)}/rerun{_api_key_query(api_key)}"
@@ -221,6 +223,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               {publish_action}
               <h3>Publish Receipt</h3>
               {receipt_html}
+              <h3>Audit Log</h3>
+              {audit_html}
               <form method="post" action="{rerun_action}">
                 <button type="submit">Rerun with same request</button>
               </form>
@@ -480,6 +484,14 @@ def get_approval(run_id: str) -> ApprovalRecord | None:
 def get_publish_receipt(run_id: str) -> PublishReceipt | None:
     try:
         return review_service.publish_receipt(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/audit-log", response_model=list[AuditEvent])
+def get_audit_log(run_id: str) -> list[AuditEvent]:
+    try:
+        return review_service.audit_log(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -775,6 +787,32 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
       <table>
         <thead><tr><th>Action</th><th>Path</th><th>Description</th></tr></thead>
         <tbody>{item_rows}</tbody>
+      </table>
+    """
+
+
+def _audit_log_html(events: list[AuditEvent]) -> str:
+    if not events:
+        return "<p>No audit events recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(event.action)}</td>
+          <td>{escape(event.actor)}</td>
+          <td>{escape(event.previous_status.value if event.previous_status else "n/a")}</td>
+          <td>{escape(event.new_status.value if event.new_status else "n/a")}</td>
+          <td>{escape(event.occurred_at.isoformat())}</td>
+        </tr>
+        """
+        for event in events
+    )
+    return f"""
+      <p><a href="/runs/{escape(events[0].run_id)}/audit-log">Audit JSON</a></p>
+      <table>
+        <thead>
+          <tr><th>Action</th><th>Actor</th><th>From</th><th>To</th><th>At</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 

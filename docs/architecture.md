@@ -78,6 +78,8 @@ reviewed run requires approval unless the operator uses an explicit force overri
 system a real editorial control point instead of treating publish as a casual button click.
 Successful publishes write `publish-receipt.json`, which links the public URL back to the run,
 publisher, approval record, force flag, and publish plan items.
+Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,
+and publish transitions in addition to the latest run state.
 
 ```text
 needs_review -> approved -> publishing -> published

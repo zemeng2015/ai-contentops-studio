@@ -110,6 +110,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     published = review_service.publish(result.run.id)
     approval = review_service.approval(result.run.id)
     receipt = review_service.publish_receipt(result.run.id)
+    audit_events = review_service.audit_log(result.run.id)
 
     assert "draft.json" in artifacts
     assert "eval-report.json" in artifacts
@@ -134,7 +135,11 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert receipt.url == published.published_url
     assert receipt.approval is not None
     assert receipt.approval.reviewer == "zack"
+    assert [event.action for event in audit_events] == ["approve", "publish"]
+    assert audit_events[0].actor == "zack"
+    assert audit_events[1].new_status == RunStatus.PUBLISHED
     assert (result.run.artifact_dir / "publish-receipt.json").exists()
+    assert (result.run.artifact_dir / "audit-log.json").exists()
 
 
 def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None:
@@ -173,11 +178,15 @@ def test_review_service_rejects_run(tmp_path: Path) -> None:
 
     rejected = review_service.reject(result.run.id, reviewer="zack", notes="Needs a better angle.")
     approval = review_service.approval(result.run.id)
+    audit_events = review_service.audit_log(result.run.id)
 
     assert rejected.status == RunStatus.REJECTED
     assert approval is not None
     assert approval.decision.value == "rejected"
     assert approval.notes == "Needs a better angle."
+    assert len(audit_events) == 1
+    assert audit_events[0].action == "reject"
+    assert audit_events[0].actor == "zack"
 
 
 def test_review_service_records_forced_publish_receipt(tmp_path: Path) -> None:

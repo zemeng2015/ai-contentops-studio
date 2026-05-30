@@ -197,6 +197,16 @@ def publish_receipt(run_id: str) -> None:
     typer.echo(receipt.model_dump_json(indent=2))
 
 
+@app.command("audit-log")
+def audit_log(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        events = service.audit_log(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(json.dumps([event.model_dump(mode="json") for event in events], indent=2))
+
+
 @app.command("publish-plan")
 def publish_plan(run_id: str) -> None:
     service = build_review_service(Settings())

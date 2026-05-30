@@ -14,6 +14,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - 可观测的运行历史、trace 和 artifacts
 - Artifact manifest 记录文件大小、类型、更新时间和内容哈希
 - reviewed run 发布前必须有显式 approval record
+- approve、reject、publish 等操作会追加写入 audit log
 - publish receipt 会审计 provider、URL、approval 和变更文件
 - 可选 operator API key，用于保护 API 和 Dashboard 的写操作
 - API、CLI、worker、publisher 清晰分层
@@ -122,6 +123,7 @@ contentops metrics <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
+contentops audit-log <run_id>
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
@@ -140,6 +142,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
+GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
@@ -155,7 +158,7 @@ GET /dashboard
 
 Dashboard 支持数据库层面的 topic、run id、slug、status 筛选，并带有队列统计和分页。Run detail 页面包含 Source Review、Publish Plan、Run Timeline、Approval、Publish Receipt，以及对比两个 run 的入口。
 
-待 review 的 run 必须先 approve 才能 publish，除非操作员显式使用 `force=true`。每次 approve 或 reject 都会写入 `approval.json`，每次成功发布都会写入 `publish-receipt.json`。
+待 review 的 run 必须先 approve 才能 publish，除非操作员显式使用 `force=true`。每次 approve 或 reject 都会写入 `approval.json`，每次成功发布都会写入 `publish-receipt.json`。关键 review 和 publish 操作还会追加写入 `audit-log.json`，方便追踪运营动作。
 
 ## Scheduled Worker Jobs
 

@@ -16,6 +16,7 @@ from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
     ArtifactMetadata,
+    AuditEvent,
     Draft,
     EvaluationReport,
     PublishPlan,
@@ -78,6 +79,7 @@ class ReviewService:
         draft = self._load_json(run, "draft.json", Draft)
         report = self._load_json(run, "eval-report.json", EvaluationReport)
         approval = self.approval(run_id)
+        previous_status = run.status
         if run.status == RunStatus.NEEDS_REVIEW and approval is None and not force:
             raise ValueError("Run must be approved before publishing. Use force=true to override.")
         if approval is not None and approval.decision == ApprovalDecision.REJECTED and not force:
@@ -103,10 +105,27 @@ class ReviewService:
         )
         run.touch(RunStatus.PUBLISHED)
         self.repository.save(run)
+        actor = approval.reviewer if approval is not None else "force"
+        self._append_audit_event(
+            run,
+            AuditEvent(
+                run_id=run_id,
+                action="publish",
+                actor=actor,
+                previous_status=previous_status,
+                new_status=run.status,
+                fields={
+                    "force": force,
+                    "provider": plan.provider,
+                    "url": run.published_url,
+                },
+            ),
+        )
         return run
 
     def approve(self, run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
         run = self._get_run(run_id)
+        previous_status = run.status
         report = self._load_json(run, "eval-report.json", EvaluationReport)
         if not report.publish_ready:
             raise ValueError("Run is not publish-ready and cannot be approved.")
@@ -124,10 +143,22 @@ class ReviewService:
         )
         run.touch(RunStatus.APPROVED)
         self.repository.save(run)
+        self._append_audit_event(
+            run,
+            AuditEvent(
+                run_id=run_id,
+                action="approve",
+                actor=reviewer,
+                previous_status=previous_status,
+                new_status=run.status,
+                fields={"notes": notes},
+            ),
+        )
         return run
 
     def reject(self, run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
         run = self._get_run(run_id)
+        previous_status = run.status
         self._write_approval(
             run,
             ApprovalRecord(
@@ -139,7 +170,26 @@ class ReviewService:
         )
         run.touch(RunStatus.REJECTED)
         self.repository.save(run)
+        self._append_audit_event(
+            run,
+            AuditEvent(
+                run_id=run_id,
+                action="reject",
+                actor=reviewer,
+                previous_status=previous_status,
+                new_status=run.status,
+                fields={"notes": notes},
+            ),
+        )
         return run
+
+    def audit_log(self, run_id: str) -> list[AuditEvent]:
+        run = self._get_run(run_id)
+        path = run.artifact_dir / "audit-log.json"
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return [AuditEvent.model_validate(item) for item in data]
 
     def approval(self, run_id: str) -> ApprovalRecord | None:
         run = self._get_run(run_id)
@@ -258,6 +308,16 @@ class ReviewService:
     def _write_publish_receipt(run: RunRecord, receipt: PublishReceipt) -> None:
         path = run.artifact_dir / "publish-receipt.json"
         path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _append_audit_event(run: RunRecord, event: AuditEvent) -> None:
+        path = run.artifact_dir / "audit-log.json"
+        if path.exists():
+            events = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            events = []
+        events.append(event.model_dump(mode="json"))
+        path.write_text(json.dumps(events, indent=2, ensure_ascii=False), encoding="utf-8")
 
     @staticmethod
     def _load_sources(run: RunRecord) -> list[Source]:

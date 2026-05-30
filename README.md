@@ -15,6 +15,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - artifact manifests with size, type, timestamp, and content hash metadata
 - queryable review queue with status/search filters and pagination
 - explicit approval records before reviewed runs are published
+- append-only audit logs for review and publishing actions
 - publish receipts that audit provider, URL, approval, and changed files
 - optional operator API key protection for mutating API and dashboard actions
 - API, CLI, worker, and publisher boundaries
@@ -128,6 +129,7 @@ contentops metrics <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
+contentops audit-log <run_id>
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
@@ -144,6 +146,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
+GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 POST /runs/{run_id}/approve
@@ -170,6 +173,7 @@ Reviewed runs must be approved before publishing unless an operator explicitly u
 Each decision is persisted as `approval.json` beside the other run artifacts.
 Each successful publish writes `publish-receipt.json`, which records the provider, target URL,
 publish plan items, approval record, force flag, and timestamp.
+Review and publishing actions are appended to `audit-log.json` for operational traceability.
 
 ## Scheduled worker jobs
 
