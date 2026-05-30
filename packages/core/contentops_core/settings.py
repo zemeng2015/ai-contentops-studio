@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CONTENTOPS_", env_file=".env", extra="ignore")
 
     artifact_root: Path = Path("artifacts")
+    artifact_store_provider: str = "local"
+    artifact_s3_bucket: str | None = None
+    artifact_s3_prefix: str = "contentops-artifacts"
     database_url: str = "sqlite:///contentops.db"
     site_output_dir: Path = Path("site")
     public_base_url: str = "http://localhost:8000/site"

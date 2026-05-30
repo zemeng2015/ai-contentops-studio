@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRequest, RunStatus
 from contentops_core.repository import RunRepository
@@ -81,3 +82,14 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert "eval-report.json" in artifacts
     assert published.status == RunStatus.PUBLISHED
     assert published.published_url is not None
+
+
+def test_s3_artifact_store_requires_bucket(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        artifact_store_provider="s3",
+    )
+
+    with pytest.raises(ValueError, match="CONTENTOPS_ARTIFACT_S3_BUCKET"):
+        build_pipeline(settings)

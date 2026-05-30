@@ -139,6 +139,20 @@ CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 ```
 
+Mirror artifacts to S3 in AWS deployments:
+
+```text
+CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3
+CONTENTOPS_ARTIFACT_S3_BUCKET=your-artifact-bucket
+CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
+```
+
+Install the optional AWS dependency before enabling S3 mirroring:
+
+```powershell
+pip install -e ".[aws]"
+```
+
 Use real source URLs:
 
 ```powershell

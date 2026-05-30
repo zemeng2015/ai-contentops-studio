@@ -94,6 +94,9 @@ def init_config(
         "\n".join(
             [
                 "CONTENTOPS_ARTIFACT_ROOT=artifacts",
+                "CONTENTOPS_ARTIFACT_STORE_PROVIDER=local",
+                "# CONTENTOPS_ARTIFACT_S3_BUCKET=",
+                "CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts",
                 "CONTENTOPS_DATABASE_URL=sqlite:///contentops.db",
                 "CONTENTOPS_SITE_OUTPUT_DIR=site",
                 "CONTENTOPS_PUBLIC_BASE_URL=http://localhost:8000/site",

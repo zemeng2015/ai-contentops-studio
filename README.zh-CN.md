@@ -135,6 +135,20 @@ CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 ```
 
+在 AWS 部署中将 artifacts 镜像到 S3：
+
+```text
+CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3
+CONTENTOPS_ARTIFACT_S3_BUCKET=your-artifact-bucket
+CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
+```
+
+启用 S3 镜像前需要安装可选 AWS 依赖：
+
+```powershell
+pip install -e ".[aws]"
+```
+
 使用真实网页来源：
 
 ```powershell

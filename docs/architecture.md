@@ -66,7 +66,7 @@ Local defaults:
 AWS-ready equivalents:
 
 - RDS Postgres for run metadata
-- S3 for artifacts
+- S3 for artifacts through optional S3 mirroring
 - EventBridge Scheduler for recurring runs
 - ECS Fargate or Lambda for API/worker execution
 - CloudWatch for logs and metrics

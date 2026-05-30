@@ -7,7 +7,7 @@ from contentops_observability.tracing import RunTrace
 from contentops_providers.research import ResearchProvider
 from contentops_publishing.static_site import Publisher
 
-from contentops_core.artifacts import ArtifactStore
+from contentops_core.artifacts import ArtifactWriter
 from contentops_core.generator import DraftGenerator
 from contentops_core.models import RunRecord, RunRequest, RunStatus
 from contentops_core.planner import ContentPlanner
@@ -24,7 +24,7 @@ class ContentOpsPipeline:
     def __init__(
         self,
         repository: RunRepository,
-        artifact_store: ArtifactStore,
+        artifact_store: ArtifactWriter,
         research_provider: ResearchProvider,
         planner: ContentPlanner,
         generator: DraftGenerator,

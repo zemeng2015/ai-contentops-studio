@@ -10,7 +10,7 @@ from contentops_providers.research import (
 from contentops_publishing.homepage import HomepagePublisher
 from contentops_publishing.static_site import StaticSitePublisher
 
-from contentops_core.artifacts import ArtifactStore
+from contentops_core.artifacts import ArtifactStore, ArtifactWriter, S3MirroringArtifactStore
 from contentops_core.generator import ContentGenerator, DraftGenerator
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.planner import ContentPlanner
@@ -22,7 +22,7 @@ from contentops_core.settings import Settings
 def build_pipeline(settings: Settings | None = None) -> ContentOpsPipeline:
     settings = settings or Settings()
     repository = RunRepository(settings.database_url)
-    artifact_store = ArtifactStore(settings.artifact_root)
+    artifact_store = _build_artifact_store(settings)
     return ContentOpsPipeline(
         repository=repository,
         artifact_store=artifact_store,
@@ -42,6 +42,18 @@ def _build_research_provider(
     if settings.research_provider == "url":
         return URLResearchProvider()
     return HybridResearchProvider()
+
+
+def _build_artifact_store(settings: Settings) -> ArtifactWriter:
+    if settings.artifact_store_provider == "s3":
+        if not settings.artifact_s3_bucket:
+            raise ValueError("CONTENTOPS_ARTIFACT_S3_BUCKET is required for S3 artifact storage.")
+        return S3MirroringArtifactStore(
+            root=settings.artifact_root,
+            bucket=settings.artifact_s3_bucket,
+            prefix=settings.artifact_s3_prefix,
+        )
+    return ArtifactStore(settings.artifact_root)
 
 
 def _build_generator(settings: Settings) -> DraftGenerator:
