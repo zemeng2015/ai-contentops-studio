@@ -87,3 +87,7 @@ terraform apply \
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes
 require `X-ContentOps-Api-Key` or an `api_key` query parameter.
+
+Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions` unless
+`--receipt-dir` is provided. In ECS/EventBridge deployments, keep artifact mirroring enabled so
+these receipts are copied to S3 with the rest of the run artifacts.

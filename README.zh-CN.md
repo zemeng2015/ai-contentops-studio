@@ -181,7 +181,13 @@ Worker 可以校验或执行 YAML 定义的内容选题计划：
 ```powershell
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
+
+Every worker execution writes a job receipt JSON file under
+`CONTENTOPS_ARTIFACT_ROOT/job-executions` by default. Receipts include execution id, dry-run flag,
+timestamps, duration, per-job status, run ids, artifact directories, publish URLs, tags, metadata,
+and errors.
 
 Job file 兼容旧的单任务格式，也支持更接近生产环境的批量任务：
 

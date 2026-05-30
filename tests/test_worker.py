@@ -22,12 +22,19 @@ jobs:
     )
     runner = CliRunner()
 
-    result = runner.invoke(app, ["run-pipeline", str(path), "--dry-run"])
+    receipt_dir = tmp_path / "receipts"
+
+    result = runner.invoke(
+        app,
+        ["run-pipeline", str(path), "--dry-run", "--receipt-dir", str(receipt_dir)],
+    )
 
     assert result.exit_code == 0
     assert "Loaded 2 job(s)" in result.output
+    assert "Receipt:" in result.output
     assert "roundup: AI platform weekly roundup" in result.output
     assert "evals: LLM evaluation checklist" in result.output
+    assert len(list(receipt_dir.glob("*.json"))) == 1
 
 
 def test_worker_dry_run_can_emit_json(tmp_path: Path) -> None:
@@ -35,7 +42,14 @@ def test_worker_dry_run_can_emit_json(tmp_path: Path) -> None:
     path.write_text("name: one\ntopic: AI systems\n", encoding="utf-8")
     runner = CliRunner()
 
-    result = runner.invoke(app, ["run-pipeline", str(path), "--dry-run", "--json"])
+    receipt_dir = tmp_path / "receipts"
+
+    result = runner.invoke(
+        app,
+        ["run-pipeline", str(path), "--dry-run", "--json", "--receipt-dir", str(receipt_dir)],
+    )
 
     assert result.exit_code == 0
     assert '"topic": "AI systems"' in result.output
+    assert '"dry_run": true' in result.output
+    assert len(list(receipt_dir.glob("*.json"))) == 1

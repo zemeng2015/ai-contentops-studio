@@ -75,4 +75,36 @@ jobs:
     assert report.total == 2
     assert report.succeeded == 2
     assert report.failed == 0
+    assert report.dry_run is False
+    assert report.receipt_path is not None
+    assert Path(report.receipt_path).exists()
+    assert all(result.duration_ms is not None for result in report.results)
     assert all(result.run_id for result in report.results)
+
+
+def test_job_runner_builds_dry_run_receipt(tmp_path: Path) -> None:
+    path = tmp_path / "jobs.yaml"
+    path.write_text(
+        """
+name: dry-calendar
+jobs:
+  - name: roundup
+    topic: AI platform weekly roundup
+    publish: true
+    tags: [ai, roundup]
+    metadata:
+      owner: zack
+""",
+        encoding="utf-8",
+    )
+
+    report = JobRunner.dry_run_report(load_job_file(path))
+
+    assert report.name == "dry-calendar"
+    assert report.dry_run is True
+    assert report.total == 1
+    assert report.succeeded == 1
+    assert report.results[0].status == "dry_run"
+    assert report.results[0].publish is True
+    assert report.results[0].tags == ["ai", "roundup"]
+    assert report.results[0].metadata == {"owner": "zack"}

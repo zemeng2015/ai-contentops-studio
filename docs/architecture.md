@@ -118,6 +118,11 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
 ```
 
+Every worker invocation writes a job execution receipt under `artifact_root/job-executions` by
+default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,
+artifact directories, publish URLs, and per-job errors, giving EventBridge/ECS-triggered runs an
+auditable artifact even when stdout logs are rotated.
+
 ## Production path
 
 Local defaults:

@@ -200,7 +200,14 @@ The worker can validate or execute YAML-defined content calendars:
 ```powershell
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
+
+Every worker execution writes a job receipt JSON file. Receipts include an execution id, dry-run
+flag, start/end timestamps, duration, per-job status, run ids, artifact directories, published URLs,
+tags, metadata, and errors. By default receipts are written under
+`CONTENTOPS_ARTIFACT_ROOT/job-executions`, which is suitable for ECS/EventBridge logs and S3
+artifact mirroring.
 
 Job files support a legacy single-job shape or a production-style batch:
 
