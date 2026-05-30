@@ -19,6 +19,7 @@ from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
     AuditEvent,
+    PublishedContentListResponse,
     PublishPlan,
     PublishReceipt,
     PublishRollbackResult,
@@ -89,6 +90,7 @@ def dashboard(
         job_execution_dir(settings.artifact_root),
         limit=5,
     )
+    published_content = review_service.published_content(limit=5)
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -169,6 +171,11 @@ def dashboard(
               <h2>Worker Executions</h2>
               <p>Recent scheduled job receipts for automation audit and incident review.</p>
               {_job_executions_html(job_executions.items)}
+            </section>
+            <section class="hero compact">
+              <h2>Published Content</h2>
+              <p>Operational catalog of shipped articles and their evaluation scores.</p>
+              {_published_content_html(published_content)}
             </section>
             """,
         )
@@ -516,6 +523,14 @@ def get_job_execution(execution_id: str) -> JobExecutionReport:
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/content", response_model=PublishedContentListResponse)
+def list_published_content(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> PublishedContentListResponse:
+    return review_service.published_content(limit=limit, offset=offset)
 
 
 @app.get("/runs/{run_id}", response_model=RunRecord)
@@ -1019,6 +1034,37 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
           <tr>
             <th>Execution</th><th>Name</th><th>Dry run</th><th>Succeeded</th>
             <th>Failed</th><th>Duration</th><th>Started</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _published_content_html(catalog: PublishedContentListResponse) -> str:
+    if not catalog.items:
+        return "<p>No published content recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td><a href="{escape(item.url)}">{escape(item.title)}</a></td>
+          <td>{escape(item.provider)}</td>
+          <td>{item.groundedness:.2f}</td>
+          <td>{item.source_quality:.2f}</td>
+          <td>{item.technical_depth:.2f}</td>
+          <td>{escape(item.published_at.isoformat())}</td>
+        </tr>
+        """
+        for item in catalog.items
+    )
+    return f"""
+      <p><a href="/content">Content catalog JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Title</th><th>Provider</th><th>Grounded</th>
+            <th>Source quality</th><th>Depth</th><th>Published</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>

@@ -156,6 +156,7 @@ GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
+GET  /content?limit=20&offset=0
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -186,6 +187,7 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 contentops job-executions --json
 contentops job-execution <execution_id>
+contentops content --json
 ```
 
 Every worker execution writes a job receipt JSON file under

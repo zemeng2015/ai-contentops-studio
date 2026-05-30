@@ -150,6 +150,28 @@ def job_execution(execution_id: str) -> None:
     typer.echo(report.model_dump_json(indent=2))
 
 
+@app.command("content")
+def content_catalog(
+    limit: Annotated[int, typer.Option(help="Number of published items to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of published items to skip.")] = 0,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    catalog = service.published_content(limit=limit, offset=offset)
+    if json_output:
+        typer.echo(catalog.model_dump_json(indent=2))
+        return
+    typer.echo(f"Showing {len(catalog.items)} of {catalog.total} published content items")
+    for item in catalog.items:
+        typer.echo(
+            f"{item.run_id}  {item.provider:10}  "
+            f"{item.groundedness:.2f}/{item.technical_depth:.2f}  {item.title}"
+        )
+
+
 @app.command()
 def show(
     run_id: str,

@@ -139,6 +139,7 @@ contentops manifest <run_id>
 contentops audit-log <run_id>
 contentops job-executions --json
 contentops job-execution <execution_id>
+contentops content --json
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
@@ -163,6 +164,7 @@ GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
+GET  /content?limit=20&offset=0
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -187,6 +189,8 @@ The dashboard create form accepts optional source URLs, one per line.
 The dashboard list supports database-backed status/topic filters, queue counts, and pagination.
 The dashboard also surfaces recent worker executions from job receipts so scheduled content runs
 can be reviewed from the same operational surface.
+It also includes a Published Content catalog with shipped URLs, providers, timestamps, and
+evaluation scores for portfolio and operations review.
 Run detail pages can compare two runs to spot evaluation deltas, source-count changes, and source
 overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.

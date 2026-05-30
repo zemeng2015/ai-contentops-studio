@@ -19,6 +19,8 @@ from contentops_core.models import (
     AuditEvent,
     Draft,
     EvaluationReport,
+    PublishedContentItem,
+    PublishedContentListResponse,
     PublishFileChange,
     PublishPlan,
     PublishReceipt,
@@ -246,6 +248,24 @@ class ReviewService:
             return None
         return PublishReceipt.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
+    def published_content(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> PublishedContentListResponse:
+        runs = self.repository.list(
+            limit=limit,
+            offset=offset,
+            status=RunStatus.PUBLISHED,
+        )
+        items = [self._published_content_item(run) for run in runs if run.published_url]
+        return PublishedContentListResponse(
+            items=items,
+            total=self.repository.count(status=RunStatus.PUBLISHED),
+            limit=limit,
+            offset=offset,
+        )
+
     def rollback_publish(
         self,
         run_id: str,
@@ -422,6 +442,26 @@ class ReviewService:
     def _write_publish_rollback(run: RunRecord, result: PublishRollbackResult) -> None:
         path = run.artifact_dir / "publish-rollback.json"
         path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
+
+    def _published_content_item(self, run: RunRecord) -> PublishedContentItem:
+        draft = self._load_json(run, "draft.json", Draft)
+        report = self._load_json(run, "eval-report.json", EvaluationReport)
+        receipt = self.publish_receipt(run.id)
+        return PublishedContentItem(
+            run_id=run.id,
+            topic=run.topic,
+            slug=run.slug,
+            title=draft.title,
+            url=receipt.url if receipt is not None else run.published_url or "",
+            provider=receipt.provider if receipt is not None else "unknown",
+            published_at=receipt.published_at if receipt is not None else run.updated_at,
+            publish_ready=report.publish_ready,
+            groundedness=report.groundedness,
+            source_coverage=report.source_coverage,
+            source_quality=report.source_quality,
+            career_relevance=report.career_relevance,
+            technical_depth=report.technical_depth,
+        )
 
     @staticmethod
     def _append_audit_event(run: RunRecord, event: AuditEvent) -> None:

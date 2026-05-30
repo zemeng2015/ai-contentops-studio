@@ -90,6 +90,10 @@ Rollback uses that receipt to restore backed-up files or delete files created by
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,
 and publish transitions in addition to the latest run state.
+Published runs are projected into a content catalog exposed through `/content`, `contentops content`,
+and the dashboard. The catalog combines run metadata, publish receipts, URLs, providers, publish
+timestamps, and evaluation scores so the platform can be reviewed as a content inventory instead
+of a collection of one-off artifacts.
 
 ```text
 needs_review -> approved -> publishing -> published

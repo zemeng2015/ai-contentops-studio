@@ -78,6 +78,7 @@ def test_cli_approve_then_publish(
     approve_result = runner.invoke(app, ["approve", run_id, "--reviewer", "zack"])
     publish_result = runner.invoke(app, ["publish", run_id])
     receipt_result = runner.invoke(app, ["publish-receipt", run_id])
+    content_result = runner.invoke(app, ["content", "--json"])
     rollback_result = runner.invoke(app, ["rollback-publish", run_id, "--actor", "zack"])
     audit_result = runner.invoke(app, ["audit-log", run_id])
 
@@ -88,6 +89,9 @@ def test_cli_approve_then_publish(
     assert receipt_result.exit_code == 0
     assert '"provider": "static"' in receipt_result.output
     assert '"reviewer": "zack"' in receipt_result.output
+    assert content_result.exit_code == 0
+    assert run_id in content_result.output
+    assert '"provider": "static"' in content_result.output
     assert rollback_result.exit_code == 0
     assert '"deleted_files"' in rollback_result.output
     assert audit_result.exit_code == 0

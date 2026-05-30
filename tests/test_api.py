@@ -69,6 +69,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     approval_response = client.get(f"/runs/{run['id']}/approval")
     publish_response = client.post(f"/runs/{run['id']}/publish")
     receipt_response = client.get(f"/runs/{run['id']}/publish-receipt")
+    content_response = client.get("/content?limit=5")
     audit_response = client.get(f"/runs/{run['id']}/audit-log")
 
     assert create_response.status_code == 200
@@ -97,6 +98,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert receipt_response.json()["url"] == publish_response.json()["published_url"]
     assert receipt_response.json()["approval"]["reviewer"] == "zack"
     assert len(receipt_response.json()["file_changes"]) == 3
+    assert content_response.status_code == 200
+    assert any(item["run_id"] == run["id"] for item in content_response.json()["items"])
     assert audit_response.status_code == 200
     assert [event["action"] for event in audit_response.json()] == ["approve", "publish"]
 
@@ -217,6 +220,7 @@ def test_dashboard_renders() -> None:
     assert "AI ContentOps Studio" in response.text
     assert "Create run" in response.text
     assert "Optional source URLs" in response.text
+    assert "Published Content" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

@@ -177,6 +177,29 @@ class PublishRollbackResult(BaseModel):
     rolled_back_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PublishedContentItem(BaseModel):
+    run_id: str
+    topic: str
+    slug: str
+    title: str
+    url: str
+    provider: str
+    published_at: datetime
+    publish_ready: bool
+    groundedness: float
+    source_coverage: float
+    source_quality: float
+    career_relevance: float
+    technical_depth: float
+
+
+class PublishedContentListResponse(BaseModel):
+    items: list[PublishedContentItem]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 class AuditEvent(BaseModel):
     run_id: str
     action: str
