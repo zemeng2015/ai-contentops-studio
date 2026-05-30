@@ -27,6 +27,9 @@ before Terraform or CDK resources are added.
 
 It intentionally stops short of creating public networking and an ALB until the runtime deployment
 choice is finalized.
+GitHub Actions runs `terraform fmt`, `terraform init -backend=false`, and `terraform validate` on
+this directory so infrastructure changes are checked with the same quality gate as application
+code.
 
 ```bash
 cd infra/aws/terraform
