@@ -128,6 +128,7 @@ GET /dashboard
 
 Run details include a Source Review table so reviewers can inspect source status and extraction
 quality before publishing.
+The dashboard create form accepts optional source URLs, one per line.
 
 ## Provider configuration
 

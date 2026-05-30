@@ -124,6 +124,7 @@ GET /dashboard
 ```
 
 Run detail 页面包含 Source Review 表，方便在发布前检查来源状态和抽取质量。
+Dashboard 创建表单支持填写可选 source URLs，每行一个。
 
 ## Provider 配置
 

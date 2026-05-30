@@ -38,6 +38,7 @@ def test_dashboard_renders() -> None:
     assert response.status_code == 200
     assert "AI ContentOps Studio" in response.text
     assert "Create run" in response.text
+    assert "Optional source URLs" in response.text
 
 
 def test_dashboard_run_detail_shows_source_review() -> None:
@@ -50,3 +51,18 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert detail_response.status_code == 200
     assert "Source Review" in detail_response.text
     assert "extraction" not in detail_response.text.lower()
+
+
+def test_dashboard_create_accepts_source_urls() -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/dashboard/runs",
+        data={
+            "topic": "Dashboard URL research",
+            "source_urls": "https://example.com/one\nhttps://example.com/two",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303

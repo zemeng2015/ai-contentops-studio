@@ -51,6 +51,10 @@ def dashboard() -> HTMLResponse:
               <p>Review generated research, drafts, evaluation reports, and publishing state.</p>
               <form method="post" action="/dashboard/runs">
                 <input name="topic" placeholder="Run topic" required>
+                <textarea
+                  name="source_urls"
+                  placeholder="Optional source URLs, one per line"
+                ></textarea>
                 <label><input type="checkbox" name="publish" value="true"> publish if ready</label>
                 <button type="submit">Create run</button>
               </form>
@@ -67,9 +71,17 @@ def dashboard() -> HTMLResponse:
 @app.post("/dashboard/runs")
 async def dashboard_create_run(
     topic: Annotated[str, Form()],
+    source_urls: Annotated[str, Form()] = "",
     publish: Annotated[bool, Form()] = False,
 ) -> RedirectResponse:
-    result = pipeline.run(RunRequest(topic=topic, publish=publish))
+    parsed_source_urls = [
+        line.strip()
+        for line in source_urls.replace(",", "\n").splitlines()
+        if line.strip()
+    ]
+    result = pipeline.run(
+        RunRequest(topic=topic, source_urls=parsed_source_urls, publish=publish)
+    )
     return RedirectResponse(f"/dashboard/runs/{result.run.id}", status_code=303)
 
 
@@ -216,11 +228,15 @@ def _page(title: str, body: str) -> str:
           }}
           .hero {{ padding: 24px; margin-bottom: 18px; }}
           form {{ display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }}
-          input[type="text"], input[name="topic"] {{
+          input[type="text"], input[name="topic"], textarea {{
             min-width: min(520px, 100%);
             padding: 12px;
             border: 1px solid #d8ddd7;
             border-radius: 6px;
+          }}
+          textarea {{
+            min-height: 92px;
+            resize: vertical;
           }}
           button {{
             padding: 12px 16px;
