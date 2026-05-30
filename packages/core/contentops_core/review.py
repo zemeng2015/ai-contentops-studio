@@ -26,6 +26,7 @@ from contentops_core.models import (
     IncidentReportListResponse,
     IncidentSeverity,
     NotificationDelivery,
+    OperationsSummary,
     PublishedContentItem,
     PublishedContentListResponse,
     PublishFileChange,
@@ -477,6 +478,53 @@ class ReviewService:
             limit=limit,
             offset=offset,
             action_required=sum(1 for item in items if item.requires_action),
+        )
+
+    def operations_summary(self, window_size: int = 100) -> OperationsSummary:
+        window_size = max(1, window_size)
+        runs = self.repository.list(limit=window_size)
+        scorecards = [self._scorecard_for_run(run) for run in runs]
+        cost_reports = [self._cost_report_for_run(run) for run in runs]
+        incident_reports = [self._incident_report_for_run(run) for run in runs]
+        durations = [
+            item.total_duration_ms
+            for item in scorecards
+            if item.total_duration_ms is not None
+        ]
+        return OperationsSummary(
+            window_size=window_size,
+            total_runs=self.repository.count(),
+            status_counts={
+                status.value: self.repository.count(status=status)
+                for status in RunStatus
+            },
+            review_queue_depth=self.repository.count(status=RunStatus.NEEDS_REVIEW),
+            approved_ready_count=self.repository.count(status=RunStatus.APPROVED),
+            published_count=self.repository.count(status=RunStatus.PUBLISHED),
+            failed_count=self.repository.count(status=RunStatus.FAILED),
+            action_required_incidents=sum(
+                1 for item in incident_reports if item.requires_action
+            ),
+            critical_incidents=sum(
+                1
+                for item in incident_reports
+                if item.severity == IncidentSeverity.CRITICAL
+            ),
+            warning_incidents=sum(
+                1
+                for item in incident_reports
+                if item.severity == IncidentSeverity.WARNING
+            ),
+            quality_pass_rate=_pass_rate(
+                item.overall_pass for item in scorecards if item.overall_pass is not None
+            ),
+            budget_pass_rate=_pass_rate(item.budget_pass for item in cost_reports),
+            avg_duration_ms=(
+                int(sum(durations) / len(durations)) if durations else None
+            ),
+            estimated_total_tokens=sum(
+                item.estimated_total_tokens for item in cost_reports
+            ),
         )
 
     def compare(self, base_run_id: str, candidate_run_id: str) -> RunComparison:
@@ -1062,6 +1110,13 @@ def _rollback_hint(action: str, backup_artifact: str | None) -> str:
     if action == "unchanged":
         return "No rollback action needed."
     return "No backup artifact is available; inspect version control or deployment history."
+
+
+def _pass_rate(values: Iterable[bool]) -> float:
+    items = list(values)
+    if not items:
+        return 0.0
+    return round(sum(1 for item in items if item) / len(items), 3)
 
 
 def _max_severity(severities: Iterable[IncidentSeverity]) -> IncidentSeverity:

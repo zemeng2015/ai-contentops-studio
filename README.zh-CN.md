@@ -20,6 +20,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - publish receipts record file hashes, backup artifacts, and rollback hints
 - publish receipt 会审计 provider、URL、approval 和变更文件
 - incident reports 汇总失败、质量退化、预算超限、发布漂移和通知失败的运行信号
+- operations summary 汇总队列深度、incident 严重级别、通过率和预算状态
 - 可选 operator API key，用于保护 API 和 Dashboard 的写操作
 - `/ready` 和 `contentops doctor` 用于生产部署前诊断
 - API、CLI、worker、publisher 清晰分层
@@ -134,6 +135,7 @@ contentops cost-report <run_id>
 contentops cost-reports --status needs_review --json
 contentops generation-receipt <run_id>
 contentops source-audit <run_id>
+contentops ops-summary --json
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
@@ -176,6 +178,7 @@ GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
 GET  /incident-reports?status=published&q=rag&limit=20&offset=0
+GET  /ops-summary?window_size=100
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject

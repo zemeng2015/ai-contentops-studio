@@ -176,6 +176,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     cost_reports_response = client.get("/cost-reports?limit=5")
     incident_report_response = client.get(f"/runs/{run['id']}/incident-report")
     incident_reports_response = client.get("/incident-reports?limit=5")
+    ops_summary_response = client.get("/ops-summary")
     generation_receipt_response = client.get(f"/runs/{run['id']}/generation-receipt")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
@@ -216,6 +217,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert incident_report_response.json()["severity"] in {"info", "warning", "critical"}
     assert incident_reports_response.status_code == 200
     assert any(item["run_id"] == run["id"] for item in incident_reports_response.json()["items"])
+    assert ops_summary_response.status_code == 200
+    assert ops_summary_response.json()["total_runs"] >= 1
+    assert "needs_review" in ops_summary_response.json()["status_counts"]
     assert generation_receipt_response.status_code == 200
     assert generation_receipt_response.json()["provider"] == "template"
     assert generation_receipt_response.json()["total_tokens"] > 0
@@ -364,6 +368,7 @@ def test_dashboard_renders() -> None:
     assert "Quality Scorecards" in response.text
     assert "Token Budgets" in response.text
     assert "Incident Reports" in response.text
+    assert "Operations Summary" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

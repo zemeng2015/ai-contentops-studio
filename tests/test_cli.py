@@ -136,6 +136,7 @@ def test_cli_queue_and_manifest_commands(
         app,
         ["incident-reports", "--query", "searchable", "--json"],
     )
+    ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
@@ -170,6 +171,10 @@ def test_cli_queue_and_manifest_commands(
     incident_reports_payload = json.loads(incident_reports_result.output)
     assert incident_reports_payload["total"] == 1
     assert incident_reports_payload["items"][0]["run_id"] == run_id
+    assert ops_summary_result.exit_code == 0
+    ops_summary_payload = json.loads(ops_summary_result.output)
+    assert ops_summary_payload["total_runs"] == 1
+    assert ops_summary_payload["review_queue_depth"] == 1
     assert generation_receipt_result.exit_code == 0
     generation_receipt_payload = json.loads(generation_receipt_result.output)
     assert generation_receipt_payload["provider"] == "template"

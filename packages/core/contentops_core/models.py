@@ -362,6 +362,24 @@ class IncidentReportListResponse(BaseModel):
     action_required: int = Field(ge=0)
 
 
+class OperationsSummary(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    window_size: int = Field(ge=1)
+    total_runs: int = Field(ge=0)
+    status_counts: dict[str, int] = Field(default_factory=dict)
+    review_queue_depth: int = Field(ge=0)
+    approved_ready_count: int = Field(ge=0)
+    published_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    action_required_incidents: int = Field(ge=0)
+    critical_incidents: int = Field(ge=0)
+    warning_incidents: int = Field(ge=0)
+    quality_pass_rate: float = Field(ge=0, le=1)
+    budget_pass_rate: float = Field(ge=0, le=1)
+    avg_duration_ms: int | None = None
+    estimated_total_tokens: int = Field(ge=0)
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str

@@ -9,12 +9,14 @@ Run these checks before a scheduled worker or manual publish window:
 
 ```powershell
 contentops doctor --json
+contentops ops-summary --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 ```
 
 Expected result:
 
 - `doctor` is `ok` or `degraded` with only intentional local-development warnings.
+- `ops-summary` shows no unexpected failed runs or action-required incidents.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 
@@ -101,6 +103,7 @@ Track shipped content as an operational catalog:
 contentops content --json
 contentops scorecards --json
 contentops cost-reports --json
+contentops ops-summary --json
 ```
 
 The same catalog is available from:
@@ -110,6 +113,7 @@ GET /content?limit=20&offset=0
 GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
 GET /incident-reports?limit=20&offset=0
+GET /ops-summary?window_size=100
 ```
 
 Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,

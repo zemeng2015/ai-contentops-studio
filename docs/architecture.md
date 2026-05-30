@@ -102,6 +102,10 @@ Incident reports sit above the review artifacts and aggregate run failures, scor
 budget warnings, publish drift, and notification delivery failures into a single severity and
 action-required flag. They are exposed through the dashboard, CLI, and API so operational triage
 does not require manually opening every JSON artifact first.
+The operations summary composes repository status counts with scorecards, cost reports, and
+incident reports over a recent-run window. This gives operators one API/CLI/dashboard view for
+queue depth, approved-but-unpublished work, failed runs, pass rates, average duration, incident
+severity, and estimated token usage.
 Rollback uses that receipt to restore backed-up files or delete files created by the publish, then
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,

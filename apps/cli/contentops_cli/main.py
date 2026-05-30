@@ -72,6 +72,35 @@ def doctor(
     raise typer.Exit(0 if report.status != "fail" else 1)
 
 
+@app.command("ops-summary")
+def ops_summary(
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to include in quality/cost windows."),
+    ] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    summary = service.operations_summary(window_size=window_size)
+    if json_output:
+        typer.echo(summary.model_dump_json(indent=2))
+        return
+    typer.echo(f"Total runs: {summary.total_runs}")
+    typer.echo(f"Needs review: {summary.review_queue_depth}")
+    typer.echo(f"Approved: {summary.approved_ready_count}")
+    typer.echo(f"Published: {summary.published_count}")
+    typer.echo(f"Failed: {summary.failed_count}")
+    typer.echo(f"Incidents requiring action: {summary.action_required_incidents}")
+    typer.echo(f"Critical incidents: {summary.critical_incidents}")
+    typer.echo(f"Warning incidents: {summary.warning_incidents}")
+    typer.echo(f"Quality pass rate: {summary.quality_pass_rate:.0%}")
+    typer.echo(f"Budget pass rate: {summary.budget_pass_rate:.0%}")
+    typer.echo(f"Estimated window tokens: {summary.estimated_total_tokens}")
+
+
 @app.command("queue")
 def review_queue(
     limit: Annotated[int, typer.Option(help="Number of queue items to show.")] = 20,

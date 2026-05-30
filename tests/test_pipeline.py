@@ -122,6 +122,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     verification = review_service.verify_publish(result.run.id)
     incident_report = review_service.incident_report(result.run.id)
     incident_reports = review_service.incident_reports(limit=5)
+    operations_summary = review_service.operations_summary()
     audit_events = review_service.audit_log(result.run.id)
     notifications = review_service.notification_log(result.run.id)
 
@@ -177,6 +178,11 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert incident_report.severity.value == "info"
     assert incident_report.requires_action is False
     assert incident_reports.action_required >= 0
+    assert operations_summary.total_runs == 1
+    assert operations_summary.published_count == 1
+    assert operations_summary.action_required_incidents == 0
+    assert operations_summary.quality_pass_rate == 1
+    assert operations_summary.budget_pass_rate == 1
     assert [event.action for event in audit_events] == ["approve", "publish"]
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED

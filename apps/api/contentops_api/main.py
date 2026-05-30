@@ -24,6 +24,7 @@ from contentops_core.models import (
     GenerationReceipt,
     IncidentReportListResponse,
     NotificationDelivery,
+    OperationsSummary,
     PublishedContentListResponse,
     PublishPlan,
     PublishReceipt,
@@ -171,6 +172,7 @@ def dashboard(
     scorecards = review_service.scorecards(limit=5)
     cost_reports = review_service.cost_reports(limit=5)
     incident_reports = review_service.incident_reports(limit=5)
+    operations_summary = review_service.operations_summary()
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -247,6 +249,11 @@ def dashboard(
               </table>
             </form>
             {pagination}
+            <section class="hero compact">
+              <h2>Operations Summary</h2>
+              <p>Portfolio-wide run health, queue depth, incident severity, and cost posture.</p>
+              {_operations_summary_html(operations_summary)}
+            </section>
             <section class="hero compact">
               <h2>Worker Executions</h2>
               <p>Recent scheduled job receipts for automation audit and incident review.</p>
@@ -733,6 +740,17 @@ def list_incident_reports(
         status=_parse_status_filter(status),
         query=q,
     )
+
+
+@app.get(
+    "/ops-summary",
+    response_model=OperationsSummary,
+    dependencies=[Depends(require_read_access)],
+)
+def get_ops_summary(
+    window_size: int = Query(default=100, ge=1, le=500),
+) -> OperationsSummary:
+    return review_service.operations_summary(window_size=window_size)
 
 
 @app.get(
@@ -1422,6 +1440,27 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
         </thead>
         <tbody>{rows}</tbody>
       </table>
+    """
+
+
+def _operations_summary_html(summary: OperationsSummary) -> str:
+    return f"""
+      <p><a href="/ops-summary">Operations summary JSON</a></p>
+      <div class="metrics">
+        <div><strong>{summary.total_runs}</strong><span>Total runs</span></div>
+        <div><strong>{summary.review_queue_depth}</strong><span>Needs review</span></div>
+        <div><strong>{summary.approved_ready_count}</strong><span>Approved</span></div>
+        <div><strong>{summary.published_count}</strong><span>Published</span></div>
+        <div><strong>{summary.failed_count}</strong><span>Failed</span></div>
+        <div>
+          <strong>{summary.action_required_incidents}</strong>
+          <span>Incidents</span>
+        </div>
+        <div><strong>{summary.quality_pass_rate:.0%}</strong><span>Quality pass</span></div>
+        <div><strong>{summary.budget_pass_rate:.0%}</strong><span>Budget pass</span></div>
+        <div><strong>{_duration_label(summary.avg_duration_ms)}</strong><span>Avg run</span></div>
+        <div><strong>{summary.estimated_total_tokens}</strong><span>Window tokens</span></div>
+      </div>
     """
 
 
