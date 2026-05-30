@@ -13,4 +13,10 @@ class Settings(BaseSettings):
     site_output_dir: Path = Path("site")
     public_base_url: str = "http://localhost:8000/site"
     min_publish_score: float = 0.72
-
+    research_provider: str = "hybrid"
+    generator_provider: str = "template"
+    publisher_provider: str = "static"
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-5-mini"
+    homepage_repo_path: Path | None = None
+    homepage_public_base_url: str = "https://zemeng2015.github.io/zack-ai-homepage"

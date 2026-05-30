@@ -57,3 +57,20 @@ AWS-ready equivalents:
 - CloudWatch for logs and metrics
 - Secrets Manager for provider credentials
 
+## Stage 2 provider boundaries
+
+Research providers:
+
+- `local`: deterministic source packet for CI and offline demos
+- `url`: fetches operator-supplied URLs and normalizes title, publisher, and summary
+- `hybrid`: combines URL sources with local portfolio context
+
+Generation providers:
+
+- `template`: deterministic Markdown/HTML generation for repeatable tests
+- `openai`: OpenAI Responses API generation, enabled only when credentials are configured
+
+Publishing providers:
+
+- `static`: writes generated content to a local static site directory
+- `homepage`: writes posts into Zack's GitHub Pages homepage repository and updates the Writing grid

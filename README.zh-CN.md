@@ -83,6 +83,9 @@ tests/                     单元测试和集成测试
 ## 当前 MVP
 
 - 本地 research provider 和 deterministic source packet
+- URL research provider：可以抓取并标准化用户提供的网页来源
+- 可选 OpenAI Responses API generator，并且放在 provider 边界后面
+- 可选 homepage publisher：可以发布到 Zack 的 GitHub Pages 个人主页仓库
 - Markdown 与 HTML 文章生成
 - 内容质量评估报告
 - SQLite run metadata
@@ -91,6 +94,38 @@ tests/                     单元测试和集成测试
 - FastAPI `POST /runs` 和 `GET /runs`
 - CLI `contentops run`、`contentops runs`、`contentops show`
 - 覆盖核心 pipeline 行为的 pytest 测试
+
+## Provider 配置
+
+默认配置不需要任何外部密钥：
+
+```text
+CONTENTOPS_RESEARCH_PROVIDER=hybrid
+CONTENTOPS_GENERATOR_PROVIDER=template
+CONTENTOPS_PUBLISHER_PROVIDER=static
+```
+
+使用真实网页来源：
+
+```powershell
+contentops run --topic "Agent observability" --source-url "https://example.com/article"
+```
+
+启用 OpenAI 内容生成：
+
+```text
+CONTENTOPS_GENERATOR_PROVIDER=openai
+CONTENTOPS_OPENAI_API_KEY=...
+CONTENTOPS_OPENAI_MODEL=gpt-5-mini
+```
+
+发布到个人主页仓库：
+
+```text
+CONTENTOPS_PUBLISHER_PROVIDER=homepage
+CONTENTOPS_HOMEPAGE_REPO_PATH=C:\Users\wangz\Documents\Codex\2026-05-22\files-mentioned-by-the-user-zackwang\zack-ai-homepage
+CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
+```
 
 ## 为什么这个项目有价值
 

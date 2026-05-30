@@ -27,3 +27,14 @@ docker run --rm -p 8000:8000 ai-contentops-studio
 The code uses provider and publisher boundaries so local filesystem/SQLite can be replaced by
 S3/Postgres without changing the pipeline contract.
 
+## Provider environment variables
+
+```text
+CONTENTOPS_RESEARCH_PROVIDER=hybrid
+CONTENTOPS_GENERATOR_PROVIDER=template
+CONTENTOPS_PUBLISHER_PROVIDER=static
+CONTENTOPS_OPENAI_MODEL=gpt-5-mini
+CONTENTOPS_OPENAI_API_KEY=
+CONTENTOPS_HOMEPAGE_REPO_PATH=
+CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
+```

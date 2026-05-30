@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 from html import escape
+from typing import Protocol
 
 from contentops_core.models import ContentPlan, Draft, ResearchPacket
+
+
+class DraftGenerator(Protocol):
+    def generate(self, packet: ResearchPacket, plan: ContentPlan) -> Draft:
+        """Generate a draft from research and planning artifacts."""
 
 
 class ContentGenerator:
@@ -100,4 +106,3 @@ class ContentGenerator:
             + "\n".join(body)
             + "</body></html>"
         )
-

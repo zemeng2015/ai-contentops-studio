@@ -86,6 +86,9 @@ tests/                     Unit and integration tests
 ## Current MVP
 
 - Local research provider with deterministic source packets
+- URL research provider that fetches and normalizes operator-supplied sources
+- Optional OpenAI Responses API generator behind a provider boundary
+- Optional homepage publisher for Zack's GitHub Pages portfolio
 - Markdown and HTML article generation
 - Quality evaluation report
 - SQLite run metadata
@@ -94,3 +97,35 @@ tests/                     Unit and integration tests
 - FastAPI `POST /runs` and `GET /runs`
 - CLI `contentops run`, `contentops runs`, and `contentops show`
 - pytest coverage for pipeline behavior
+
+## Provider configuration
+
+The default stack runs without external credentials:
+
+```text
+CONTENTOPS_RESEARCH_PROVIDER=hybrid
+CONTENTOPS_GENERATOR_PROVIDER=template
+CONTENTOPS_PUBLISHER_PROVIDER=static
+```
+
+Use real source URLs:
+
+```powershell
+contentops run --topic "Agent observability" --source-url "https://example.com/article"
+```
+
+Use OpenAI generation:
+
+```text
+CONTENTOPS_GENERATOR_PROVIDER=openai
+CONTENTOPS_OPENAI_API_KEY=...
+CONTENTOPS_OPENAI_MODEL=gpt-5-mini
+```
+
+Publish into the portfolio homepage repository:
+
+```text
+CONTENTOPS_PUBLISHER_PROVIDER=homepage
+CONTENTOPS_HOMEPAGE_REPO_PATH=C:\Users\wangz\Documents\Codex\2026-05-22\files-mentioned-by-the-user-zackwang\zack-ai-homepage
+CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
+```

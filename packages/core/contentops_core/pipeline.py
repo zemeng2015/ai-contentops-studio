@@ -8,7 +8,7 @@ from contentops_providers.research import ResearchProvider
 from contentops_publishing.static_site import Publisher
 
 from contentops_core.artifacts import ArtifactStore
-from contentops_core.generator import ContentGenerator
+from contentops_core.generator import DraftGenerator
 from contentops_core.models import RunRecord, RunRequest, RunStatus
 from contentops_core.planner import ContentPlanner
 from contentops_core.repository import RunRepository
@@ -27,7 +27,7 @@ class ContentOpsPipeline:
         artifact_store: ArtifactStore,
         research_provider: ResearchProvider,
         planner: ContentPlanner,
-        generator: ContentGenerator,
+        generator: DraftGenerator,
         evaluator: ContentEvaluator,
         publisher: Publisher,
     ) -> None:
@@ -96,4 +96,3 @@ class ContentOpsPipeline:
             self.artifact_store.write_json(record, "trace.json", trace.as_dict())
             self.repository.save(record)
             raise
-
