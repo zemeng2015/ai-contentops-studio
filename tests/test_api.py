@@ -53,6 +53,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     manifest_response = client.get(f"/runs/{run['id']}/artifact-manifest")
     artifact_response = client.get(f"/runs/{run['id']}/artifacts/eval-report.json")
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
+    source_audit_response = client.get(f"/runs/{run['id']}/source-audit")
     metrics_response = client.get(f"/runs/{run['id']}/metrics")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
@@ -70,6 +71,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert artifact_response.status_code == 200
     assert plan_response.status_code == 200
     assert plan_response.json()["ready"] is True
+    assert source_audit_response.status_code == 200
+    assert source_audit_response.json()["source_count"] >= 1
     assert metrics_response.status_code == 200
     assert metrics_response.json()["source_count"] >= 1
     assert rerun_response.status_code == 200

@@ -52,6 +52,27 @@ class ResearchPacket(BaseModel):
     project_implications: list[str]
 
 
+class SourceAssessment(BaseModel):
+    source_title: str
+    canonical_url: str | None = None
+    publisher: str
+    discovery_method: str
+    score: float = Field(ge=0, le=1)
+    grade: str
+    reasons: list[str]
+    recommendation: str
+
+
+class SourceAuditReport(BaseModel):
+    topic: str
+    source_count: int
+    average_score: float = Field(ge=0, le=1)
+    strong_count: int = 0
+    review_count: int = 0
+    failed_count: int = 0
+    assessments: list[SourceAssessment]
+
+
 class ContentPlan(BaseModel):
     title: str
     slug: str

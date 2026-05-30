@@ -24,6 +24,7 @@ def test_pipeline_creates_reviewable_artifacts(tmp_path: Path) -> None:
     assert result.run.status == RunStatus.NEEDS_REVIEW
     assert (result.run.artifact_dir / "request.json").exists()
     assert (result.run.artifact_dir / "research.json").exists()
+    assert (result.run.artifact_dir / "source-audit.json").exists()
     assert (result.run.artifact_dir / "outline.md").exists()
     assert (result.run.artifact_dir / "draft.md").exists()
     assert (result.run.artifact_dir / "eval-report.json").exists()

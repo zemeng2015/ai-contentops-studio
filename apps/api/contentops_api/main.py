@@ -22,6 +22,7 @@ from contentops_core.models import (
     RunRecord,
     RunRequest,
     RunStatus,
+    SourceAuditReport,
     SystemStatus,
 )
 from contentops_core.repository import RunRepository
@@ -206,6 +207,12 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     source_rows = ""
     if "research.json" in artifacts:
         source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
+    source_audit_html = ""
+    if "source-audit.json" in artifacts:
+        source_audit_html = _source_audit_html(
+            run_id,
+            review_service.read_artifact(run_id, "source-audit.json"),
+        )
     approval_html = _approval_html(review_service.approval(run_id))
     receipt_html = _publish_receipt_html(review_service.publish_receipt(run_id))
     audit_html = _audit_log_html(review_service.audit_log(run_id))
@@ -287,6 +294,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
             </section>
             <section class="hero">
               <h3>Source Review</h3>
+              {source_audit_html}
               <table>
                 <thead>
                   <tr>
@@ -603,6 +611,15 @@ def get_run_metrics(run_id: str) -> RunMetrics:
         return review_service.metrics(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/source-audit", response_model=SourceAuditReport)
+def get_source_audit(run_id: str) -> SourceAuditReport:
+    try:
+        raw = review_service.read_artifact(run_id, "source-audit.json")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return SourceAuditReport.model_validate_json(raw)
 
 
 @app.get("/runs/{base_run_id}/compare/{candidate_run_id}", response_model=RunComparison)
@@ -923,6 +940,19 @@ def _source_review_rows(research_json: str) -> str:
             """
         )
     return "\n".join(rows)
+
+
+def _source_audit_html(run_id: str, source_audit_json: str) -> str:
+    report = SourceAuditReport.model_validate_json(source_audit_json)
+    return f"""
+      <p><a href="/runs/{escape(run_id)}/source-audit">Source audit JSON</a></p>
+      <div class="metrics">
+        <div><strong>{report.average_score:.2f}</strong><span>Avg source score</span></div>
+        <div><strong>{report.strong_count}</strong><span>Strong</span></div>
+        <div><strong>{report.review_count}</strong><span>Needs review</span></div>
+        <div><strong>{report.failed_count}</strong><span>Failed</span></div>
+      </div>
+    """
 
 
 def _timeline_rows(metrics: RunMetrics) -> str:

@@ -15,7 +15,7 @@ flowchart LR
   Pipeline --> Publisher[Publishing Adapter]
   Pipeline --> Store[Artifact Store]
   Pipeline --> DB[(SQLite / Postgres)]
-  Store --> Artifacts[research.json / draft.md / eval-report.json / trace.json]
+  Store --> Artifacts[research.json / source-audit.json / draft.md / eval-report.json / trace.json]
 ```
 
 ## Boundaries
@@ -60,8 +60,10 @@ The dashboard list and `/review-queue` endpoint use repository-level filtering, 
 pagination so operators can review larger queues without loading only the most recent local slice.
 
 The dashboard and API expose run metrics derived from `trace.json`: total duration, per-step
-durations, source count, and publish readiness. This keeps observability tied to persisted run
-artifacts rather than transient process logs.
+durations, source count, source audit score, and publish readiness. This keeps observability tied
+to persisted run artifacts rather than transient process logs.
+Each research step also writes `source-audit.json`, which grades every source with reviewer-facing
+reasons and recommendations before the draft moves into planning.
 The API also exposes `/ready`, and the CLI exposes `contentops doctor`, to report database,
 artifact store, provider configuration, and operator-key readiness without exposing secrets.
 

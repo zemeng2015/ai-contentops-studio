@@ -17,6 +17,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - batch approve/reject workflow for review queues
 - explicit approval records before reviewed runs are published
 - append-only audit logs for review and publishing actions
+- source audit reports with scoring, risk reasons, and reviewer recommendations
 - publish receipts that audit provider, URL, approval, and changed files
 - optional operator API key protection for mutating API and dashboard actions
 - readiness checks and CLI diagnostics for production deployments
@@ -31,7 +32,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 
 Given a topic, URL, or repository, the system creates a content run:
 
-1. collect and normalize sources
+1. collect, normalize, and audit sources
 2. extract engineering signals and claims
 3. plan the article angle and outline
 4. generate markdown and HTML drafts
@@ -149,6 +150,7 @@ GET  /runs/{run_id}/artifact-manifest
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
+GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log

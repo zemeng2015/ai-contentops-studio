@@ -12,6 +12,7 @@ from contentops_core.generator import DraftGenerator
 from contentops_core.models import RunRecord, RunRequest, RunStatus
 from contentops_core.planner import ContentPlanner
 from contentops_core.repository import RunRepository
+from contentops_core.source_audit import audit_sources
 
 
 @dataclass
@@ -51,7 +52,15 @@ class ContentOpsPipeline:
             trace.add("research", "started")
             packet = self.research_provider.collect(request)
             self.artifact_store.write_json(record, "research.json", packet)
-            trace.add("research", "completed", sources=len(packet.sources))
+            source_audit = audit_sources(packet)
+            self.artifact_store.write_json(record, "source-audit.json", source_audit)
+            trace.add(
+                "research",
+                "completed",
+                sources=len(packet.sources),
+                source_quality=source_audit.average_score,
+                sources_requiring_review=source_audit.review_count + source_audit.failed_count,
+            )
 
             record.touch(RunStatus.PLANNING)
             self.repository.save(record)
