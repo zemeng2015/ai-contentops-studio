@@ -14,6 +14,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - observable run history and artifacts
 - explicit approval records before reviewed runs are published
 - publish receipts that audit provider, URL, approval, and changed files
+- optional operator API key protection for mutating API and dashboard actions
 - API, CLI, worker, and publisher boundaries
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
 - run comparison for repeatable quality and source regression review
@@ -193,6 +194,7 @@ CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
+# CONTENTOPS_OPERATOR_API_KEY=
 ```
 
 Research provider modes:
@@ -223,6 +225,15 @@ Use Postgres/RDS for run metadata:
 ```text
 CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
 ```
+
+Protect write operations in shared environments:
+
+```text
+CONTENTOPS_OPERATOR_API_KEY=replace-with-a-long-random-secret
+```
+
+When configured, mutating API and dashboard actions require `X-ContentOps-Api-Key` or an
+`api_key` query parameter. Read-only endpoints remain available for dashboards and integrations.
 
 Use real source URLs:
 

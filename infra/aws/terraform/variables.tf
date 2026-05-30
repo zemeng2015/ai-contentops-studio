@@ -73,6 +73,12 @@ variable "openai_api_key_secret_arn" {
   default     = ""
 }
 
+variable "operator_api_key_secret_arn" {
+  description = "Secrets Manager ARN containing the optional operator API key."
+  type        = string
+  default     = ""
+}
+
 variable "homepage_repo_path" {
   description = "Optional mounted path for homepage publisher in container deployments."
   type        = string

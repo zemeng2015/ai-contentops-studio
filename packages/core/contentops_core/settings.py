@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,5 +28,6 @@ class Settings(BaseSettings):
     publisher_provider: str = "static"
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-mini"
+    operator_api_key: SecretStr | None = None
     homepage_repo_path: Path | None = None
     homepage_public_base_url: str = "https://zemeng2015.github.io/zack-ai-homepage"

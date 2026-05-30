@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from contentops_api.main import app
+from contentops_api.main import app, settings
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 
 def test_health_endpoint() -> None:
@@ -174,3 +175,23 @@ def test_rejected_run_requires_force_to_publish() -> None:
     assert reject_response.json()["status"] == "rejected"
     assert publish_response.status_code == 409
     assert force_publish_response.status_code == 200
+
+
+def test_operator_api_key_protects_mutations() -> None:
+    client = TestClient(app)
+    original_key = settings.operator_api_key
+    settings.operator_api_key = SecretStr("test-secret")
+    try:
+        blocked_response = client.post("/runs", json={"topic": "Protected mutation"})
+        allowed_response = client.post(
+            "/runs",
+            json={"topic": "Protected mutation"},
+            headers={"X-ContentOps-Api-Key": "test-secret"},
+        )
+        read_response = client.get("/runs")
+    finally:
+        settings.operator_api_key = original_key
+
+    assert blocked_response.status_code == 401
+    assert allowed_response.status_code == 200
+    assert read_response.status_code == 200

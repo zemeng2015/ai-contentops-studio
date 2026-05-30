@@ -20,6 +20,7 @@ before Terraform or CDK resources are added.
 - S3 artifact storage with versioning and encryption
 - RDS Postgres run metadata storage
 - Secrets Manager storage for `CONTENTOPS_DATABASE_URL`
+- optional Secrets Manager injection for `CONTENTOPS_OPERATOR_API_KEY`
 - ECS Fargate task definitions for API and worker
 - task execution and artifact access IAM roles
 - CloudWatch log groups
@@ -42,3 +43,5 @@ terraform plan \
 
 The recurring worker schedule is disabled by default. Set `worker_schedule_enabled=true` after the
 image, networking, RDS metadata store, and publishing target are ready.
+Set `operator_api_key_secret_arn` to require an operator key for write actions in shared
+deployments.

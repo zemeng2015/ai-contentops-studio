@@ -13,6 +13,7 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 - 可观测的运行历史、trace 和 artifacts
 - reviewed run 发布前必须有显式 approval record
 - publish receipt 会审计 provider、URL、approval 和变更文件
+- 可选 operator API key，用于保护写操作和 Dashboard mutation
 - API、CLI、worker、publisher 清晰分层
 - Review dashboard：可检查 artifact、source、evaluation、publish plan 和 run comparison
 - YAML 定义的 worker jobs：可用于每日/每周内容选题计划
@@ -180,6 +181,7 @@ CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
+# CONTENTOPS_OPERATOR_API_KEY=
 ```
 
 Research provider 模式：
@@ -210,6 +212,15 @@ pip install -e ".[aws]"
 ```text
 CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
 ```
+
+在共享或部署环境中保护写操作：
+
+```text
+CONTENTOPS_OPERATOR_API_KEY=replace-with-a-long-random-secret
+```
+
+配置后，创建 run、approve/reject、publish、rerun 等 mutation 需要
+`X-ContentOps-Api-Key` header 或 `api_key` query 参数；只读接口仍可用于 dashboard 和集成。
 
 使用真实网页来源：
 

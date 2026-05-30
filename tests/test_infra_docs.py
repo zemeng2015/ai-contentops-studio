@@ -17,6 +17,7 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "ecs:RunTask" in main
     assert "iam:PassRole" in main
     assert "CONTENTOPS_DATABASE_URL" in main
+    assert "CONTENTOPS_OPERATOR_API_KEY" in main
 
 
 def test_ci_validates_terraform() -> None:

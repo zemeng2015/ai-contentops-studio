@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from html import escape
 from typing import Annotated
 
@@ -16,7 +17,7 @@ from contentops_core.models import (
 )
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
-from fastapi import FastAPI, Form, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 settings = Settings()
@@ -31,6 +32,16 @@ app = FastAPI(
 )
 
 
+async def require_operator(request: Request) -> None:
+    configured = settings.operator_api_key
+    if configured is None:
+        return
+    expected = configured.get_secret_value()
+    provided = request.headers.get("x-contentops-api-key") or request.query_params.get("api_key")
+    if provided is None or not secrets.compare_digest(provided, expected):
+        raise HTTPException(status_code=401, detail="Valid operator API key required.")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -41,6 +52,7 @@ def health() -> dict[str, str]:
 def dashboard(
     q: str = Query(default=""),
     status: str = Query(default=""),
+    api_key: str = Query(default=""),
 ) -> HTMLResponse:
     all_runs = repository.list(limit=100)
     runs = _filter_runs(all_runs, q, status)[:50]
@@ -73,7 +85,7 @@ def dashboard(
                 <div><strong>{completed}</strong><span>Traced</span></div>
                 <div><strong>{avg_duration}</strong><span>Avg duration</span></div>
               </div>
-              <form method="post" action="/dashboard/runs">
+              <form method="post" action="/dashboard/runs{_api_key_query(api_key)}">
                 <input name="topic" placeholder="Run topic" required>
                 <textarea
                   name="source_urls"
@@ -104,6 +116,7 @@ def dashboard(
 @app.post("/dashboard/runs")
 async def dashboard_create_run(
     topic: Annotated[str, Form()],
+    _: Annotated[None, Depends(require_operator)],
     source_urls: Annotated[str, Form()] = "",
     publish: Annotated[bool, Form()] = False,
 ) -> RedirectResponse:
@@ -119,7 +132,7 @@ async def dashboard_create_run(
 
 
 @app.get("/dashboard/runs/{run_id}", response_class=HTMLResponse)
-def dashboard_run_detail(run_id: str) -> HTMLResponse:
+def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLResponse:
     run = repository.get(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -143,15 +156,19 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
         source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
     approval_html = _approval_html(review_service.approval(run_id))
     receipt_html = _publish_receipt_html(review_service.publish_receipt(run_id))
+    approve_action = f"/dashboard/runs/{escape(run_id)}/approve{_api_key_query(api_key)}"
+    reject_action = f"/dashboard/runs/{escape(run_id)}/reject{_api_key_query(api_key)}"
+    rerun_action = f"/dashboard/runs/{escape(run_id)}/rerun{_api_key_query(api_key)}"
     publish_action = (
-        f'<form method="post" action="/dashboard/runs/{escape(run_id)}/publish">'
+        f'<form method="post" action="/dashboard/runs/{escape(run_id)}/publish'
+        f'{_api_key_query(api_key)}">'
         '<button type="submit">Publish run</button></form>'
     )
     return HTMLResponse(
         _page(
             f"Run {run.id}",
             f"""
-            <p><a href="/dashboard">Back to dashboard</a></p>
+            <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
             <section class="hero">
               <h2>{escape(run.topic)}</h2>
               <p>Status: <strong>{escape(run.status.value)}</strong></p>
@@ -168,12 +185,12 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               {plan_html}
               <h3>Approval</h3>
               {approval_html}
-              <form method="post" action="/dashboard/runs/{escape(run_id)}/approve">
+              <form method="post" action="{approve_action}">
                 <input name="reviewer" placeholder="Reviewer" value="operator">
                 <input name="notes" placeholder="Approval notes">
                 <button type="submit">Approve run</button>
               </form>
-              <form method="post" action="/dashboard/runs/{escape(run_id)}/reject">
+              <form method="post" action="{reject_action}">
                 <input name="reviewer" placeholder="Reviewer" value="operator">
                 <input name="notes" placeholder="Rejection notes">
                 <button type="submit">Reject run</button>
@@ -181,7 +198,7 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               {publish_action}
               <h3>Publish Receipt</h3>
               {receipt_html}
-              <form method="post" action="/dashboard/runs/{escape(run_id)}/rerun">
+              <form method="post" action="{rerun_action}">
                 <button type="submit">Rerun with same request</button>
               </form>
               <form method="get" action="/dashboard/compare">
@@ -248,7 +265,10 @@ def dashboard_compare(base_run_id: str, candidate_run_id: str) -> HTMLResponse:
 
 
 @app.post("/dashboard/runs/{run_id}/publish")
-def dashboard_publish_run(run_id: str) -> RedirectResponse:
+def dashboard_publish_run(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+) -> RedirectResponse:
     try:
         review_service.publish(run_id)
     except FileNotFoundError as exc:
@@ -261,6 +281,7 @@ def dashboard_publish_run(run_id: str) -> RedirectResponse:
 @app.post("/dashboard/runs/{run_id}/approve")
 def dashboard_approve_run(
     run_id: str,
+    _: Annotated[None, Depends(require_operator)],
     reviewer: Annotated[str, Form()] = "operator",
     notes: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
@@ -276,6 +297,7 @@ def dashboard_approve_run(
 @app.post("/dashboard/runs/{run_id}/reject")
 def dashboard_reject_run(
     run_id: str,
+    _: Annotated[None, Depends(require_operator)],
     reviewer: Annotated[str, Form()] = "operator",
     notes: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
@@ -287,14 +309,20 @@ def dashboard_reject_run(
 
 
 @app.post("/dashboard/runs/{run_id}/rerun")
-def dashboard_rerun(run_id: str) -> RedirectResponse:
+def dashboard_rerun(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+) -> RedirectResponse:
     request = review_service.request(run_id)
     result = pipeline.run(request)
     return RedirectResponse(f"/dashboard/runs/{result.run.id}", status_code=303)
 
 
 @app.post("/runs", response_model=RunRecord)
-def create_run(request: RunRequest) -> RunRecord:
+def create_run(
+    request: RunRequest,
+    _: Annotated[None, Depends(require_operator)],
+) -> RunRecord:
     result = pipeline.run(request)
     return result.run
 
@@ -333,7 +361,11 @@ def get_artifact(run_id: str, artifact_name: str) -> Response:
 
 
 @app.post("/runs/{run_id}/publish", response_model=RunRecord)
-def publish_run(run_id: str, force: bool = False) -> RunRecord:
+def publish_run(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+    force: bool = False,
+) -> RunRecord:
     try:
         return review_service.publish(run_id, force=force)
     except FileNotFoundError as exc:
@@ -343,7 +375,12 @@ def publish_run(run_id: str, force: bool = False) -> RunRecord:
 
 
 @app.post("/runs/{run_id}/approve", response_model=RunRecord)
-def approve_run(run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
+def approve_run(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+    reviewer: str = "operator",
+    notes: str = "",
+) -> RunRecord:
     try:
         return review_service.approve(run_id, reviewer=reviewer, notes=notes)
     except FileNotFoundError as exc:
@@ -353,7 +390,12 @@ def approve_run(run_id: str, reviewer: str = "operator", notes: str = "") -> Run
 
 
 @app.post("/runs/{run_id}/reject", response_model=RunRecord)
-def reject_run(run_id: str, reviewer: str = "operator", notes: str = "") -> RunRecord:
+def reject_run(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+    reviewer: str = "operator",
+    notes: str = "",
+) -> RunRecord:
     try:
         return review_service.reject(run_id, reviewer=reviewer, notes=notes)
     except FileNotFoundError as exc:
@@ -377,7 +419,11 @@ def get_publish_receipt(run_id: str) -> PublishReceipt | None:
 
 
 @app.post("/runs/{run_id}/rerun", response_model=RunRecord)
-def rerun(run_id: str, publish: bool | None = None) -> RunRecord:
+def rerun(
+    run_id: str,
+    _: Annotated[None, Depends(require_operator)],
+    publish: bool | None = None,
+) -> RunRecord:
     try:
         request = review_service.request(run_id)
     except FileNotFoundError as exc:
@@ -494,6 +540,12 @@ def _page(title: str, body: str) -> str:
       </body>
     </html>
     """
+
+
+def _api_key_query(api_key: str) -> str:
+    if not api_key:
+        return ""
+    return f"?api_key={escape(api_key, quote=True)}"
 
 
 def _filter_runs(runs: list[RunRecord], query: str, status: str) -> list[RunRecord]:

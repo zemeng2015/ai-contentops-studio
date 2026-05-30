@@ -209,6 +209,7 @@ def init_config(
                 "CONTENTOPS_PUBLISHER_PROVIDER=static",
                 "CONTENTOPS_OPENAI_MODEL=gpt-5-mini",
                 "# CONTENTOPS_OPENAI_API_KEY=",
+                "# CONTENTOPS_OPERATOR_API_KEY=",
                 "# CONTENTOPS_HOMEPAGE_REPO_PATH=C:\\path\\to\\zack-ai-homepage",
                 "# CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage",
             ]

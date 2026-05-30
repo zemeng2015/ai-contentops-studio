@@ -22,7 +22,7 @@ docker run --rm -p 8000:8000 ai-contentops-studio
 - Artifacts: S3 bucket partitioned by run date
 - Metadata: RDS Postgres, exposed to tasks through a Secrets Manager
   `CONTENTOPS_DATABASE_URL`
-- Secrets: AWS Secrets Manager
+- Secrets: AWS Secrets Manager for database URLs, model credentials, and optional operator keys
 - Logs and metrics: CloudWatch
 
 The code uses provider and publisher boundaries so local filesystem/SQLite can be replaced by
@@ -47,6 +47,7 @@ CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 CONTENTOPS_OPENAI_MODEL=gpt-5-mini
 CONTENTOPS_OPENAI_API_KEY=
+CONTENTOPS_OPERATOR_API_KEY=
 CONTENTOPS_HOMEPAGE_REPO_PATH=
 CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
 ```
@@ -73,3 +74,7 @@ terraform apply \
   -var='worker_schedule_enabled=true' \
   -var='worker_schedule_expression=cron(0 13 * * ? *)'
 ```
+
+For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
+through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes
+require `X-ContentOps-Api-Key` or an `api_key` query parameter.

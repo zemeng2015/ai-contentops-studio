@@ -168,7 +168,8 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
       Effect = "Allow"
       Resource = compact([
         aws_secretsmanager_secret.database_url.arn,
-        var.openai_api_key_secret_arn
+        var.openai_api_key_secret_arn,
+        var.operator_api_key_secret_arn
       ])
     }]
   })
@@ -236,9 +237,20 @@ resource "aws_ecs_task_definition" "api" {
         { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" },
         { name = "CONTENTOPS_HOMEPAGE_REPO_PATH", value = var.homepage_repo_path }
       ]
-      secrets = [
-        { name = "CONTENTOPS_DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
-      ]
+      secrets = concat(
+        [
+          {
+            name      = "CONTENTOPS_DATABASE_URL"
+            valueFrom = aws_secretsmanager_secret.database_url.arn
+          }
+        ],
+        var.operator_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_OPERATOR_API_KEY"
+            valueFrom = var.operator_api_key_secret_arn
+          }
+        ] : []
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -274,9 +286,20 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "CONTENTOPS_GENERATOR_PROVIDER", value = "template" },
         { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" }
       ]
-      secrets = [
-        { name = "CONTENTOPS_DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
-      ]
+      secrets = concat(
+        [
+          {
+            name      = "CONTENTOPS_DATABASE_URL"
+            valueFrom = aws_secretsmanager_secret.database_url.arn
+          }
+        ],
+        var.operator_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_OPERATOR_API_KEY"
+            valueFrom = var.operator_api_key_secret_arn
+          }
+        ] : []
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
