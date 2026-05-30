@@ -21,6 +21,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     artifacts_response = client.get(f"/runs/{run['id']}/artifacts")
     artifact_response = client.get(f"/runs/{run['id']}/artifacts/eval-report.json")
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
+    metrics_response = client.get(f"/runs/{run['id']}/metrics")
     publish_response = client.post(f"/runs/{run['id']}/publish")
 
     assert create_response.status_code == 200
@@ -29,6 +30,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert artifact_response.status_code == 200
     assert plan_response.status_code == 200
     assert plan_response.json()["ready"] is True
+    assert metrics_response.status_code == 200
+    assert metrics_response.json()["source_count"] >= 1
     assert publish_response.status_code == 200
     assert publish_response.json()["status"] == "published"
 
@@ -54,6 +57,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert detail_response.status_code == 200
     assert "Source Review" in detail_response.text
     assert "Publish Plan" in detail_response.text
+    assert "Run Timeline" in detail_response.text
     assert "extraction" not in detail_response.text.lower()
 
 

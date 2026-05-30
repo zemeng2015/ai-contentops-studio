@@ -109,6 +109,7 @@ contentops run --topic "AI quality gates for RAG systems"
 contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
+contentops metrics <run_id>
 contentops publish <run_id>
 ```
 
@@ -118,6 +119,7 @@ API 也暴露同样的生命周期：
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
+GET  /runs/{run_id}/metrics
 POST /runs/{run_id}/publish
 ```
 
@@ -129,6 +131,7 @@ GET /dashboard
 
 Run detail 页面包含 Source Review 表，方便在发布前检查来源状态和抽取质量。
 Run detail 页面也包含 Publish Plan，会在发布前列出文件级变更。
+Run detail 页面会从 `trace.json` 展示 step timeline、耗时和字段信息。
 Dashboard 创建表单支持填写可选 source URLs，每行一个。
 
 ## Provider 配置

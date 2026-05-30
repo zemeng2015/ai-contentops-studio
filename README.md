@@ -112,6 +112,7 @@ contentops run --topic "AI quality gates for RAG systems"
 contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
+contentops metrics <run_id>
 contentops publish <run_id>
 ```
 
@@ -121,6 +122,7 @@ The API exposes the same lifecycle:
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
+GET  /runs/{run_id}/metrics
 POST /runs/{run_id}/publish
 ```
 
@@ -133,6 +135,7 @@ GET /dashboard
 Run details include a Source Review table so reviewers can inspect source status and extraction
 quality before publishing.
 Run details also include a Publish Plan that lists file-level changes before the publish action.
+Run details include a timeline derived from `trace.json`, including step durations and fields.
 The dashboard create form accepts optional source URLs, one per line.
 
 ## Provider configuration

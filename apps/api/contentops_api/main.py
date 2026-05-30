@@ -5,7 +5,7 @@ from html import escape
 from typing import Annotated
 
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import PublishPlan, RunRecord, RunRequest
+from contentops_core.models import PublishPlan, RunMetrics, RunRecord, RunRequest
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from fastapi import FastAPI, Form, HTTPException, Response
@@ -32,6 +32,12 @@ def health() -> dict[str, str]:
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard() -> HTMLResponse:
     runs = repository.list(limit=50)
+    metrics = [_safe_metrics(run.id) for run in runs]
+    completed = sum(
+        1 for item in metrics if item is not None and item.total_duration_ms is not None
+    )
+    published = sum(1 for run in runs if run.status.value == "published")
+    avg_duration = _avg_duration(metrics)
     rows = "\n".join(
         f"""
         <tr>
@@ -49,6 +55,12 @@ def dashboard() -> HTMLResponse:
             f"""
             <section class="hero">
               <p>Review generated research, drafts, evaluation reports, and publishing state.</p>
+              <div class="metrics">
+                <div><strong>{len(runs)}</strong><span>Runs</span></div>
+                <div><strong>{published}</strong><span>Published</span></div>
+                <div><strong>{completed}</strong><span>Traced</span></div>
+                <div><strong>{avg_duration}</strong><span>Avg duration</span></div>
+              </div>
               <form method="post" action="/dashboard/runs">
                 <input name="topic" placeholder="Run topic" required>
                 <textarea
@@ -98,6 +110,8 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
     eval_report = "{}"
     if "eval-report.json" in artifacts:
         eval_report = review_service.read_artifact(run_id, "eval-report.json")
+    metrics = review_service.metrics(run_id)
+    timeline_rows = _timeline_rows(metrics)
     plan_html = ""
     try:
         plan_html = _publish_plan_html(review_service.publish_plan(run_id))
@@ -119,6 +133,14 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               <h2>{escape(run.topic)}</h2>
               <p>Status: <strong>{escape(run.status.value)}</strong></p>
               <p>Published URL: {escape(run.published_url or "not published")}</p>
+              <div class="metrics">
+                <div><strong>{_duration_label(metrics.total_duration_ms)}</strong><span>Total</span></div>
+                <div><strong>{metrics.source_count}</strong><span>Sources</span></div>
+                <div>
+                  <strong>{str(metrics.publish_ready).lower()}</strong>
+                  <span>Publish ready</span>
+                </div>
+              </div>
               <h3>Publish Plan</h3>
               {plan_html}
               {publish_action}
@@ -132,6 +154,15 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
                 <h3>Evaluation</h3>
                 <pre>{escape(eval_report)}</pre>
               </div>
+            </section>
+            <section class="hero">
+              <h3>Run Timeline</h3>
+              <table>
+                <thead>
+                  <tr><th>Step</th><th>Status</th><th>Duration</th><th>Fields</th></tr>
+                </thead>
+                <tbody>{timeline_rows}</tbody>
+              </table>
             </section>
             <section class="hero">
               <h3>Source Review</h3>
@@ -215,6 +246,14 @@ def get_publish_plan(run_id: str) -> dict[str, object]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@app.get("/runs/{run_id}/metrics", response_model=RunMetrics)
+def get_run_metrics(run_id: str) -> RunMetrics:
+    try:
+        return review_service.metrics(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 def _page(title: str, body: str) -> str:
     return f"""
     <!doctype html>
@@ -243,6 +282,20 @@ def _page(title: str, body: str) -> str:
           }}
           .hero {{ padding: 24px; margin-bottom: 18px; }}
           form {{ display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }}
+          .metrics {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin: 18px 0;
+          }}
+          .metrics div {{
+            padding: 14px;
+            border: 1px solid #d8ddd7;
+            border-radius: 8px;
+            background: #f7f8f6;
+          }}
+          .metrics strong {{ display: block; font-size: 22px; }}
+          .metrics span {{ color: #5f6965; font-size: 13px; font-weight: 800; }}
           input[type="text"], input[name="topic"], textarea {{
             min-width: min(520px, 100%);
             padding: 12px;
@@ -268,7 +321,9 @@ def _page(title: str, body: str) -> str:
           .grid {{ display: grid; grid-template-columns: 0.4fr 0.6fr; gap: 18px; }}
           .grid > div {{ padding: 22px; min-width: 0; }}
           pre {{ overflow: auto; padding: 16px; background: #101816; color: #e6f0ec; }}
-          @media (max-width: 800px) {{ .grid {{ grid-template-columns: 1fr; }} }}
+          @media (max-width: 800px) {{
+            .grid, .metrics {{ grid-template-columns: 1fr; }}
+          }}
         </style>
       </head>
       <body>
@@ -302,6 +357,49 @@ def _source_review_rows(research_json: str) -> str:
             """
         )
     return "\n".join(rows)
+
+
+def _timeline_rows(metrics: RunMetrics) -> str:
+    rows: list[str] = []
+    for step in metrics.step_metrics:
+        fields = escape(json.dumps(step.fields, ensure_ascii=False))
+        rows.append(
+            f"""
+            <tr>
+              <td>{escape(step.step)}</td>
+              <td>{escape(step.status)}</td>
+              <td>{_duration_label(step.duration_ms)}</td>
+              <td><code>{fields}</code></td>
+            </tr>
+            """
+        )
+    return "\n".join(rows)
+
+
+def _safe_metrics(run_id: str) -> RunMetrics | None:
+    try:
+        return review_service.metrics(run_id)
+    except FileNotFoundError:
+        return None
+
+
+def _avg_duration(metrics: list[RunMetrics | None]) -> str:
+    durations = [
+        item.total_duration_ms
+        for item in metrics
+        if item is not None and item.total_duration_ms is not None
+    ]
+    if not durations:
+        return "n/a"
+    return _duration_label(int(sum(durations) / len(durations)))
+
+
+def _duration_label(duration_ms: int | None) -> str:
+    if duration_ms is None:
+        return "n/a"
+    if duration_ms < 1000:
+        return f"{duration_ms}ms"
+    return f"{duration_ms / 1000:.2f}s"
 
 
 def _publish_plan_html(plan: PublishPlan) -> str:

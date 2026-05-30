@@ -77,12 +77,17 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
 
     artifacts = review_service.list_artifacts(result.run.id)
     plan = review_service.publish_plan(result.run.id)
+    metrics = review_service.metrics(result.run.id)
     published = review_service.publish(result.run.id)
 
     assert "draft.json" in artifacts
     assert "eval-report.json" in artifacts
     assert plan.ready is True
     assert len(plan.items) == 3
+    assert metrics.run_id == result.run.id
+    assert metrics.total_duration_ms is not None
+    assert metrics.publish_ready is True
+    assert {step.step for step in metrics.step_metrics} >= {"research", "planning", "drafting"}
     assert published.status == RunStatus.PUBLISHED
     assert published.published_url is not None
 

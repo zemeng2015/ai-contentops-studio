@@ -7,7 +7,15 @@ from typing import TypeVar
 from contentops_publishing.static_site import Publisher
 from pydantic import BaseModel
 
-from contentops_core.models import Draft, EvaluationReport, PublishPlan, RunRecord, RunStatus
+from contentops_core.metrics import MetricsService
+from contentops_core.models import (
+    Draft,
+    EvaluationReport,
+    PublishPlan,
+    RunMetrics,
+    RunRecord,
+    RunStatus,
+)
 from contentops_core.repository import RunRepository
 
 T = TypeVar("T", bound=BaseModel)
@@ -17,6 +25,7 @@ class ReviewService:
     def __init__(self, repository: RunRepository, publisher: Publisher) -> None:
         self.repository = repository
         self.publisher = publisher
+        self.metrics_service = MetricsService()
 
     def list_artifacts(self, run_id: str) -> list[str]:
         run = self._get_run(run_id)
@@ -48,6 +57,9 @@ class ReviewService:
         draft = self._load_json(run, "draft.json", Draft)
         report = self._load_json(run, "eval-report.json", EvaluationReport)
         return self.publisher.plan(run, draft, report)
+
+    def metrics(self, run_id: str) -> RunMetrics:
+        return self.metrics_service.run_metrics(self._get_run(run_id))
 
     def _get_run(self, run_id: str) -> RunRecord:
         run = self.repository.get(run_id)

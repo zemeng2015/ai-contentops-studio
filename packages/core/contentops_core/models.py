@@ -91,6 +91,29 @@ class PublishPlan(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class TraceEvent(BaseModel):
+    timestamp: datetime
+    step: str
+    status: str
+    fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class StepMetric(BaseModel):
+    step: str
+    status: str
+    duration_ms: int | None = None
+    fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class RunMetrics(BaseModel):
+    run_id: str
+    status: RunStatus
+    total_duration_ms: int | None = None
+    source_count: int = 0
+    publish_ready: bool | None = None
+    step_metrics: list[StepMetric]
+
+
 class RunRequest(BaseModel):
     topic: str
     source_urls: list[str] = Field(default_factory=list)

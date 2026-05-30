@@ -56,6 +56,10 @@ queue.
 The FastAPI app includes a lightweight server-rendered dashboard at `/dashboard` so the project has
 a usable review surface before a larger React dashboard is introduced.
 
+The dashboard and API expose run metrics derived from `trace.json`: total duration, per-step
+durations, source count, and publish readiness. This keeps observability tied to persisted run
+artifacts rather than transient process logs.
+
 ## Production path
 
 Local defaults:
