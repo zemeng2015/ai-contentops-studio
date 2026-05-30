@@ -146,6 +146,7 @@ GET  /runs
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifact-manifest
+GET  /runs/{run_id}/bundle
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
@@ -188,6 +189,7 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir art
 contentops job-executions --json
 contentops job-execution <execution_id>
 contentops content --json
+contentops export-run <run_id> --output run-evidence.zip
 ```
 
 Every worker execution writes a job receipt JSON file under

@@ -94,6 +94,10 @@ Published runs are projected into a content catalog exposed through `/content`, 
 and the dashboard. The catalog combines run metadata, publish receipts, URLs, providers, publish
 timestamps, and evaluation scores so the platform can be reviewed as a content inventory instead
 of a collection of one-off artifacts.
+Each run can also be exported as an evidence bundle through `/runs/{id}/bundle` or
+`contentops export-run`. The zip contains a bundle manifest plus every run artifact, which makes
+generated research, evaluation, traces, approval records, and publishing receipts portable for
+portfolio reviews or incident handoffs.
 
 ```text
 needs_review -> approved -> publishing -> published

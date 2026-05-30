@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import TypeVar
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from contentops_publishing.static_site import Publisher
 from pydantic import BaseModel
@@ -79,6 +80,38 @@ class ReviewService:
         run = self._get_run(run_id)
         artifact_path = self._safe_artifact_path(run.artifact_dir, artifact_name)
         return artifact_path.read_text(encoding="utf-8")
+
+    def create_bundle(self, run_id: str, output_path: Path | None = None) -> Path:
+        run = self._get_run(run_id)
+        target = output_path or run.artifact_dir / f"{run.id}-bundle.zip"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        artifact_paths = [
+            path
+            for path in sorted(run.artifact_dir.iterdir())
+            if path.is_file()
+            and path.resolve() != target.resolve()
+            and not path.name.endswith(".zip")
+        ]
+        manifest = {
+            "run": run.model_dump(mode="json"),
+            "artifacts": {
+                path.name: {
+                    "size_bytes": path.stat().st_size,
+                    "media_type": mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+                    "sha256": sha256(path.read_bytes()).hexdigest(),
+                }
+                for path in artifact_paths
+            },
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        with ZipFile(target, "w", compression=ZIP_DEFLATED) as bundle:
+            bundle.writestr(
+                "bundle-manifest.json",
+                json.dumps(manifest, indent=2),
+            )
+            for path in artifact_paths:
+                bundle.write(path, f"artifacts/{path.name}")
+        return target
 
     def publish(self, run_id: str, force: bool = False) -> RunRecord:
         run = self._get_run(run_id)

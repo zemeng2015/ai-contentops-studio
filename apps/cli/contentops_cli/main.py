@@ -200,6 +200,22 @@ def artifacts(run_id: str) -> None:
         typer.echo(artifact)
 
 
+@app.command("export-run")
+def export_run(
+    run_id: str,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Optional zip file path."),
+    ] = None,
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        bundle_path = service.create_bundle(run_id, output_path=output)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Bundle: {bundle_path}")
+
+
 @app.command()
 def manifest(run_id: str) -> None:
     service = build_review_service(Settings())

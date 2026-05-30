@@ -37,7 +37,7 @@ from contentops_core.models import (
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 settings = Settings()
 pipeline = build_pipeline(settings)
@@ -304,6 +304,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               <div>
                 <h3>Artifacts</h3>
                 <p><a href="/runs/{escape(run_id)}/artifact-manifest">Manifest JSON</a></p>
+                <p><a href="/runs/{escape(run_id)}/bundle">Download evidence bundle</a></p>
                 <table>
                   <thead><tr><th>Name</th><th>Bytes</th><th>Type</th><th>SHA</th></tr></thead>
                   <tbody>{artifact_rows}</tbody>
@@ -555,6 +556,19 @@ def get_artifact_manifest(run_id: str) -> ArtifactManifest:
         return review_service.artifact_manifest(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/bundle")
+def get_run_bundle(run_id: str) -> FileResponse:
+    try:
+        bundle_path = review_service.create_bundle(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(
+        bundle_path,
+        media_type="application/zip",
+        filename=bundle_path.name,
+    )
 
 
 @app.get("/runs/{run_id}/artifacts/{artifact_name}")

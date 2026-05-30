@@ -59,6 +59,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     run = create_response.json()
     artifacts_response = client.get(f"/runs/{run['id']}/artifacts")
     manifest_response = client.get(f"/runs/{run['id']}/artifact-manifest")
+    bundle_response = client.get(f"/runs/{run['id']}/bundle")
     artifact_response = client.get(f"/runs/{run['id']}/artifacts/eval-report.json")
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
     source_audit_response = client.get(f"/runs/{run['id']}/source-audit")
@@ -77,6 +78,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "eval-report.json" in artifacts_response.json()
     assert manifest_response.status_code == 200
     assert manifest_response.json()["artifacts"]["eval-report.json"]["size_bytes"] > 0
+    assert bundle_response.status_code == 200
+    assert bundle_response.content.startswith(b"PK")
     assert artifact_response.status_code == 200
     assert plan_response.status_code == 200
     assert plan_response.json()["ready"] is True
@@ -249,6 +252,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Publish Receipt" in detail_response.text
     assert "Audit Log" in detail_response.text
     assert "Manifest JSON" in detail_response.text
+    assert "Download evidence bundle" in detail_response.text
     assert "Run Timeline" in detail_response.text
     assert "Rerun with same request" in detail_response.text
     assert "Compare runs" in detail_response.text

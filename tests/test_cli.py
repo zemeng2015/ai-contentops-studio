@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 from contentops_cli.main import app
@@ -121,6 +122,8 @@ def test_cli_queue_and_manifest_commands(
     )
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
+    bundle_path = tmp_path / "bundle.zip"
+    export_result = runner.invoke(app, ["export-run", run_id, "--output", str(bundle_path)])
 
     assert run_result.exit_code == 0
     assert queue_result.exit_code == 0
@@ -134,6 +137,11 @@ def test_cli_queue_and_manifest_commands(
     assert source_audit_result.exit_code == 0
     source_audit_payload = json.loads(source_audit_result.output)
     assert source_audit_payload["source_count"] >= 1
+    assert export_result.exit_code == 0
+    assert bundle_path.exists()
+    with ZipFile(bundle_path) as bundle:
+        assert "bundle-manifest.json" in bundle.namelist()
+        assert "artifacts/eval-report.json" in bundle.namelist()
 
 
 def test_cli_job_execution_commands(

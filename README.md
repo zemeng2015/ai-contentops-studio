@@ -130,6 +130,7 @@ Generate first, inspect artifacts, then publish:
 contentops run --topic "AI quality gates for RAG systems"
 contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
+contentops export-run <run_id> --output run-evidence.zip
 contentops publish-plan <run_id>
 contentops metrics <run_id>
 contentops source-audit <run_id>
@@ -153,6 +154,7 @@ The API exposes the same lifecycle:
 ```text
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifact-manifest
+GET  /runs/{run_id}/bundle
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
@@ -185,6 +187,8 @@ Run details include a Source Review table so reviewers can inspect source status
 quality before publishing.
 Run details also include a Publish Plan that lists file-level changes before the publish action.
 Run details include a timeline derived from `trace.json`, including step durations and fields.
+Run details link to a downloadable evidence bundle with the run metadata, artifact manifest, and
+all run artifacts for interview review or incident handoff.
 The dashboard create form accepts optional source URLs, one per line.
 The dashboard list supports database-backed status/topic filters, queue counts, and pagination.
 The dashboard also surfaces recent worker executions from job receipts so scheduled content runs
