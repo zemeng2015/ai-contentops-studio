@@ -192,6 +192,11 @@ AWS-ready equivalents:
 - CloudWatch for logs and metrics
 - Secrets Manager for provider credentials
 
+The S3 artifact store keeps the local filesystem copy authoritative and mirrors each write to
+S3. Every mirror attempt appends `s3-mirror-log.json` beside the run artifacts with provider,
+bucket, key, content type, status, error, and timestamp fields. This makes object-level storage
+state auditable even when cloud logs have rotated or a worker fails midway through a run.
+
 The Terraform baseline now provisions an RDS Postgres metadata database and writes a
 `postgresql+psycopg://` `CONTENTOPS_DATABASE_URL` into Secrets Manager for ECS task injection.
 This keeps local SQLite useful for development while proving the production metadata path has a

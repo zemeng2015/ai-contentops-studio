@@ -19,6 +19,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - 全局 audit event 查询可跨 run 检索 approve、reject、publish 和 rollback 动作
 - source audit reports，包含来源评分、风险原因和 reviewer 建议
 - artifact retention reports 用于统计 artifact 占用并规划归档/清理
+- S3 mirror receipts 记录 artifact 镜像到 AWS S3 的 bucket、key、状态和错误
 - publish receipts record file hashes, backup artifacts, and rollback hints
 - publish receipt 会审计 provider、URL、approval 和变更文件
 - incident reports 汇总失败、质量退化、预算超限、发布漂移和通知失败的运行信号
@@ -299,6 +300,10 @@ CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```powershell
 pip install -e ".[aws]"
 ```
+
+启用 S3 镜像后，每个 run artifact 目录会写入本地 `s3-mirror-log.json` receipt。
+该文件记录 artifact 名称、bucket、object key、content type、镜像状态、错误信息和时间戳，
+用于排查 S3 上传失败或证明 artifact 已经镜像到预期路径。
 
 使用 Postgres/RDS 存储 run metadata：
 

@@ -528,3 +528,15 @@ class ArtifactManifest(BaseModel):
     run_id: str
     artifacts: dict[str, ArtifactMetadata] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ArtifactMirrorRecord(BaseModel):
+    run_id: str
+    artifact_name: str
+    provider: str
+    bucket: str
+    key: str
+    content_type: str
+    status: str
+    error: str | None = None
+    mirrored_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

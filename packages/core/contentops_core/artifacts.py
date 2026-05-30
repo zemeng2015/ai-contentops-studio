@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from contentops_core.models import ArtifactManifest, RunRecord
+from contentops_core.models import ArtifactManifest, ArtifactMirrorRecord, RunRecord
 
 
 class ArtifactWriter(Protocol):
@@ -75,18 +75,69 @@ class S3MirroringArtifactStore(ArtifactStore):
         return path
 
     def _upload(self, path: Path, run: RunRecord, name: str, content_type: str) -> None:
+        key = f"{self.prefix}/{run.id}/{name}"
         try:
             boto3 = importlib.import_module("boto3")
         except ModuleNotFoundError as exc:
+            self._append_mirror_record(
+                run,
+                ArtifactMirrorRecord(
+                    run_id=run.id,
+                    artifact_name=name,
+                    provider="s3",
+                    bucket=self.bucket,
+                    key=key,
+                    content_type=content_type,
+                    status="failed",
+                    error="boto3 is not installed",
+                ),
+            )
             raise RuntimeError(
                 "boto3 is required for CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3. "
                 "Install the aws extra with: pip install -e \".[aws]\""
             ) from exc
         client = boto3.client("s3")
-        key = f"{self.prefix}/{run.id}/{name}"
-        client.upload_file(
-            str(path),
-            self.bucket,
-            key,
-            ExtraArgs={"ContentType": content_type},
+        try:
+            client.upload_file(
+                str(path),
+                self.bucket,
+                key,
+                ExtraArgs={"ContentType": content_type},
+            )
+        except Exception as exc:
+            self._append_mirror_record(
+                run,
+                ArtifactMirrorRecord(
+                    run_id=run.id,
+                    artifact_name=name,
+                    provider="s3",
+                    bucket=self.bucket,
+                    key=key,
+                    content_type=content_type,
+                    status="failed",
+                    error=str(exc),
+                ),
+            )
+            raise
+        self._append_mirror_record(
+            run,
+            ArtifactMirrorRecord(
+                run_id=run.id,
+                artifact_name=name,
+                provider="s3",
+                bucket=self.bucket,
+                key=key,
+                content_type=content_type,
+                status="mirrored",
+            ),
         )
+
+    @staticmethod
+    def _append_mirror_record(run: RunRecord, record: ArtifactMirrorRecord) -> None:
+        path = run.artifact_dir / "s3-mirror-log.json"
+        if path.exists():
+            records = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            records = []
+        records.append(record.model_dump(mode="json"))
+        path.write_text(json.dumps(records, indent=2), encoding="utf-8")

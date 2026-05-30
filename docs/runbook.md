@@ -42,6 +42,8 @@ contentops job-recovery-plan <execution_id> --output recovery.yaml
 
 Review the execution receipt for per-job failures, run ids, artifact directories, publish URLs, and
 duration. In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
+For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
+whether any artifact mirror attempt failed before the worker completed.
 When failures occur, inspect the recovery plan before rerunning it with
 `contentops-worker run-pipeline recovery.yaml`.
 
@@ -191,7 +193,8 @@ Recommended AWS-backed setup:
 
 - API and worker on ECS Fargate or Lambda.
 - RDS Postgres for run metadata.
-- S3 artifact mirroring for run artifacts, worker receipts, and evidence bundles.
+- S3 artifact mirroring for run artifacts, worker receipts, and evidence bundles, with
+  `s3-mirror-log.json` receipts retained locally for object-level audit trails.
 - EventBridge Scheduler for daily AI research jobs.
 - Secrets Manager for OpenAI, search provider, database, and operator API keys.
 - Optional webhook endpoint for review and publishing notifications.

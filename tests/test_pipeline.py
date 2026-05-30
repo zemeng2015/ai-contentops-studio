@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contentops_core.artifacts import S3MirroringArtifactStore
 from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import RunRequest, RunStatus
+from contentops_core.models import RunRecord, RunRequest, RunStatus
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from pydantic import SecretStr
@@ -491,6 +492,49 @@ def test_s3_artifact_store_requires_bucket(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="CONTENTOPS_ARTIFACT_S3_BUCKET"):
         build_pipeline(settings)
+
+
+def test_s3_artifact_store_writes_mirror_receipts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    uploads: list[dict[str, object]] = []
+
+    class FakeS3Client:
+        def upload_file(
+            self,
+            filename: str,
+            bucket: str,
+            key: str,
+            ExtraArgs: dict[str, str],
+        ) -> None:
+            uploads.append(
+                {
+                    "filename": filename,
+                    "bucket": bucket,
+                    "key": key,
+                    "extra_args": ExtraArgs,
+                }
+            )
+
+    class FakeBoto3:
+        @staticmethod
+        def client(service: str) -> FakeS3Client:
+            assert service == "s3"
+            return FakeS3Client()
+
+    monkeypatch.setattr("contentops_core.artifacts.importlib.import_module", lambda name: FakeBoto3)
+    run = RunRecord.create(RunRequest(topic="Mirror receipts"), tmp_path / "artifacts")
+    store = S3MirroringArtifactStore(tmp_path / "artifacts", "artifact-bucket", "prefix")
+    store.prepare(run)
+
+    store.write_text(run, "draft.md", "hello")
+
+    mirror_log = store.read_text(run, "s3-mirror-log.json")
+    assert uploads[-1]["bucket"] == "artifact-bucket"
+    assert uploads[-1]["key"] == f"prefix/{run.id}/draft.md"
+    assert '"artifact_name": "draft.md"' in mirror_log
+    assert '"status": "mirrored"' in mirror_log
 
 
 def test_system_status_reports_configuration_failures(tmp_path: Path) -> None:

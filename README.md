@@ -23,6 +23,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - notification delivery logs for review and publishing events, with optional webhook delivery
 - source audit reports with scoring, risk reasons, and reviewer recommendations
 - artifact retention reports for storage hygiene and archive planning
+- S3 mirror receipts for bucket/key/status auditability in AWS deployments
 - generation receipts that audit model provider, retry attempts, fallback, and usage tokens
 - publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
 - publish verification reports that prove target files still match their receipt hashes
@@ -369,6 +370,11 @@ It also installs the Postgres driver used by RDS deployments.
 ```powershell
 pip install -e ".[aws]"
 ```
+
+When S3 mirroring is enabled, each mirrored artifact writes a local `s3-mirror-log.json`
+receipt in the run artifact directory. The receipt records artifact name, bucket, object key,
+content type, mirror status, error details, and timestamp, so operators can audit what reached
+S3 without relying only on CloudWatch logs.
 
 Use Postgres/RDS for run metadata:
 
