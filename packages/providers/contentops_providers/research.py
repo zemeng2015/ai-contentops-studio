@@ -385,6 +385,133 @@ class FeedResearchProvider:
         )
 
 
+@dataclass(frozen=True)
+class SearchResult:
+    title: str
+    url: str | None
+    snippet: str
+    publisher: str
+
+
+class SearchResearchProvider:
+    """Search API backed research provider.
+
+    The default request shape matches Brave Search's web endpoint, while the JSON parser accepts
+    common `web.results`, `organic`, and `results` lists so operators can swap compatible search
+    services without changing pipeline code.
+    """
+
+    def __init__(
+        self,
+        endpoint: str,
+        api_key: str,
+        max_sources: int = 6,
+        timeout_seconds: float = 12.0,
+    ) -> None:
+        self.endpoint = endpoint
+        self.api_key = api_key
+        self.max_sources = max_sources
+        self.timeout_seconds = timeout_seconds
+
+    def collect(self, request: RunRequest) -> ResearchPacket:
+        results = self._search(request.topic)
+        selected = results[: self.max_sources]
+        sources = dedupe_sources([self._result_to_source(result) for result in selected])
+        claims = [
+            Claim(
+                text=f"{source.title} is a search-discovered source for {request.topic}.",
+                source_title=source.title,
+                confidence=source.credibility,
+            )
+            for source in sources
+        ]
+        return ResearchPacket(
+            topic=request.topic.strip(),
+            sources=sources,
+            claims=claims,
+            engineering_signals=[
+                "Search-backed research expands beyond fixed feeds and manual URLs.",
+                "Search snippets should be treated as leads that reviewers can inspect.",
+                "Provider boundaries let teams swap search vendors without changing workflow code.",
+            ],
+            risks=[
+                "Search result quality depends on provider ranking and query wording.",
+                "Snippets can omit nuance; important sources should be reviewed before publishing.",
+            ],
+            project_implications=[
+                "Use search provider credentials in deployed workers for daily AI monitoring.",
+                "Persist search metadata so review and evaluation stay auditable.",
+            ],
+        )
+
+    def _search(self, topic: str) -> list[SearchResult]:
+        try:
+            with httpx.Client(
+                timeout=self.timeout_seconds,
+                follow_redirects=True,
+                headers={
+                    "Accept": "application/json",
+                    "User-Agent": "ai-contentops-studio/0.1",
+                    "X-Subscription-Token": self.api_key,
+                },
+            ) as client:
+                response = client.get(
+                    self.endpoint,
+                    params={"q": topic, "count": self.max_sources},
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except Exception as exc:
+            return [
+                SearchResult(
+                    title=f"Search failed for: {topic}",
+                    url=self.endpoint,
+                    snippet=f"Search provider request failed: {exc}",
+                    publisher=_publisher_from_url(self.endpoint),
+                )
+            ]
+        return self._parse_results(payload)
+
+    @staticmethod
+    def _parse_results(payload: object) -> list[SearchResult]:
+        if not isinstance(payload, dict):
+            return []
+        raw_results = _search_result_items(payload)
+        results: list[SearchResult] = []
+        for item in raw_results:
+            if not isinstance(item, dict):
+                continue
+            url = _first_string(item, ["url", "link"])
+            title = _first_string(item, ["title", "name"]) or url or "Untitled search result"
+            snippet = _first_string(item, ["description", "snippet", "summary"]) or ""
+            results.append(
+                SearchResult(
+                    title=title,
+                    url=url,
+                    snippet=snippet,
+                    publisher=_publisher_from_url(url or ""),
+                )
+            )
+        return results
+
+    @staticmethod
+    def _result_to_source(result: SearchResult) -> Source:
+        summary = re.sub(r"\s+", " ", _strip_tags(result.snippet)).strip()
+        if not summary:
+            summary = "Search result did not include a snippet."
+        return Source(
+            title=result.title[:180],
+            url=result.url,
+            canonical_url=_normalize_url(result.url),
+            publisher=result.publisher,
+            summary=summary[:500],
+            credibility=0.68,
+            extraction_status="search",
+            extraction_quality=0.68 if len(summary) >= 80 else 0.52,
+            content_length=len(summary),
+        )
+
+
 class DiscoveryResearchProvider:
     def __init__(self, feeds: list[str], max_sources: int = 6) -> None:
         self.local = LocalResearchProvider()
@@ -498,6 +625,27 @@ def _xml_link(element: ET.Element) -> str | None:
 
 def _xml_local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+
+
+def _search_result_items(payload: dict[str, object]) -> list[object]:
+    web = payload.get("web")
+    if isinstance(web, dict):
+        web_results = web.get("results")
+        if isinstance(web_results, list):
+            return list(web_results)
+    for key in ("organic", "results", "items"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return list(value)
+    return []
+
+
+def _first_string(item: dict[str, object], keys: list[str]) -> str | None:
+    for key in keys:
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def dedupe_sources(sources: list[Source]) -> list[Source]:

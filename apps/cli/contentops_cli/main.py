@@ -320,6 +320,8 @@ def init_config(
                     "&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending"
                 ),
                 "CONTENTOPS_RESEARCH_MAX_SOURCES=6",
+                "CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search",
+                "# CONTENTOPS_RESEARCH_SEARCH_API_KEY=",
                 "CONTENTOPS_GENERATOR_PROVIDER=template",
                 "CONTENTOPS_PUBLISHER_PROVIDER=static",
                 "CONTENTOPS_OPENAI_MODEL=gpt-5-mini",

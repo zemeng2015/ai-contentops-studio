@@ -24,6 +24,8 @@ class Settings(BaseSettings):
         "&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending"
     )
     research_max_sources: int = 6
+    research_search_endpoint: str = "https://api.search.brave.com/res/v1/web/search"
+    research_search_api_key: str | None = None
     generator_provider: str = "template"
     publisher_provider: str = "static"
     openai_api_key: str | None = None

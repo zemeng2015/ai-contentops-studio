@@ -6,7 +6,7 @@ from contentops_core.models import ComponentCheck, SystemStatus
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
-RESEARCH_PROVIDERS = {"local", "url", "hybrid", "feed", "discovery"}
+RESEARCH_PROVIDERS = {"local", "url", "hybrid", "feed", "discovery", "search"}
 GENERATOR_PROVIDERS = {"template", "openai"}
 PUBLISHER_PROVIDERS = {"static", "homepage"}
 ARTIFACT_STORE_PROVIDERS = {"local", "s3"}
@@ -95,6 +95,10 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append(f"unknown publisher provider: {settings.publisher_provider}")
     if settings.generator_provider == "openai" and not settings.openai_api_key:
         failures.append("OpenAI generation requires CONTENTOPS_OPENAI_API_KEY")
+    if settings.research_provider == "search" and not settings.research_search_api_key:
+        failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_API_KEY")
+    if settings.research_provider == "search" and not settings.research_search_endpoint:
+        failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_ENDPOINT")
     if settings.publisher_provider == "homepage" and settings.homepage_repo_path is None:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):

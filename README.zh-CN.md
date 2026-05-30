@@ -96,6 +96,7 @@ tests/                     单元测试和集成测试
 - 本地 research provider 和 deterministic source packet
 - URL research provider，可抓取并标准化用户提供的网页来源
 - Feed research provider，可从 RSS/Atom feed 自动发现候选来源
+- Search research provider，可接入 Brave-compatible web search API
 - Discovery research provider，组合 feed discovery、用户 URL 和本地 portfolio context
 - Source 去重，以及 extraction status、quality、content length 元数据
 - 可选 OpenAI Responses API generator，并且放在 provider 边界后面
@@ -195,6 +196,8 @@ jobs:
 CONTENTOPS_RESEARCH_PROVIDER=discovery
 CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
+CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search
+# CONTENTOPS_RESEARCH_SEARCH_API_KEY=
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 # CONTENTOPS_OPERATOR_API_KEY=
@@ -206,6 +209,7 @@ Research provider 模式：
 - `url`：抓取并标准化用户提供的 URL
 - `hybrid`：用户 URL 加本地 context
 - `feed`：从 RSS/Atom feeds 或 Atom search endpoints 自动发现来源
+- `search`：从 Brave-compatible web search API 自动发现来源
 - `discovery`：feed discovery、用户 URL 和本地 portfolio context 组合模式
 
 在 AWS 部署中将 artifacts 镜像到 S3：

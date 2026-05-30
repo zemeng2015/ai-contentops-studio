@@ -19,6 +19,7 @@ from contentops_providers.research import (
     DiscoveryResearchProvider,
     FeedResearchProvider,
     HybridResearchProvider,
+    SearchResearchProvider,
     URLResearchProvider,
 )
 from contentops_publishing.homepage import HomepagePublisher
@@ -136,6 +137,74 @@ def test_openai_provider_requires_api_key(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="CONTENTOPS_OPENAI_API_KEY"):
         build_pipeline(settings)
+
+
+def test_search_research_provider_requires_api_key(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        research_provider="search",
+    )
+
+    with pytest.raises(ValueError, match="CONTENTOPS_RESEARCH_SEARCH_API_KEY"):
+        build_pipeline(settings)
+
+
+def test_search_research_parses_brave_style_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {
+                "web": {
+                    "results": [
+                        {
+                            "title": "Agent evaluation platform",
+                            "url": "https://example.com/agents?ref=search",
+                            "description": (
+                                "A detailed article about agent evaluation, workflow tracing, "
+                                "and production reliability."
+                            ),
+                        },
+                        {
+                            "title": "LLM release notes",
+                            "url": "https://example.com/releases",
+                            "description": "New model release.",
+                        },
+                    ]
+                }
+            }
+
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str, params: dict[str, object]) -> FakeResponse:
+            assert params["q"] == "Agent evaluation"
+            return FakeResponse()
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = SearchResearchProvider(
+        endpoint="https://search.example.com",
+        api_key="secret",
+        max_sources=2,
+    ).collect(RunRequest(topic="Agent evaluation"))
+
+    assert len(packet.sources) == 2
+    assert packet.sources[0].title == "Agent evaluation platform"
+    assert packet.sources[0].canonical_url == "https://example.com/agents"
+    assert packet.sources[0].extraction_status == "search"
+    assert packet.sources[0].publisher == "example.com"
 
 
 def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch) -> None:

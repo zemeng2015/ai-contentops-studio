@@ -288,3 +288,19 @@ def test_system_status_reports_configuration_failures(tmp_path: Path) -> None:
     provider_check = next(check for check in status.checks if check.name == "provider_config")
     assert provider_check.status == "fail"
     assert "CONTENTOPS_OPENAI_API_KEY" in provider_check.fields["failures"][0]
+
+
+def test_system_status_reports_missing_search_credentials(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        research_provider="search",
+        research_search_api_key=None,
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    assert status.status == "fail"
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in provider_check.fields["failures"][0]

@@ -7,6 +7,7 @@ from contentops_providers.research import (
     FeedResearchProvider,
     HybridResearchProvider,
     LocalResearchProvider,
+    SearchResearchProvider,
     URLResearchProvider,
 )
 from contentops_publishing.homepage import HomepagePublisher
@@ -44,6 +45,7 @@ def _build_research_provider(
     | HybridResearchProvider
     | FeedResearchProvider
     | DiscoveryResearchProvider
+    | SearchResearchProvider
 ):
     if settings.research_provider == "local":
         return LocalResearchProvider()
@@ -52,6 +54,14 @@ def _build_research_provider(
     if settings.research_provider == "feed":
         return FeedResearchProvider(
             feeds=_research_feeds(settings),
+            max_sources=settings.research_max_sources,
+        )
+    if settings.research_provider == "search":
+        if not settings.research_search_api_key:
+            raise ValueError("CONTENTOPS_RESEARCH_SEARCH_API_KEY is required for search research.")
+        return SearchResearchProvider(
+            endpoint=settings.research_search_endpoint,
+            api_key=settings.research_search_api_key,
             max_sources=settings.research_max_sources,
         )
     if settings.research_provider == "discovery":

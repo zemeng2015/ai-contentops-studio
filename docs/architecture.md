@@ -146,12 +146,13 @@ Research providers:
 - `url`: fetches operator-supplied URLs and normalizes title, publisher, and summary
 - `hybrid`: combines URL sources with local portfolio context
 - `feed`: discovers candidate sources from configured RSS/Atom feeds or Atom search endpoints
+- `search`: discovers candidate sources from a Brave-compatible web search API
 - `discovery`: combines feed discovery, operator URLs, and local portfolio context
 
-The discovery provider is the production path for recurring AI research jobs. It lets the worker
-start from a topic, retrieve current feed/search entries, rank them by topic relevance and AI
-engineering keywords, deduplicate canonical URLs, and persist the discovered sources into
-`research.json`.
+The search provider is the credentialed production path for open-web discovery. The discovery
+provider is the low-cost recurring path for curated feeds and operator URLs. Both let the worker
+start from a topic, retrieve current entries, rank them by topic relevance and AI engineering
+keywords, deduplicate canonical URLs, and persist the discovered sources into `research.json`.
 
 Generation providers:
 
