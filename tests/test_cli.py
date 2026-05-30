@@ -5,6 +5,13 @@ from pathlib import Path
 
 import pytest
 from contentops_cli.main import app
+from contentops_core.jobs import (
+    JobRunner,
+    job_execution_dir,
+    load_job_file,
+    write_job_execution_report,
+)
+from contentops_core.settings import Settings
 from typer.testing import CliRunner
 
 
@@ -123,6 +130,29 @@ def test_cli_queue_and_manifest_commands(
     assert source_audit_result.exit_code == 0
     source_audit_payload = json.loads(source_audit_result.output)
     assert source_audit_payload["source_count"] >= 1
+
+
+def test_cli_job_execution_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    path = tmp_path / "job.yaml"
+    path.write_text("name: cli-job-history\ntopic: CLI job history\n", encoding="utf-8")
+    report = JobRunner.dry_run_report(load_job_file(path))
+    write_job_execution_report(report, job_execution_dir(Settings().artifact_root))
+    runner = CliRunner()
+
+    list_result = runner.invoke(app, ["job-executions", "--json"])
+    detail_result = runner.invoke(app, ["job-execution", report.execution_id])
+
+    assert list_result.exit_code == 0
+    list_payload = json.loads(list_result.output)
+    assert list_payload["total"] == 1
+    assert list_payload["items"][0]["execution_id"] == report.execution_id
+    assert detail_result.exit_code == 0
+    detail_payload = json.loads(detail_result.output)
+    assert detail_payload["name"] == "cli-job-history"
 
 
 def test_cli_approve_many_returns_per_run_results(

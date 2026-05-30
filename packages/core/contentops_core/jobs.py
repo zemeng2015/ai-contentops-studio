@@ -68,6 +68,13 @@ class JobExecutionReport(BaseModel):
     receipt_path: str | None = None
 
 
+class JobExecutionListResponse(BaseModel):
+    items: list[JobExecutionReport]
+    total: int
+    limit: int
+    offset: int
+
+
 class JobRunner:
     def __init__(self, pipeline: ContentOpsPipeline) -> None:
         self.pipeline = pipeline
@@ -151,7 +158,7 @@ class JobRunner:
         report: JobExecutionReport,
         receipt_dir: Path | None = None,
     ) -> Path:
-        target_dir = receipt_dir or self.pipeline.artifact_store.root / "job-executions"
+        target_dir = receipt_dir or job_execution_dir(self.pipeline.artifact_store.root)
         return write_job_execution_report(report, target_dir)
 
 
@@ -171,6 +178,52 @@ def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) ->
     report.receipt_path = str(path)
     path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     return path
+
+
+def job_execution_dir(artifact_root: Path) -> Path:
+    return artifact_root / "job-executions"
+
+
+def list_job_execution_reports(
+    receipt_dir: Path,
+    limit: int = 20,
+    offset: int = 0,
+) -> JobExecutionListResponse:
+    paths = _job_execution_receipt_paths(receipt_dir)
+    selected = paths[offset : offset + limit]
+    return JobExecutionListResponse(
+        items=[_read_job_execution_report(path) for path in selected],
+        total=len(paths),
+        limit=limit,
+        offset=offset,
+    )
+
+
+def get_job_execution_report(receipt_dir: Path, execution_id: str) -> JobExecutionReport:
+    normalized = execution_id.strip()
+    if not normalized:
+        raise FileNotFoundError("Job execution not found.")
+    for path in _job_execution_receipt_paths(receipt_dir):
+        report = _read_job_execution_report(path)
+        if report.execution_id == normalized:
+            return report
+    raise FileNotFoundError(f"Job execution not found: {execution_id}")
+
+
+def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:
+    if not receipt_dir.exists():
+        return []
+    return sorted(
+        receipt_dir.glob("*.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _read_job_execution_report(path: Path) -> JobExecutionReport:
+    report = JobExecutionReport.model_validate_json(path.read_text(encoding="utf-8"))
+    report.receipt_path = str(path)
+    return report
 
 
 def _duration_ms(started_at: datetime) -> int:

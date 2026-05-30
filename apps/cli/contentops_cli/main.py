@@ -7,6 +7,11 @@ from typing import Annotated
 import typer
 from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
+from contentops_core.jobs import (
+    get_job_execution_report,
+    job_execution_dir,
+    list_job_execution_reports,
+)
 from contentops_core.models import RunRequest, RunStatus, SourceAuditReport
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -104,6 +109,45 @@ def review_queue(
     typer.echo(f"Showing {len(runs)} of {total} matching runs")
     for record in runs:
         typer.echo(f"{record.id}  {record.status.value:13}  {record.topic}")
+
+
+@app.command("job-executions")
+def job_executions(
+    limit: Annotated[int, typer.Option(help="Number of recent job executions to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of job executions to skip.")] = 0,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report_list = list_job_execution_reports(
+        job_execution_dir(settings.artifact_root),
+        limit=limit,
+        offset=offset,
+    )
+    if json_output:
+        typer.echo(report_list.model_dump_json(indent=2))
+        return
+    typer.echo(f"Showing {len(report_list.items)} of {report_list.total} job executions")
+    for report in report_list.items:
+        typer.echo(
+            f"{report.execution_id}  {report.name:24}  "
+            f"{report.succeeded}/{report.total} ok  failed={report.failed}"
+        )
+
+
+@app.command("job-execution")
+def job_execution(execution_id: str) -> None:
+    settings = Settings()
+    try:
+        report = get_job_execution_report(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(report.model_dump_json(indent=2))
 
 
 @app.command()

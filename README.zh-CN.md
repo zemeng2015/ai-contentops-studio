@@ -154,6 +154,8 @@ GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
+GET  /job-executions?limit=20&offset=0
+GET  /job-executions/{execution_id}
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -182,12 +184,15 @@ Worker 可以校验或执行 YAML 定义的内容选题计划：
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
+contentops job-executions --json
+contentops job-execution <execution_id>
 ```
 
 Every worker execution writes a job receipt JSON file under
 `CONTENTOPS_ARTIFACT_ROOT/job-executions` by default. Receipts include execution id, dry-run flag,
 timestamps, duration, per-job status, run ids, artifact directories, publish URLs, tags, metadata,
-and errors.
+and errors. Worker receipts are queryable from CLI, API, and dashboard, so scheduled content jobs
+keep a durable execution history beyond stdout logs.
 
 Job file 兼容旧的单任务格式，也支持更接近生产环境的批量任务：
 

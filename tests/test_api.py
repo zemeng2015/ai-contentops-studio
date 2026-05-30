@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from contentops_api.main import app, settings
+from contentops_core.jobs import (
+    JobRunner,
+    job_execution_dir,
+    load_job_file,
+    write_job_execution_report,
+)
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -153,6 +161,29 @@ def test_review_queue_filters_and_paginates() -> None:
     assert len(payload["items"]) == 1
     assert payload["items"][0]["status"] == "needs_review"
     assert "searchable" in payload["items"][0]["topic"].lower()
+
+
+def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
+    client = TestClient(app)
+    path = tmp_path / "job.yaml"
+    path.write_text("name: api-job-history\ntopic: API job history\n", encoding="utf-8")
+    report = JobRunner.dry_run_report(load_job_file(path))
+    write_job_execution_report(report, job_execution_dir(settings.artifact_root))
+
+    list_response = client.get("/job-executions?limit=5")
+    detail_response = client.get(f"/job-executions/{report.execution_id}")
+    dashboard_response = client.get("/dashboard")
+
+    assert list_response.status_code == 200
+    assert any(
+        item["execution_id"] == report.execution_id
+        for item in list_response.json()["items"]
+    )
+    assert detail_response.status_code == 200
+    assert detail_response.json()["name"] == "api-job-history"
+    assert dashboard_response.status_code == 200
+    assert "Worker Executions" in dashboard_response.text
+    assert report.execution_id in dashboard_response.text
 
 
 def test_review_queue_batch_approve_returns_per_run_results() -> None:

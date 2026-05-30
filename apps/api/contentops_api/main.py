@@ -8,6 +8,13 @@ from urllib.parse import urlencode
 
 from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
+from contentops_core.jobs import (
+    JobExecutionListResponse,
+    JobExecutionReport,
+    get_job_execution_report,
+    job_execution_dir,
+    list_job_execution_reports,
+)
 from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
@@ -78,6 +85,10 @@ def dashboard(
     status_filter = _parse_status_filter(status)
     runs = repository.list(limit=limit, offset=offset, status=status_filter, query=q)
     total = repository.count(status=status_filter, query=q)
+    job_executions = list_job_execution_reports(
+        job_execution_dir(settings.artifact_root),
+        limit=5,
+    )
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -154,6 +165,11 @@ def dashboard(
               </table>
             </form>
             {pagination}
+            <section class="hero compact">
+              <h2>Worker Executions</h2>
+              <p>Recent scheduled job receipts for automation audit and incident review.</p>
+              {_job_executions_html(job_executions.items)}
+            </section>
             """,
         )
     )
@@ -477,6 +493,29 @@ def review_queue(
         limit=limit,
         offset=offset,
     )
+
+
+@app.get("/job-executions", response_model=JobExecutionListResponse)
+def list_job_executions(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+) -> JobExecutionListResponse:
+    return list_job_execution_reports(
+        job_execution_dir(settings.artifact_root),
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/job-executions/{execution_id}", response_model=JobExecutionReport)
+def get_job_execution(execution_id: str) -> JobExecutionReport:
+    try:
+        return get_job_execution_report(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/runs/{run_id}", response_model=RunRecord)
@@ -948,6 +987,41 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
           </tr>
         </thead>
         <tbody>{change_rows}</tbody>
+      </table>
+    """
+
+
+def _job_executions_html(reports: list[JobExecutionReport]) -> str:
+    if not reports:
+        return "<p>No worker executions recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>
+            <a href="/job-executions/{escape(report.execution_id)}">
+              {escape(report.execution_id)}
+            </a>
+          </td>
+          <td>{escape(report.name)}</td>
+          <td>{str(report.dry_run).lower()}</td>
+          <td>{report.succeeded}/{report.total}</td>
+          <td>{report.failed}</td>
+          <td>{_duration_label(report.duration_ms)}</td>
+          <td>{escape(report.started_at.isoformat())}</td>
+        </tr>
+        """
+        for report in reports
+    )
+    return f"""
+      <p><a href="/job-executions">Job execution JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Execution</th><th>Name</th><th>Dry run</th><th>Succeeded</th>
+            <th>Failed</th><th>Duration</th><th>Started</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 

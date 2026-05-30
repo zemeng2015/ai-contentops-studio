@@ -3,7 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from contentops_core.factory import build_pipeline
-from contentops_core.jobs import JobRunner, load_job_file
+from contentops_core.jobs import (
+    JobRunner,
+    get_job_execution_report,
+    list_job_execution_reports,
+    load_job_file,
+    write_job_execution_report,
+)
 from contentops_core.settings import Settings
 
 
@@ -108,3 +114,27 @@ jobs:
     assert report.results[0].publish is True
     assert report.results[0].tags == ["ai", "roundup"]
     assert report.results[0].metadata == {"owner": "zack"}
+
+
+def test_job_execution_receipts_can_be_listed_and_loaded(tmp_path: Path) -> None:
+    path = tmp_path / "jobs.yaml"
+    path.write_text("name: queryable\ntopic: Queryable job history\n", encoding="utf-8")
+    receipt_dir = tmp_path / "receipts"
+    report = JobRunner.dry_run_report(load_job_file(path))
+
+    write_job_execution_report(report, receipt_dir)
+    report_list = list_job_execution_reports(receipt_dir, limit=10)
+    loaded = get_job_execution_report(receipt_dir, report.execution_id)
+
+    assert report_list.total == 1
+    assert report_list.items[0].execution_id == report.execution_id
+    assert report_list.items[0].receipt_path is not None
+    assert loaded.name == "queryable"
+    assert loaded.results[0].topic == "Queryable job history"
+
+
+def test_missing_job_execution_history_is_empty(tmp_path: Path) -> None:
+    report_list = list_job_execution_reports(tmp_path / "missing", limit=10)
+
+    assert report_list.total == 0
+    assert report_list.items == []

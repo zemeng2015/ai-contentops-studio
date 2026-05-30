@@ -137,6 +137,8 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
+contentops job-executions --json
+contentops job-execution <execution_id>
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
@@ -159,6 +161,8 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
+GET  /job-executions?limit=20&offset=0
+GET  /job-executions/{execution_id}
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -181,6 +185,8 @@ Run details also include a Publish Plan that lists file-level changes before the
 Run details include a timeline derived from `trace.json`, including step durations and fields.
 The dashboard create form accepts optional source URLs, one per line.
 The dashboard list supports database-backed status/topic filters, queue counts, and pagination.
+The dashboard also surfaces recent worker executions from job receipts so scheduled content runs
+can be reviewed from the same operational surface.
 Run detail pages can compare two runs to spot evaluation deltas, source-count changes, and source
 overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
@@ -208,6 +214,8 @@ flag, start/end timestamps, duration, per-job status, run ids, artifact director
 tags, metadata, and errors. By default receipts are written under
 `CONTENTOPS_ARTIFACT_ROOT/job-executions`, which is suitable for ECS/EventBridge logs and S3
 artifact mirroring.
+Receipts are queryable through `contentops job-executions`, `contentops job-execution`, and the
+`/job-executions` API endpoints, giving scheduled workers a durable execution history.
 
 Job files support a legacy single-job shape or a production-style batch:
 
