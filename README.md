@@ -222,6 +222,8 @@ Run detail pages can compare two runs to spot evaluation deltas, source-count ch
 overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
 Each decision is persisted as `approval.json` beside the other run artifacts.
+Approval is blocked when the run scorecard fails or the estimated token budget is exceeded, giving
+reviewers a governance gate instead of a passive report.
 Each successful publish writes `publish-receipt.json`, which records the provider, target URL,
 publish plan items, approval record, force flag, timestamp, before/after file hashes, and rollback
 hints. Existing publish targets are copied into `publish-backups/` under the run artifact

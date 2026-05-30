@@ -194,6 +194,38 @@ def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None
     assert receipt.force is False
 
 
+def test_review_service_blocks_approval_when_scorecard_fails(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        min_publish_score=0.5,
+        min_source_count=999,
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Approval scorecard gate"))
+    review_service = build_review_service(settings)
+
+    with pytest.raises(ValueError, match="scorecard did not pass"):
+        review_service.approve(result.run.id)
+
+
+def test_review_service_blocks_approval_when_token_budget_fails(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        min_publish_score=0.5,
+        token_budget_per_run=1,
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Approval token budget gate"))
+    review_service = build_review_service(settings)
+
+    with pytest.raises(ValueError, match="token budget did not pass"):
+        review_service.approve(result.run.id)
+
+
 def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",

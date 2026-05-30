@@ -199,6 +199,16 @@ class ReviewService:
         report = self._load_json(run, "eval-report.json", EvaluationReport)
         if not report.publish_ready:
             raise ValueError("Run is not publish-ready and cannot be approved.")
+        scorecard = self._scorecard_for_run(run)
+        if not scorecard.overall_pass:
+            raise ValueError(
+                "Run scorecard did not pass: " + "; ".join(scorecard.warnings)
+            )
+        cost_report = self._cost_report_for_run(run)
+        if not cost_report.budget_pass:
+            raise ValueError(
+                "Run token budget did not pass: " + "; ".join(cost_report.warnings)
+            )
         plan = self.publish_plan(run_id)
         if not plan.ready:
             raise ValueError("; ".join(plan.warnings))

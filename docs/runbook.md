@@ -55,9 +55,9 @@ contentops cost-report <run_id>
 contentops show <run_id> --artifact eval-report.json
 ```
 
-Approve only when source quality, groundedness, technical depth, and the run scorecard are
-acceptable. Investigate cost reports that exceed the configured token budget before recurring
-publication is enabled.
+Approval is blocked when the scorecard fails or the cost report exceeds the configured token
+budget. Reject the run with notes, tune the source/provider configuration, or rerun with a narrower
+topic before trying to approve again.
 
 ```powershell
 contentops approve <run_id> --reviewer "Zack" --notes "Sources and evaluation reviewed."
