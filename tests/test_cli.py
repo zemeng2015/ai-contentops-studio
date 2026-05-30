@@ -105,6 +105,7 @@ def test_cli_queue_and_manifest_commands(
         ["queue", "--query", "searchable", "--status", "needs_review", "--json"],
     )
     manifest_result = runner.invoke(app, ["manifest", run_id])
+    source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
 
     assert run_result.exit_code == 0
     assert queue_result.exit_code == 0
@@ -115,6 +116,9 @@ def test_cli_queue_and_manifest_commands(
     manifest_payload = json.loads(manifest_result.output)
     assert manifest_payload["run_id"] == run_id
     assert manifest_payload["artifacts"]["eval-report.json"]["size_bytes"] > 0
+    assert source_audit_result.exit_code == 0
+    source_audit_payload = json.loads(source_audit_result.output)
+    assert source_audit_payload["source_count"] >= 1
 
 
 def test_cli_approve_many_returns_per_run_results(

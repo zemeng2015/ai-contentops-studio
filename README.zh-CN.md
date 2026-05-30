@@ -125,6 +125,7 @@ contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
 contentops metrics <run_id>
+contentops source-audit <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>

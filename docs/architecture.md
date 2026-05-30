@@ -69,8 +69,8 @@ artifact store, provider configuration, and operator-key readiness without expos
 
 Each run now persists `request.json`, which enables reproducible reruns through the CLI, API, and
 dashboard without relying on operator memory or external logs.
-The CLI exposes the same review queue and artifact manifest surfaces as the API, so operators can
-script review checks without scraping dashboard HTML.
+The CLI exposes the same review queue, artifact manifest, and source audit surfaces as the API, so
+operators can script review checks without scraping dashboard HTML.
 
 Run comparison is part of the review layer. It compares duration, source counts, source overlap,
 publish readiness, and evaluation score deltas between a base run and a candidate run. This makes

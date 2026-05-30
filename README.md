@@ -118,7 +118,8 @@ tests/                     Unit and integration tests
 - FastAPI metrics, rerun, publish-plan, and run-comparison endpoints
 - Worker entrypoint for single-job or batch YAML content calendars
 - CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
-  `contentops publish`, plus review commands for metrics, rerun, publish-plan, and compare
+  `contentops publish`, plus review commands for metrics, source-audit, rerun, publish-plan,
+  and compare
 - pytest coverage for pipeline behavior
 
 ## Review workflow
@@ -131,6 +132,7 @@ contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
 contentops metrics <run_id>
+contentops source-audit <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>

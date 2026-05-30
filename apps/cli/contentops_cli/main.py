@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import RunRequest, RunStatus
+from contentops_core.models import RunRequest, RunStatus, SourceAuditReport
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -268,6 +268,38 @@ def metrics(run_id: str) -> None:
     service = build_review_service(Settings())
     run_metrics = service.metrics(run_id)
     typer.echo(run_metrics.model_dump_json(indent=2))
+
+
+@app.command("source-audit")
+def source_audit(
+    run_id: str,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        report = SourceAuditReport.model_validate_json(
+            service.read_artifact(run_id, "source-audit.json")
+        )
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    typer.echo(f"Sources: {report.source_count}")
+    typer.echo(f"Average score: {report.average_score:.2f}")
+    typer.echo(
+        f"Strong: {report.strong_count}  "
+        f"Review: {report.review_count}  "
+        f"Failed: {report.failed_count}"
+    )
+    for assessment in report.assessments:
+        typer.echo(
+            f"- {assessment.grade:6} {assessment.score:.2f} "
+            f"{assessment.source_title}: {assessment.recommendation}"
+        )
 
 
 @app.command()
