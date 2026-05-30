@@ -149,6 +149,18 @@ class RunMetrics(BaseModel):
     step_metrics: list[StepMetric]
 
 
+class ComponentCheck(BaseModel):
+    name: str
+    status: str
+    message: str
+    fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class SystemStatus(BaseModel):
+    status: str
+    checks: list[ComponentCheck]
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

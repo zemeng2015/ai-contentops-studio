@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import DateTime, String, Text, create_engine, func, or_, select
+from sqlalchemy import DateTime, String, Text, create_engine, func, or_, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.sql import Select
 
@@ -80,6 +80,10 @@ class RunRepository:
         with self.session_factory() as session:
             row = session.get(RunRow, run_id)
             return self._to_record(row) if row else None
+
+    def ping(self) -> None:
+        with self.session_factory() as session:
+            session.execute(text("SELECT 1"))
 
     @staticmethod
     def _filtered_statement(status: RunStatus | None, query: str) -> Select[tuple[RunRow]]:

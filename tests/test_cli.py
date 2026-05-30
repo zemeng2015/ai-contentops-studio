@@ -31,6 +31,27 @@ def test_cli_publish_reports_approval_gate_without_traceback(
     assert "Traceback" not in publish_result.output
 
 
+def test_cli_doctor_reports_system_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] in {"ok", "degraded"}
+    assert {check["name"] for check in payload["checks"]} >= {
+        "database",
+        "artifact_store",
+        "provider_config",
+        "operator_security",
+    }
+
+
 def test_cli_approve_then_publish(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

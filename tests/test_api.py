@@ -9,9 +9,39 @@ def test_health_endpoint() -> None:
     client = TestClient(app)
 
     response = client.get("/health")
+    ready_response = client.get("/ready")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+    assert ready_response.status_code == 200
+    ready_payload = ready_response.json()
+    assert ready_payload["status"] in {"ok", "degraded"}
+    assert {check["name"] for check in ready_payload["checks"]} >= {
+        "database",
+        "artifact_store",
+        "provider_config",
+        "operator_security",
+    }
+    assert "operator_api_key" not in ready_response.text
+
+
+def test_ready_endpoint_reports_invalid_provider() -> None:
+    client = TestClient(app)
+    original_provider = settings.generator_provider
+    settings.generator_provider = "missing"
+    try:
+        response = client.get("/ready")
+    finally:
+        settings.generator_provider = original_provider
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "fail"
+    provider_check = next(
+        check for check in payload["checks"] if check["name"] == "provider_config"
+    )
+    assert provider_check["status"] == "fail"
+    assert "unknown generator provider" in provider_check["fields"]["failures"][0]
 
 
 def test_run_artifact_and_publish_endpoints() -> None:

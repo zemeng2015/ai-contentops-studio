@@ -6,6 +6,7 @@ from html import escape
 from typing import Annotated
 from urllib.parse import urlencode
 
+from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
     ApprovalRecord,
@@ -19,6 +20,7 @@ from contentops_core.models import (
     RunRecord,
     RunRequest,
     RunStatus,
+    SystemStatus,
 )
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -50,6 +52,14 @@ async def require_operator(request: Request) -> None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/ready", response_model=SystemStatus)
+def ready(response: Response) -> SystemStatus:
+    status = system_status(settings, repository)
+    if status.status == "fail":
+        response.status_code = 503
+    return status
 
 
 @app.get("/", response_class=HTMLResponse)

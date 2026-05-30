@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRequest, RunStatus
 from contentops_core.repository import RunRepository
@@ -46,6 +47,24 @@ def list_runs(
     status_filter = _parse_status(status)
     for record in repo.list(limit=limit, offset=offset, status=status_filter, query=query):
         typer.echo(f"{record.id}  {record.status.value:13}  {record.topic}")
+
+
+@app.command()
+def doctor(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report = system_status(settings, RunRepository(settings.database_url))
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.status != "fail" else 1)
+    typer.echo(f"Status: {report.status}")
+    for check in report.checks:
+        typer.echo(f"- {check.name}: {check.status} - {check.message}")
+    raise typer.Exit(0 if report.status != "fail" else 1)
 
 
 @app.command("queue")

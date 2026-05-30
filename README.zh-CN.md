@@ -17,6 +17,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - approve、reject、publish 等操作会追加写入 audit log
 - publish receipt 会审计 provider、URL、approval 和变更文件
 - 可选 operator API key，用于保护 API 和 Dashboard 的写操作
+- `/ready` 和 `contentops doctor` 用于生产部署前诊断
 - API、CLI、worker、publisher 清晰分层
 - Review dashboard 可检查 artifact、source、evaluation、publish plan 和 run comparison
 - YAML 定义的 worker jobs，可用于每日或每周内容选题计划
@@ -44,6 +45,7 @@ python -m venv .venv
 pip install -e ".[dev]"
 contentops run --topic "LLM observability for enterprise RAG systems"
 contentops runs
+contentops doctor
 pytest
 ```
 
@@ -144,6 +146,7 @@ GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
+GET  /ready
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun

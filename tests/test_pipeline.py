@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRequest, RunStatus
 from contentops_core.repository import RunRepository
@@ -246,3 +247,20 @@ def test_s3_artifact_store_requires_bucket(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="CONTENTOPS_ARTIFACT_S3_BUCKET"):
         build_pipeline(settings)
+
+
+def test_system_status_reports_configuration_failures(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        generator_provider="openai",
+        openai_api_key=None,
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    assert status.status == "fail"
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    assert provider_check.status == "fail"
+    assert "CONTENTOPS_OPENAI_API_KEY" in provider_check.fields["failures"][0]

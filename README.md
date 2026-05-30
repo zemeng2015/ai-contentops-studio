@@ -18,6 +18,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - append-only audit logs for review and publishing actions
 - publish receipts that audit provider, URL, approval, and changed files
 - optional operator API key protection for mutating API and dashboard actions
+- readiness checks and CLI diagnostics for production deployments
 - API, CLI, worker, and publisher boundaries
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
 - run comparison for repeatable quality and source regression review
@@ -49,6 +50,7 @@ python -m venv .venv
 pip install -e ".[dev]"
 contentops run --topic "LLM observability for enterprise RAG systems"
 contentops runs
+contentops doctor
 pytest
 ```
 
@@ -149,6 +151,7 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
+GET  /ready
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun

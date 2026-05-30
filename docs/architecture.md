@@ -62,6 +62,8 @@ pagination so operators can review larger queues without loading only the most r
 The dashboard and API expose run metrics derived from `trace.json`: total duration, per-step
 durations, source count, and publish readiness. This keeps observability tied to persisted run
 artifacts rather than transient process logs.
+The API also exposes `/ready`, and the CLI exposes `contentops doctor`, to report database,
+artifact store, provider configuration, and operator-key readiness without exposing secrets.
 
 Each run now persists `request.json`, which enables reproducible reruns through the CLI, API, and
 dashboard without relying on operator memory or external logs.
