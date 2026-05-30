@@ -21,8 +21,14 @@ variable "vpc_id" {
 }
 
 variable "private_subnet_ids" {
-  description = "Private subnet IDs for the RDS subnet group."
+  description = "Private subnet IDs for RDS and scheduled ECS worker tasks."
   type        = list(string)
+}
+
+variable "worker_security_group_ids" {
+  description = "Security group IDs attached to scheduled ECS worker tasks."
+  type        = list(string)
+  default     = []
 }
 
 variable "db_allowed_cidr_blocks" {
@@ -71,4 +77,22 @@ variable "homepage_repo_path" {
   description = "Optional mounted path for homepage publisher in container deployments."
   type        = string
   default     = ""
+}
+
+variable "worker_schedule_expression" {
+  description = "EventBridge Scheduler expression for recurring worker runs."
+  type        = string
+  default     = "cron(0 13 * * ? *)"
+}
+
+variable "worker_schedule_timezone" {
+  description = "Timezone for the worker schedule expression."
+  type        = string
+  default     = "America/New_York"
+}
+
+variable "worker_schedule_enabled" {
+  description = "Whether the recurring worker schedule is enabled."
+  type        = bool
+  default     = false
 }

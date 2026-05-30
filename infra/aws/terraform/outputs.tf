@@ -27,3 +27,8 @@ output "database_url_secret_arn" {
   description = "Secrets Manager secret ARN containing CONTENTOPS_DATABASE_URL."
   value       = aws_secretsmanager_secret.database_url.arn
 }
+
+output "daily_worker_schedule_arn" {
+  description = "EventBridge Scheduler ARN for the recurring worker."
+  value       = aws_scheduler_schedule.daily_worker.arn
+}

@@ -121,6 +121,10 @@ The Terraform baseline now provisions an RDS Postgres metadata database and writ
 This keeps local SQLite useful for development while proving the production metadata path has a
 real cloud target.
 
+It also provisions an EventBridge Scheduler rule for the worker task. The schedule is disabled by
+default so deployments can validate networking, RDS connectivity, and publishing configuration
+before recurring content generation is turned on.
+
 ## Stage 2 provider boundaries
 
 Research providers:

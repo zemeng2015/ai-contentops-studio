@@ -5,6 +5,9 @@ locals {
     System  = "ai-contentops-studio"
   }
   database_url = "postgresql+psycopg://${var.db_username}:${random_password.db.result}@${aws_db_instance.metadata.address}:${aws_db_instance.metadata.port}/${var.db_name}"
+  worker_security_group_ids = length(var.worker_security_group_ids) > 0 ? var.worker_security_group_ids : [
+    aws_security_group.worker.id
+  ]
 }
 
 data "aws_caller_identity" "current" {}
@@ -58,6 +61,29 @@ resource "aws_security_group" "metadata_db" {
   description = "Postgres access for AI ContentOps metadata."
   vpc_id      = var.vpc_id
   tags        = local.tags
+}
+
+resource "aws_security_group" "worker" {
+  name        = "${local.name}-worker"
+  description = "Scheduled worker task network access."
+  vpc_id      = var.vpc_id
+  tags        = local.tags
+}
+
+resource "aws_vpc_security_group_egress_rule" "worker" {
+  security_group_id = aws_security_group.worker.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+  description       = "Allow worker outbound access to feeds, S3, Secrets Manager, and logs."
+}
+
+resource "aws_vpc_security_group_ingress_rule" "metadata_db_worker" {
+  security_group_id            = aws_security_group.metadata_db.id
+  referenced_security_group_id = aws_security_group.worker.id
+  from_port                    = 5432
+  ip_protocol                  = "tcp"
+  to_port                      = 5432
+  description                  = "Allow scheduled workers to write run metadata."
 }
 
 resource "aws_vpc_security_group_ingress_rule" "metadata_db_cidr" {
@@ -267,4 +293,75 @@ resource "aws_ecs_task_definition" "worker" {
 resource "aws_scheduler_schedule_group" "contentops" {
   name = local.name
   tags = local.tags
+}
+
+resource "aws_iam_role" "scheduler" {
+  name = "${local.name}-scheduler"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+    }]
+  })
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy" "scheduler_run_worker" {
+  name = "${local.name}-run-worker"
+  role = aws_iam_role.scheduler.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ecs:RunTask"
+        ]
+        Effect   = "Allow"
+        Resource = aws_ecs_task_definition.worker.arn
+      },
+      {
+        Action = [
+          "iam:PassRole"
+        ]
+        Effect = "Allow"
+        Resource = [
+          aws_iam_role.task.arn,
+          aws_iam_role.task_execution.arn
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_scheduler_schedule" "daily_worker" {
+  name                         = "${local.name}-daily-worker"
+  group_name                   = aws_scheduler_schedule_group.contentops.name
+  schedule_expression          = var.worker_schedule_expression
+  schedule_expression_timezone = var.worker_schedule_timezone
+  state                        = var.worker_schedule_enabled ? "ENABLED" : "DISABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.main.arn
+    role_arn = aws_iam_role.scheduler.arn
+
+    ecs_parameters {
+      launch_type         = "FARGATE"
+      task_count          = 1
+      task_definition_arn = aws_ecs_task_definition.worker.arn
+
+      network_configuration {
+        assign_public_ip = false
+        security_groups  = local.worker_security_group_ids
+        subnets          = var.private_subnet_ids
+      }
+    }
+  }
 }

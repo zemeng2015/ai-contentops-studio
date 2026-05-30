@@ -13,6 +13,9 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "aws_ecs_task_definition" in main
     assert "aws_cloudwatch_log_group" in main
     assert "aws_scheduler_schedule_group" in main
+    assert "aws_scheduler_schedule" in main
+    assert "ecs:RunTask" in main
+    assert "iam:PassRole" in main
     assert "CONTENTOPS_DATABASE_URL" in main
 
 

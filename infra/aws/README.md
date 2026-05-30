@@ -23,7 +23,7 @@ before Terraform or CDK resources are added.
 - ECS Fargate task definitions for API and worker
 - task execution and artifact access IAM roles
 - CloudWatch log groups
-- EventBridge Scheduler schedule group placeholder
+- EventBridge Scheduler recurring worker run
 
 It intentionally stops short of creating public networking and an ALB until the runtime deployment
 choice is finalized.
@@ -39,3 +39,6 @@ terraform plan \
   -var='vpc_id=vpc-...' \
   -var='private_subnet_ids=["subnet-...","subnet-..."]'
 ```
+
+The recurring worker schedule is disabled by default. Set `worker_schedule_enabled=true` after the
+image, networking, RDS metadata store, and publishing target are ready.

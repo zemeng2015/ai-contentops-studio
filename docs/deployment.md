@@ -29,8 +29,9 @@ The code uses provider and publisher boundaries so local filesystem/SQLite can b
 S3/Postgres without changing the pipeline contract.
 
 The AWS Terraform skeleton lives in `infra/aws/terraform`. It defines the artifact bucket, RDS
-Postgres metadata database, database URL secret, ECS task definitions, IAM roles, log groups, and
-scheduler group needed for the first production deployment shape.
+Postgres metadata database, database URL secret, ECS task definitions, scheduled worker IAM role,
+EventBridge Scheduler rule, log groups, and scheduler group needed for the first production
+deployment shape.
 
 ## Provider environment variables
 
@@ -62,4 +63,13 @@ For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy ca
 
 ```powershell
 pip install -e ".[aws]"
+```
+
+The Terraform worker schedule is disabled by default. Enable it only after the container image,
+private subnets, database connectivity, and feed configuration are ready:
+
+```bash
+terraform apply \
+  -var='worker_schedule_enabled=true' \
+  -var='worker_schedule_expression=cron(0 13 * * ? *)'
 ```
