@@ -1,5 +1,7 @@
 # AI ContentOps Studio
 
+[English](README.md) | [中文](README.zh-CN.md)
+
 AI ContentOps Studio is a production-shaped platform for technical research automation,
 source-grounded content generation, quality evaluation, artifact tracking, and publishing.
 
@@ -92,4 +94,3 @@ tests/                     Unit and integration tests
 - FastAPI `POST /runs` and `GET /runs`
 - CLI `contentops run`, `contentops runs`, and `contentops show`
 - pytest coverage for pipeline behavior
-
