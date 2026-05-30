@@ -3,6 +3,8 @@ from __future__ import annotations
 from contentops_evaluators.quality import HeuristicContentEvaluator
 from contentops_providers.openai_generator import OpenAIResponsesGenerator
 from contentops_providers.research import (
+    DiscoveryResearchProvider,
+    FeedResearchProvider,
     HybridResearchProvider,
     LocalResearchProvider,
     URLResearchProvider,
@@ -36,12 +38,32 @@ def build_pipeline(settings: Settings | None = None) -> ContentOpsPipeline:
 
 def _build_research_provider(
     settings: Settings,
-) -> LocalResearchProvider | URLResearchProvider | HybridResearchProvider:
+) -> (
+    LocalResearchProvider
+    | URLResearchProvider
+    | HybridResearchProvider
+    | FeedResearchProvider
+    | DiscoveryResearchProvider
+):
     if settings.research_provider == "local":
         return LocalResearchProvider()
     if settings.research_provider == "url":
         return URLResearchProvider()
+    if settings.research_provider == "feed":
+        return FeedResearchProvider(
+            feeds=_research_feeds(settings),
+            max_sources=settings.research_max_sources,
+        )
+    if settings.research_provider == "discovery":
+        return DiscoveryResearchProvider(
+            feeds=_research_feeds(settings),
+            max_sources=settings.research_max_sources,
+        )
     return HybridResearchProvider()
+
+
+def _research_feeds(settings: Settings) -> list[str]:
+    return [feed.strip() for feed in settings.research_feeds.split(",") if feed.strip()]
 
 
 def _build_artifact_store(settings: Settings) -> ArtifactWriter:

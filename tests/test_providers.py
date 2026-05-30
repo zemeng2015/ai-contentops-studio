@@ -4,9 +4,23 @@ from pathlib import Path
 
 import pytest
 from contentops_core.factory import build_pipeline
-from contentops_core.models import Draft, EvaluationReport, RunRecord, RunRequest, RunStatus, Source
+from contentops_core.models import (
+    Claim,
+    Draft,
+    EvaluationReport,
+    ResearchPacket,
+    RunRecord,
+    RunRequest,
+    RunStatus,
+    Source,
+)
 from contentops_core.settings import Settings
-from contentops_providers.research import HybridResearchProvider, URLResearchProvider
+from contentops_providers.research import (
+    DiscoveryResearchProvider,
+    FeedResearchProvider,
+    HybridResearchProvider,
+    URLResearchProvider,
+)
 from contentops_publishing.homepage import HomepagePublisher
 
 
@@ -164,3 +178,105 @@ def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch
     assert packet.sources[0].extraction_status == "ok"
     assert packet.sources[0].extraction_quality >= 0.85
     assert packet.sources[0].content_length > 1000
+
+
+def test_feed_research_discovers_and_ranks_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        text = """
+        <rss><channel>
+          <item>
+            <title>LLM evaluation workflow patterns</title>
+            <link>https://example.com/evals</link>
+            <description>Evaluation gates for agent workflow reliability.</description>
+          </item>
+          <item>
+            <title>Database release notes</title>
+            <link>https://example.com/db</link>
+            <description>Storage maintenance notes.</description>
+          </item>
+        </channel></rss>
+        """
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str) -> FakeResponse:
+            return FakeResponse()
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = FeedResearchProvider(
+        feeds=["https://example.com/rss.xml"],
+        max_sources=1,
+    ).collect(RunRequest(topic="LLM evaluation workflow"))
+
+    assert len(packet.sources) == 1
+    assert packet.sources[0].title == "LLM evaluation workflow patterns"
+    assert packet.sources[0].extraction_status == "feed"
+    assert packet.sources[0].canonical_url == "https://example.com/evals"
+
+
+def test_discovery_research_combines_feed_url_and_local_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_fetch(self: URLResearchProvider, url: str) -> Source:
+        return Source(
+            title="Operator source",
+            url=url,
+            canonical_url=url,
+            publisher="operator",
+            summary="Operator supplied source for the run.",
+            credibility=0.95,
+            extraction_status="ok",
+            extraction_quality=0.95,
+        )
+
+    class FakeFeedProvider(FeedResearchProvider):
+        def collect(self, request: RunRequest) -> ResearchPacket:
+            return ResearchPacket(
+                topic=request.topic,
+                sources=[
+                    Source(
+                        title="Discovered agent source",
+                        url="https://example.com/agent",
+                        canonical_url="https://example.com/agent",
+                        publisher="example.com",
+                        summary="Agent reliability and evaluation workflow signal.",
+                        extraction_status="feed",
+                    )
+                ],
+                claims=[
+                    Claim(
+                        text="Discovered agent source is relevant.",
+                        source_title="Discovered agent source",
+                    )
+                ],
+                engineering_signals=["Feed discovery works."],
+                risks=["Feeds require curation."],
+                project_implications=["Automate daily research jobs."],
+            )
+
+    monkeypatch.setattr(URLResearchProvider, "_fetch_source", fake_fetch)
+    monkeypatch.setattr("contentops_providers.research.FeedResearchProvider", FakeFeedProvider)
+
+    packet = DiscoveryResearchProvider(feeds=["https://example.com/rss.xml"]).collect(
+        RunRequest(
+            topic="Agent workflow evaluation",
+            source_urls=["https://example.com/operator"],
+        )
+    )
+
+    titles = {source.title for source in packet.sources}
+    assert "Discovered agent source" in titles
+    assert "Operator source" in titles
+    assert "Portfolio project map" in titles

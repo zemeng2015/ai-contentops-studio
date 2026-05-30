@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import re
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from typing import Protocol
+from urllib.parse import urlparse
 
 import httpx
 from contentops_core.models import Claim, ResearchPacket, RunRequest, Source
@@ -225,6 +228,198 @@ class URLResearchProvider:
         return min(round(score, 3), 1.0)
 
 
+@dataclass(frozen=True)
+class FeedEntry:
+    title: str
+    url: str | None
+    summary: str
+    publisher: str
+
+
+class FeedResearchProvider:
+    """Discover current sources from RSS or Atom feeds.
+
+    This provider gives scheduled workers a real discovery path without requiring paid search
+    credentials. Operators can point it at arXiv, engineering blogs, vendor feeds, or internal
+    feeds, then let the pipeline rank candidates against the requested topic.
+    """
+
+    def __init__(
+        self,
+        feeds: list[str],
+        max_sources: int = 6,
+        timeout_seconds: float = 12.0,
+    ) -> None:
+        self.feeds = feeds
+        self.max_sources = max_sources
+        self.timeout_seconds = timeout_seconds
+
+    def collect(self, request: RunRequest) -> ResearchPacket:
+        entries = self._discover_entries()
+        scored_entries = sorted(
+            entries,
+            key=lambda entry: self._score_entry(entry, request.topic),
+            reverse=True,
+        )
+        selected = [
+            entry
+            for entry in scored_entries
+            if self._score_entry(entry, request.topic) > 0
+        ][: self.max_sources]
+        if not selected:
+            selected = scored_entries[: self.max_sources]
+        sources = dedupe_sources([self._entry_to_source(entry) for entry in selected])
+        claims = [
+            Claim(
+                text=f"{source.title} is a discovered signal for {request.topic}.",
+                source_title=source.title,
+                confidence=source.credibility,
+            )
+            for source in sources
+        ]
+        return ResearchPacket(
+            topic=request.topic.strip(),
+            sources=sources,
+            claims=claims,
+            engineering_signals=[
+                "Scheduled content should discover candidate sources before generation.",
+                "Feed ranking keeps the pipeline useful without requiring a manual URL list.",
+                "Research feeds make daily AI trend monitoring repeatable and auditable.",
+            ],
+            risks=[
+                "RSS summaries can be short, so reviewers should inspect discovered source links.",
+                "Feed relevance depends on configured sources and topic keywords.",
+            ],
+            project_implications=[
+                "Use worker YAML jobs to turn recurring AI research into a content calendar.",
+                "Compare reruns to measure whether newly discovered sources improved coverage.",
+            ],
+        )
+
+    def _discover_entries(self) -> list[FeedEntry]:
+        entries: list[FeedEntry] = []
+        for feed_url in self.feeds:
+            try:
+                with httpx.Client(
+                    timeout=self.timeout_seconds,
+                    follow_redirects=True,
+                    headers={"User-Agent": "ai-contentops-studio/0.1"},
+                ) as client:
+                    response = client.get(feed_url)
+                    response.raise_for_status()
+                entries.extend(self._parse_feed(response.text, feed_url))
+            except Exception:
+                entries.append(
+                    FeedEntry(
+                        title=f"Unavailable feed: {feed_url}",
+                        url=feed_url,
+                        summary="Feed fetch failed; check provider configuration.",
+                        publisher=_publisher_from_url(feed_url),
+                    )
+                )
+        return entries
+
+    @staticmethod
+    def _parse_feed(xml_text: str, feed_url: str) -> list[FeedEntry]:
+        root = ET.fromstring(xml_text)
+        entries: list[FeedEntry] = []
+        for item in _xml_elements(root, "item"):
+            entries.append(
+                FeedEntry(
+                    title=_xml_child_text(item, "title") or "Untitled feed item",
+                    url=_xml_child_text(item, "link"),
+                    summary=_xml_child_text(item, "description") or "",
+                    publisher=_publisher_from_url(feed_url),
+                )
+            )
+        for item in _xml_elements(root, "entry"):
+            entries.append(
+                FeedEntry(
+                    title=_xml_child_text(item, "title") or "Untitled feed item",
+                    url=_xml_link(item),
+                    summary=(
+                        _xml_child_text(item, "summary")
+                        or _xml_child_text(item, "content")
+                        or ""
+                    ),
+                    publisher=_publisher_from_url(feed_url),
+                )
+            )
+        return entries
+
+    @staticmethod
+    def _score_entry(entry: FeedEntry, topic: str) -> float:
+        text = f"{entry.title} {entry.summary}".casefold()
+        topic_terms = [term for term in re.split(r"\W+", topic.casefold()) if len(term) >= 4]
+        ai_terms = [
+            "agent",
+            "ai",
+            "eval",
+            "llm",
+            "model",
+            "observability",
+            "rag",
+            "retrieval",
+            "workflow",
+        ]
+        topic_score = sum(2.0 for term in topic_terms if term in text)
+        ai_score = sum(1.0 for term in ai_terms if term in text)
+        summary_score = min(len(entry.summary) / 400, 1.0)
+        return topic_score + ai_score + summary_score
+
+    @staticmethod
+    def _entry_to_source(entry: FeedEntry) -> Source:
+        summary = re.sub(r"\s+", " ", _strip_tags(entry.summary)).strip()
+        if not summary:
+            summary = "No feed summary was provided."
+        return Source(
+            title=entry.title[:180],
+            url=entry.url,
+            canonical_url=_normalize_url(entry.url),
+            publisher=entry.publisher,
+            summary=summary[:500],
+            credibility=0.72,
+            extraction_status="feed",
+            extraction_quality=0.7 if len(summary) >= 80 else 0.55,
+            content_length=len(summary),
+        )
+
+
+class DiscoveryResearchProvider:
+    def __init__(self, feeds: list[str], max_sources: int = 6) -> None:
+        self.local = LocalResearchProvider()
+        self.url = URLResearchProvider()
+        self.feed = FeedResearchProvider(feeds=feeds, max_sources=max_sources)
+
+    def collect(self, request: RunRequest) -> ResearchPacket:
+        local_packet = self.local.collect(request)
+        feed_packet = self.feed.collect(request)
+        url_packet = self.url.collect(request) if request.source_urls else None
+        packets = [feed_packet, local_packet]
+        if url_packet is not None:
+            packets.insert(1, url_packet)
+        sources = dedupe_sources([source for packet in packets for source in packet.sources])
+        source_titles = {source.title for source in sources}
+        claims = [
+            claim
+            for packet in packets
+            for claim in packet.claims
+            if claim.source_title in source_titles
+        ]
+        return ResearchPacket(
+            topic=request.topic.strip(),
+            sources=sources,
+            claims=claims,
+            engineering_signals=[
+                signal for packet in packets for signal in packet.engineering_signals
+            ],
+            risks=[risk for packet in packets for risk in packet.risks],
+            project_implications=[
+                implication for packet in packets for implication in packet.project_implications
+            ],
+        )
+
+
 class HybridResearchProvider:
     def __init__(self) -> None:
         self.local = LocalResearchProvider()
@@ -269,6 +464,40 @@ def _normalize_url(url: str | None) -> str | None:
         return None
     normalized = url.strip().lower().split("#", 1)[0].split("?", 1)[0]
     return normalized.rstrip("/")
+
+
+def _publisher_from_url(url: str) -> str:
+    parsed = urlparse(url)
+    return parsed.netloc.removeprefix("www.") if parsed.netloc else "web"
+
+
+def _xml_elements(root: ET.Element, local_name: str) -> list[ET.Element]:
+    return [element for element in root.iter() if _xml_local_name(element.tag) == local_name]
+
+
+def _xml_child_text(element: ET.Element, local_name: str) -> str | None:
+    match = next(
+        (child for child in element if _xml_local_name(child.tag) == local_name),
+        None,
+    )
+    if match is None:
+        return None
+    text = "".join(match.itertext()).strip()
+    return re.sub(r"\s+", " ", text).strip() if text else None
+
+
+def _xml_link(element: ET.Element) -> str | None:
+    link = next((child for child in element if _xml_local_name(child.tag) == "link"), None)
+    if link is None:
+        return None
+    if "href" in link.attrib:
+        return link.attrib["href"]
+    text = "".join(link.itertext()).strip()
+    return text or None
+
+
+def _xml_local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
 
 
 def dedupe_sources(sources: list[Source]) -> list[Source]:

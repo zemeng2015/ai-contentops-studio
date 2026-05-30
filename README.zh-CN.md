@@ -87,6 +87,8 @@ tests/                     单元测试和集成测试
 
 - 本地 research provider 和 deterministic source packet
 - URL research provider：可抓取并标准化用户提供的网页来源
+- Feed research provider：可从 RSS/Atom feed 自动发现候选来源
+- Discovery research provider：组合 feed discovery、用户 URL 和本地 portfolio context
 - Source 去重，以及 extraction status、quality、content length 元数据
 - 可选 OpenAI Responses API generator，并且放在 provider 边界后面
 - 可选 homepage publisher：可发布到 Zack 的 GitHub Pages 个人主页仓库
@@ -160,13 +162,23 @@ jobs:
 
 ## Provider 配置
 
-默认配置不需要任何外部密钥：
+默认配置不需要任何外部密钥。`hybrid` 在没有 URL 时完全本地运行；`discovery` 会抓取配置好的 RSS/Atom feeds，更适合每日 AI 技术雷达：
 
 ```text
-CONTENTOPS_RESEARCH_PROVIDER=hybrid
+CONTENTOPS_RESEARCH_PROVIDER=discovery
+CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
+CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 ```
+
+Research provider 模式：
+
+- `local`：确定性的本地 portfolio context，适合 CI
+- `url`：抓取并标准化用户提供的 URL
+- `hybrid`：用户 URL 加本地 context
+- `feed`：从 RSS/Atom feeds 或 Atom search endpoints 自动发现来源
+- `discovery`：feed discovery、用户 URL 和本地 portfolio context 组合模式
 
 在 AWS 部署中将 artifacts 镜像到 S3：
 

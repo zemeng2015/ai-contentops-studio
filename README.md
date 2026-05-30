@@ -91,6 +91,8 @@ tests/                     Unit and integration tests
 
 - Local research provider with deterministic source packets
 - URL research provider that fetches and normalizes operator-supplied sources
+- Feed research provider that discovers sources from RSS/Atom feeds
+- Discovery research provider that combines feed discovery, operator URLs, and local context
 - Source deduplication plus extraction status, quality, and content-length metadata
 - Optional OpenAI Responses API generator behind a provider boundary
 - Optional homepage publisher for Zack's GitHub Pages portfolio
@@ -170,13 +172,24 @@ jobs:
 
 ## Provider configuration
 
-The default stack runs without external credentials:
+The default stack runs without external credentials. `hybrid` is fully local unless URLs are
+provided; `discovery` also fetches configured RSS/Atom feeds for scheduled research jobs:
 
 ```text
-CONTENTOPS_RESEARCH_PROVIDER=hybrid
+CONTENTOPS_RESEARCH_PROVIDER=discovery
+CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
+CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 ```
+
+Research provider modes:
+
+- `local`: deterministic CI-safe portfolio context
+- `url`: fetch and normalize operator-supplied URLs
+- `hybrid`: URL sources plus deterministic local context
+- `feed`: discover sources from RSS/Atom feeds or Atom search endpoints
+- `discovery`: feed discovery plus operator URLs plus local portfolio context
 
 Mirror artifacts to S3 in AWS deployments:
 

@@ -141,7 +141,13 @@ def init_config(
                 "CONTENTOPS_SITE_OUTPUT_DIR=site",
                 "CONTENTOPS_PUBLIC_BASE_URL=http://localhost:8000/site",
                 "CONTENTOPS_MIN_PUBLISH_SCORE=0.72",
-                "CONTENTOPS_RESEARCH_PROVIDER=hybrid",
+                "CONTENTOPS_RESEARCH_PROVIDER=discovery",
+                (
+                    "CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?"
+                    "search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG"
+                    "&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending"
+                ),
+                "CONTENTOPS_RESEARCH_MAX_SOURCES=6",
                 "CONTENTOPS_GENERATOR_PROVIDER=template",
                 "CONTENTOPS_PUBLISHER_PROVIDER=static",
                 "CONTENTOPS_OPENAI_MODEL=gpt-5-mini",

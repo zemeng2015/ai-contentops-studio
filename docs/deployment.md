@@ -34,7 +34,9 @@ shape.
 ## Provider environment variables
 
 ```text
-CONTENTOPS_RESEARCH_PROVIDER=hybrid
+CONTENTOPS_RESEARCH_PROVIDER=discovery
+CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
+CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_ARTIFACT_STORE_PROVIDER=local
 CONTENTOPS_ARTIFACT_S3_BUCKET=
 CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
