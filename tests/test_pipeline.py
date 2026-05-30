@@ -322,3 +322,22 @@ def test_system_status_validates_research_retry_policy(tmp_path: Path) -> None:
     provider_check = next(check for check in status.checks if check.name == "provider_config")
     assert "research retry attempts must be at least 1" in provider_check.fields["failures"]
     assert "research retry backoff cannot be negative" in provider_check.fields["failures"]
+
+
+def test_system_status_validates_openai_resilience_settings(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        openai_timeout_seconds=0,
+        openai_retry_attempts=0,
+        openai_retry_backoff_seconds=-0.1,
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    assert status.status == "fail"
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    assert "OpenAI timeout must be greater than 0" in provider_check.fields["failures"]
+    assert "OpenAI retry attempts must be at least 1" in provider_check.fields["failures"]
+    assert "OpenAI retry backoff cannot be negative" in provider_check.fields["failures"]

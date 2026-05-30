@@ -206,6 +206,11 @@ CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/sear
 CONTENTOPS_RESEARCH_SEARCH_ENRICH=true
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
+CONTENTOPS_OPENAI_MODEL=gpt-5-mini
+CONTENTOPS_OPENAI_TIMEOUT_SECONDS=60
+CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2
+CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
+CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 # CONTENTOPS_OPERATOR_API_KEY=
 ```
 
@@ -262,7 +267,15 @@ contentops run --topic "Agent observability" --source-url "https://example.com/a
 CONTENTOPS_GENERATOR_PROVIDER=openai
 CONTENTOPS_OPENAI_API_KEY=...
 CONTENTOPS_OPENAI_MODEL=gpt-5-mini
+CONTENTOPS_OPENAI_TIMEOUT_SECONDS=60
+CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2
+CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
+CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 ```
+
+OpenAI provider retries transient timeouts, connection errors, `429`, and `5xx` responses. When
+`CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true`, exhausted provider failures fall back to the
+deterministic template generator so scheduled runs can still produce reviewable artifacts.
 
 发布到个人主页仓库：
 

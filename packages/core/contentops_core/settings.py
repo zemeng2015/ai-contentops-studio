@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     publisher_provider: str = "static"
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-mini"
+    openai_timeout_seconds: float = 60.0
+    openai_retry_attempts: int = 2
+    openai_retry_backoff_seconds: float = 0.5
+    openai_fallback_on_failure: bool = True
     operator_api_key: SecretStr | None = None
     homepage_repo_path: Path | None = None
     homepage_public_base_url: str = "https://zemeng2015.github.io/zack-ai-homepage"

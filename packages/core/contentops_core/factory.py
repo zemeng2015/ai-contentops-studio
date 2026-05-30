@@ -108,6 +108,10 @@ def _build_generator(settings: Settings) -> DraftGenerator:
         return OpenAIResponsesGenerator(
             api_key=settings.openai_api_key,
             model=settings.openai_model,
+            timeout_seconds=settings.openai_timeout_seconds,
+            retry_attempts=settings.openai_retry_attempts,
+            retry_backoff_seconds=settings.openai_retry_backoff_seconds,
+            fallback_on_failure=settings.openai_fallback_on_failure,
         )
     return ContentGenerator()
 

@@ -6,6 +6,7 @@ import pytest
 from contentops_core.factory import build_pipeline
 from contentops_core.models import (
     Claim,
+    ContentPlan,
     Draft,
     EvaluationReport,
     ResearchPacket,
@@ -15,6 +16,7 @@ from contentops_core.models import (
     Source,
 )
 from contentops_core.settings import Settings
+from contentops_providers.openai_generator import OpenAIResponsesGenerator
 from contentops_providers.research import (
     DiscoveryResearchProvider,
     FeedResearchProvider,
@@ -137,6 +139,87 @@ def test_openai_provider_requires_api_key(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="CONTENTOPS_OPENAI_API_KEY"):
         build_pipeline(settings)
+
+
+def test_openai_generator_retries_transient_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"output_text": "# Generated\n\nSources: Test source"}
+
+    class FakeClient:
+        calls = 0
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(
+            self,
+            url: str,
+            headers: dict[str, str],
+            json: dict[str, object],
+        ) -> FakeResponse:
+            FakeClient.calls += 1
+            assert url == "https://api.openai.com/v1/responses"
+            assert headers["Authorization"] == "Bearer secret"
+            if FakeClient.calls == 1:
+                raise TimeoutError("temporary model timeout")
+            return FakeResponse()
+
+    monkeypatch.setattr("contentops_providers.openai_generator.httpx.Client", FakeClient)
+
+    draft = OpenAIResponsesGenerator(
+        api_key="secret",
+        model="gpt-5-mini",
+        retry_attempts=2,
+        retry_backoff_seconds=0,
+    ).generate(_sample_research_packet(), _sample_content_plan())
+
+    assert FakeClient.calls == 2
+    assert draft.markdown.startswith("# Generated")
+
+
+def test_openai_generator_can_fallback_after_provider_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def post(
+            self,
+            url: str,
+            headers: dict[str, str],
+            json: dict[str, object],
+        ) -> object:
+            raise TimeoutError("model provider unavailable")
+
+    monkeypatch.setattr("contentops_providers.openai_generator.httpx.Client", FakeClient)
+
+    draft = OpenAIResponsesGenerator(
+        api_key="secret",
+        model="gpt-5-mini",
+        retry_attempts=2,
+        retry_backoff_seconds=0,
+        fallback_on_failure=True,
+    ).generate(_sample_research_packet(), _sample_content_plan())
+
+    assert draft.title == "AI Workflow Reliability"
+    assert "The useful version of AI automation" in draft.markdown
 
 
 def test_search_research_provider_requires_api_key(tmp_path: Path) -> None:
@@ -476,3 +559,38 @@ def test_discovery_research_combines_feed_url_and_local_context(
     assert "Discovered agent source" in titles
     assert "Operator source" in titles
     assert "Portfolio project map" in titles
+
+
+def _sample_research_packet() -> ResearchPacket:
+    return ResearchPacket(
+        topic="AI workflow reliability",
+        sources=[
+            Source(
+                title="Test source",
+                publisher="example.com",
+                summary="A source about AI workflow reliability.",
+                credibility=0.9,
+            )
+        ],
+        claims=[
+            Claim(
+                text="AI workflows need evaluation gates.",
+                source_title="Test source",
+                confidence=0.9,
+            )
+        ],
+        engineering_signals=["Model calls should be observable and resilient."],
+        risks=["Transient provider failures can interrupt publishing."],
+        project_implications=["Add retry and fallback controls to model providers."],
+    )
+
+
+def _sample_content_plan() -> ContentPlan:
+    return ContentPlan(
+        title="AI Workflow Reliability",
+        slug="ai-workflow-reliability",
+        audience="Applied AI engineering hiring managers",
+        thesis="Reliable AI content systems need model provider controls.",
+        outline=["Provider resilience", "Fallbacks", "Review"],
+        keywords=["ai", "workflow", "reliability"],
+    )

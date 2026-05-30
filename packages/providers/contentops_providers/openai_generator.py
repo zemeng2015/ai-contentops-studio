@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 
 import httpx
 from contentops_core.generator import ContentGenerator
@@ -14,15 +15,26 @@ class OpenAIResponsesGenerator:
     Enable this provider with `CONTENTOPS_GENERATOR_PROVIDER=openai`.
     """
 
-    def __init__(self, api_key: str, model: str, timeout_seconds: float = 60.0) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        timeout_seconds: float = 60.0,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.5,
+        fallback_on_failure: bool = True,
+    ) -> None:
         self.api_key = api_key
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
+        self.fallback_on_failure = fallback_on_failure
         self.fallback = ContentGenerator()
 
     def generate(self, packet: ResearchPacket, plan: ContentPlan) -> Draft:
         prompt = self._build_prompt(packet, plan)
-        payload = {
+        payload: dict[str, object] = {
             "model": self.model,
             "input": [
                 {
@@ -36,21 +48,44 @@ class OpenAIResponsesGenerator:
                 {"role": "user", "content": prompt},
             ],
         }
-        with httpx.Client(timeout=self.timeout_seconds) as client:
-            response = client.post(
-                "https://api.openai.com/v1/responses",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
-            response.raise_for_status()
+        try:
+            with httpx.Client(timeout=self.timeout_seconds) as client:
+                response = self._post_with_retries(client, payload)
+        except Exception:
+            if self.fallback_on_failure:
+                return self.fallback.generate(packet, plan)
+            raise
         markdown = self._extract_text(response.json()).strip()
         if not markdown:
             return self.fallback.generate(packet, plan)
         html = self.fallback._markdown_to_html(plan.title, markdown)
         return Draft(title=plan.title, slug=plan.slug, markdown=markdown, html=html)
+
+    def _post_with_retries(
+        self,
+        client: httpx.Client,
+        payload: dict[str, object],
+    ) -> httpx.Response:
+        attempts = max(self.retry_attempts, 1)
+        for attempt in range(attempts):
+            try:
+                response = client.post(
+                    "https://api.openai.com/v1/responses",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                response.raise_for_status()
+                return response
+            except Exception as exc:
+                if attempt == attempts - 1 or not _is_retryable_openai_error(exc):
+                    raise
+                delay = max(self.retry_backoff_seconds, 0) * (2**attempt)
+                if delay:
+                    time.sleep(delay)
+        raise RuntimeError("OpenAI Responses API request failed")
 
     @staticmethod
     def _extract_text(response_json: dict[str, object]) -> str:
@@ -88,3 +123,18 @@ class OpenAIResponsesGenerator:
             "- Include a section on portfolio/project implications.\n"
             "- Keep the tone practical and engineering-focused.\n"
         )
+
+
+def _is_retryable_openai_error(exc: Exception) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        return status_code == 429 or status_code >= 500
+    return isinstance(
+        exc,
+        (
+            TimeoutError,
+            ConnectionError,
+            httpx.TimeoutException,
+            httpx.TransportError,
+        ),
+    )

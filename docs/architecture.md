@@ -164,7 +164,9 @@ upstream source is briefly unavailable.
 Generation providers:
 
 - `template`: deterministic Markdown/HTML generation for repeatable tests
-- `openai`: OpenAI Responses API generation, enabled only when credentials are configured
+- `openai`: OpenAI Responses API generation, enabled only when credentials are configured;
+  transient provider failures use bounded retry/backoff, and exhausted failures can fall back to
+  the deterministic template generator for reviewable scheduled runs
 
 Publishing providers:
 

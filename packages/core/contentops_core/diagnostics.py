@@ -95,6 +95,12 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append(f"unknown publisher provider: {settings.publisher_provider}")
     if settings.generator_provider == "openai" and not settings.openai_api_key:
         failures.append("OpenAI generation requires CONTENTOPS_OPENAI_API_KEY")
+    if settings.openai_timeout_seconds <= 0:
+        failures.append("OpenAI timeout must be greater than 0")
+    if settings.openai_retry_attempts < 1:
+        failures.append("OpenAI retry attempts must be at least 1")
+    if settings.openai_retry_backoff_seconds < 0:
+        failures.append("OpenAI retry backoff cannot be negative")
     if settings.research_provider == "search" and not settings.research_search_api_key:
         failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_API_KEY")
     if settings.research_provider == "search" and not settings.research_search_endpoint:
@@ -126,6 +132,10 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             "research_retry_backoff_seconds": settings.research_retry_backoff_seconds,
             "research_search_enrich": settings.research_search_enrich,
             "generator_provider": settings.generator_provider,
+            "openai_timeout_seconds": settings.openai_timeout_seconds,
+            "openai_retry_attempts": settings.openai_retry_attempts,
+            "openai_retry_backoff_seconds": settings.openai_retry_backoff_seconds,
+            "openai_fallback_on_failure": settings.openai_fallback_on_failure,
             "publisher_provider": settings.publisher_provider,
             "warnings": warnings,
         },
