@@ -13,3 +13,21 @@ This directory is reserved for infrastructure-as-code. The intended production m
 The first implementation keeps IaC out of the critical path so the application contract can settle
 before Terraform or CDK resources are added.
 
+## Terraform skeleton
+
+`terraform/` now contains an AWS-ready baseline for:
+
+- S3 artifact storage with versioning and encryption
+- ECS Fargate task definitions for API and worker
+- task execution and artifact access IAM roles
+- CloudWatch log groups
+- EventBridge Scheduler schedule group placeholder
+
+It intentionally stops short of creating public networking and an ALB until the runtime deployment
+choice is finalized.
+
+```bash
+cd infra/aws/terraform
+terraform init
+terraform plan -var='container_image=<account>.dkr.ecr.<region>.amazonaws.com/ai-contentops-studio:latest'
+```

@@ -27,6 +27,10 @@ docker run --rm -p 8000:8000 ai-contentops-studio
 The code uses provider and publisher boundaries so local filesystem/SQLite can be replaced by
 S3/Postgres without changing the pipeline contract.
 
+The AWS Terraform skeleton lives in `infra/aws/terraform`. It defines the artifact bucket, ECS task
+definitions, IAM roles, log groups, and scheduler group needed for the first production deployment
+shape.
+
 ## Provider environment variables
 
 ```text

@@ -1,0 +1,14 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+def test_terraform_skeleton_contains_core_resources() -> None:
+    root = Path("infra/aws/terraform")
+    main = (root / "main.tf").read_text(encoding="utf-8")
+
+    assert "aws_s3_bucket" in main
+    assert "aws_ecs_task_definition" in main
+    assert "aws_cloudwatch_log_group" in main
+    assert "aws_scheduler_schedule_group" in main
+
