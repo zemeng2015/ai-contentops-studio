@@ -90,6 +90,9 @@ require `X-ContentOps-Api-Key` or an `api_key` query parameter.
 Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` when dashboard pages, artifacts, source audits, job
 receipts, content inventory, or evidence bundles should not be publicly readable. Health and
 readiness probes remain unauthenticated.
+Set `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` to deliver approve, reject, publish, and rollback events
+to an external incident, chat, or workflow system. Delivery attempts are written to
+`notification-log.json` beside each run.
 
 Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions` unless
 `--receipt-dir` is provided. In ECS/EventBridge deployments, keep artifact mirroring enabled so

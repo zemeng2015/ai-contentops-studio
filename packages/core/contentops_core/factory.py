@@ -15,6 +15,7 @@ from contentops_publishing.static_site import StaticSitePublisher
 
 from contentops_core.artifacts import ArtifactStore, ArtifactWriter, S3MirroringArtifactStore
 from contentops_core.generator import ContentGenerator, DraftGenerator
+from contentops_core.notifications import LocalNotificationPublisher, WebhookNotificationPublisher
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.planner import ContentPlanner
 from contentops_core.repository import RunRepository
@@ -129,4 +130,16 @@ def build_review_service(settings: Settings | None = None) -> ReviewService:
     return ReviewService(
         repository=RunRepository(settings.database_url),
         publisher=_build_publisher(settings),
+        notifier=_build_notifier(settings),
     )
+
+
+def _build_notifier(
+    settings: Settings,
+) -> LocalNotificationPublisher | WebhookNotificationPublisher:
+    if settings.notification_webhook_url:
+        return WebhookNotificationPublisher(
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
+        )
+    return LocalNotificationPublisher()

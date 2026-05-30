@@ -17,6 +17,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - batch approve/reject workflow for review queues
 - explicit approval records before reviewed runs are published
 - append-only audit logs for review and publishing actions
+- notification delivery logs for review and publishing events, with optional webhook delivery
 - source audit reports with scoring, risk reasons, and reviewer recommendations
 - publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
 - optional operator API key protection for mutating API and dashboard actions
@@ -144,6 +145,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
+contentops notifications <run_id>
 contentops job-executions --json
 contentops job-execution <execution_id>
 contentops content --json
@@ -168,6 +170,7 @@ GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/audit-log
+GET  /runs/{run_id}/notifications
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /job-executions?limit=20&offset=0
@@ -212,6 +215,8 @@ directory before they are overwritten. Operators can run `contentops rollback-pu
 `POST /runs/{run_id}/rollback-publish` to restore backed-up files or delete files created by the
 publish.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
+They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
+the same events are delivered to an external webhook without blocking the review workflow.
 
 ## Scheduled worker jobs
 
@@ -264,6 +269,8 @@ CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2
 CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
 CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 # CONTENTOPS_OPERATOR_API_KEY=
+CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5
+# CONTENTOPS_NOTIFICATION_WEBHOOK_URL=
 ```
 
 Research provider modes:

@@ -90,6 +90,10 @@ Rollback uses that receipt to restore backed-up files or delete files created by
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,
 and publish transitions in addition to the latest run state.
+The same review and publishing actions produce `notification-log.json` delivery receipts. By
+default the local provider records skipped deliveries for auditability; when
+`CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, events are posted to an external webhook and
+success or failure is recorded without blocking the operator workflow.
 Published runs are projected into a content catalog exposed through `/content`, `contentops content`,
 and the dashboard. The catalog combines run metadata, publish receipts, URLs, providers, publish
 timestamps, and evaluation scores so the platform can be reviewed as a content inventory instead

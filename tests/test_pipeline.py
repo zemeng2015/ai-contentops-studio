@@ -113,6 +113,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     approval = review_service.approval(result.run.id)
     receipt = review_service.publish_receipt(result.run.id)
     audit_events = review_service.audit_log(result.run.id)
+    notifications = review_service.notification_log(result.run.id)
 
     assert "draft.json" in artifacts
     assert "eval-report.json" in artifacts
@@ -145,8 +146,12 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED
     assert audit_events[1].fields["changed_files"] == 3
+    assert [delivery.action for delivery in notifications] == ["approve", "publish"]
+    assert {delivery.provider for delivery in notifications} == {"local"}
+    assert {delivery.status for delivery in notifications} == {"skipped"}
     assert (result.run.artifact_dir / "publish-receipt.json").exists()
     assert (result.run.artifact_dir / "audit-log.json").exists()
+    assert (result.run.artifact_dir / "notification-log.json").exists()
 
 
 def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None:
@@ -205,6 +210,7 @@ def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
     rollback = review_service.rollback_publish(second.id, actor="zack")
     rolled_back = review_service.repository.get(second.id)
     audit_events = review_service.audit_log(second.id)
+    notifications = review_service.notification_log(second.id)
 
     assert rollback.errors == []
     assert len(rollback.restored_files) == 3
@@ -214,6 +220,7 @@ def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
     assert (second.artifact_dir / "publish-rollback.json").exists()
     assert audit_events[-1].action == "rollback_publish"
     assert audit_events[-1].actor == "zack"
+    assert notifications[-1].action == "rollback_publish"
 
 
 def test_publish_rollback_deletes_created_files(tmp_path: Path) -> None:
@@ -253,6 +260,7 @@ def test_review_service_rejects_run(tmp_path: Path) -> None:
     rejected = review_service.reject(result.run.id, reviewer="zack", notes="Needs a better angle.")
     approval = review_service.approval(result.run.id)
     audit_events = review_service.audit_log(result.run.id)
+    notifications = review_service.notification_log(result.run.id)
 
     assert rejected.status == RunStatus.REJECTED
     assert approval is not None
@@ -261,6 +269,7 @@ def test_review_service_rejects_run(tmp_path: Path) -> None:
     assert len(audit_events) == 1
     assert audit_events[0].action == "reject"
     assert audit_events[0].actor == "zack"
+    assert notifications[0].action == "reject"
 
 
 def test_review_service_batch_approve_records_partial_results(tmp_path: Path) -> None:

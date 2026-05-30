@@ -20,6 +20,7 @@ from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
     AuditEvent,
+    NotificationDelivery,
     PublishedContentListResponse,
     PublishPlan,
     PublishReceipt,
@@ -305,6 +306,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     approval_html = _approval_html(review_service.approval(run_id))
     receipt_html = _publish_receipt_html(review_service.publish_receipt(run_id))
     audit_html = _audit_log_html(review_service.audit_log(run_id))
+    notification_html = _notification_log_html(review_service.notification_log(run_id))
     approve_action = f"/dashboard/runs/{escape(run_id)}/approve{_api_key_query(api_key)}"
     reject_action = f"/dashboard/runs/{escape(run_id)}/reject{_api_key_query(api_key)}"
     rerun_action = f"/dashboard/runs/{escape(run_id)}/rerun{_api_key_query(api_key)}"
@@ -356,6 +358,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               </form>
               <h3>Audit Log</h3>
               {audit_html}
+              <h3>Notification Deliveries</h3>
+              {notification_html}
               <form method="post" action="{rerun_action}">
                 <button type="submit">Rerun with same request</button>
               </form>
@@ -795,6 +799,18 @@ def rollback_published_run(
 def get_audit_log(run_id: str) -> list[AuditEvent]:
     try:
         return review_service.audit_log(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/runs/{run_id}/notifications",
+    response_model=list[NotificationDelivery],
+    dependencies=[Depends(require_read_access)],
+)
+def get_notification_log(run_id: str) -> list[NotificationDelivery]:
+    try:
+        return review_service.notification_log(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -1249,6 +1265,33 @@ def _audit_log_html(events: list[AuditEvent]) -> str:
       <table>
         <thead>
           <tr><th>Action</th><th>Actor</th><th>From</th><th>To</th><th>At</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _notification_log_html(deliveries: list[NotificationDelivery]) -> str:
+    if not deliveries:
+        return "<p>No notification deliveries recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(delivery.action)}</td>
+          <td>{escape(delivery.provider)}</td>
+          <td>{escape(delivery.status)}</td>
+          <td>{escape(str(delivery.status_code or "n/a"))}</td>
+          <td>{escape(delivery.endpoint or "local")}</td>
+          <td>{escape(delivery.delivered_at.isoformat())}</td>
+        </tr>
+        """
+        for delivery in deliveries
+    )
+    return f"""
+      <p><a href="/runs/{escape(deliveries[0].run_id)}/notifications">Notifications JSON</a></p>
+      <table>
+        <thead>
+          <tr><th>Action</th><th>Provider</th><th>Status</th><th>HTTP</th><th>Endpoint</th><th>At</th></tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>

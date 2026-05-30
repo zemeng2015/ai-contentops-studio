@@ -109,6 +109,8 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("research retry attempts must be at least 1")
     if settings.research_retry_backoff_seconds < 0:
         failures.append("research retry backoff cannot be negative")
+    if settings.notification_timeout_seconds <= 0:
+        failures.append("notification timeout must be greater than 0")
     if settings.publisher_provider == "homepage" and settings.homepage_repo_path is None:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
@@ -137,6 +139,8 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             "openai_retry_backoff_seconds": settings.openai_retry_backoff_seconds,
             "openai_fallback_on_failure": settings.openai_fallback_on_failure,
             "publisher_provider": settings.publisher_provider,
+            "notification_webhook_configured": settings.notification_webhook_url is not None,
+            "notification_timeout_seconds": settings.notification_timeout_seconds,
             "warnings": warnings,
         },
     )

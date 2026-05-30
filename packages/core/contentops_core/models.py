@@ -210,6 +210,18 @@ class AuditEvent(BaseModel):
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class NotificationDelivery(BaseModel):
+    delivery_id: str = Field(default_factory=lambda: uuid4().hex[:12])
+    run_id: str
+    action: str
+    provider: str
+    status: str
+    endpoint: str | None = None
+    status_code: int | None = None
+    error: str | None = None
+    delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class TraceEvent(BaseModel):
     timestamp: datetime
     step: str

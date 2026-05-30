@@ -351,6 +351,18 @@ def audit_log(run_id: str) -> None:
     typer.echo(json.dumps([event.model_dump(mode="json") for event in events], indent=2))
 
 
+@app.command("notifications")
+def notifications(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        deliveries = service.notification_log(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(
+        json.dumps([delivery.model_dump(mode="json") for delivery in deliveries], indent=2)
+    )
+
+
 @app.command("publish-plan")
 def publish_plan(run_id: str) -> None:
     service = build_review_service(Settings())
@@ -462,6 +474,8 @@ def init_config(
                 "# CONTENTOPS_OPENAI_API_KEY=",
                 "# CONTENTOPS_OPERATOR_API_KEY=",
                 "CONTENTOPS_REQUIRE_READ_API_KEY=false",
+                "# CONTENTOPS_NOTIFICATION_WEBHOOK_URL=",
+                "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5",
                 "# CONTENTOPS_HOMEPAGE_REPO_PATH=C:\\path\\to\\zack-ai-homepage",
                 "# CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage",
             ]

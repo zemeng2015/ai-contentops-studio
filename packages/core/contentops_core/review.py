@@ -20,6 +20,7 @@ from contentops_core.models import (
     AuditEvent,
     Draft,
     EvaluationReport,
+    NotificationDelivery,
     PublishedContentItem,
     PublishedContentListResponse,
     PublishFileChange,
@@ -37,15 +38,22 @@ from contentops_core.models import (
     Source,
     SourceOverlap,
 )
+from contentops_core.notifications import LocalNotificationPublisher, NotificationPublisher
 from contentops_core.repository import RunRepository
 
 T = TypeVar("T", bound=BaseModel)
 
 
 class ReviewService:
-    def __init__(self, repository: RunRepository, publisher: Publisher) -> None:
+    def __init__(
+        self,
+        repository: RunRepository,
+        publisher: Publisher,
+        notifier: NotificationPublisher | None = None,
+    ) -> None:
         self.repository = repository
         self.publisher = publisher
+        self.notifier = notifier or LocalNotificationPublisher()
         self.metrics_service = MetricsService()
 
     def list_artifacts(self, run_id: str) -> list[str]:
@@ -155,7 +163,7 @@ class ReviewService:
         run.touch(RunStatus.PUBLISHED)
         self.repository.save(run)
         actor = approval.reviewer if approval is not None else "force"
-        self._append_audit_event(
+        self._record_audit_event(
             run,
             AuditEvent(
                 run_id=run_id,
@@ -193,7 +201,7 @@ class ReviewService:
         )
         run.touch(RunStatus.APPROVED)
         self.repository.save(run)
-        self._append_audit_event(
+        self._record_audit_event(
             run,
             AuditEvent(
                 run_id=run_id,
@@ -233,7 +241,7 @@ class ReviewService:
         )
         run.touch(RunStatus.REJECTED)
         self.repository.save(run)
-        self._append_audit_event(
+        self._record_audit_event(
             run,
             AuditEvent(
                 run_id=run_id,
@@ -266,6 +274,14 @@ class ReviewService:
             return []
         data = json.loads(path.read_text(encoding="utf-8"))
         return [AuditEvent.model_validate(item) for item in data]
+
+    def notification_log(self, run_id: str) -> list[NotificationDelivery]:
+        run = self._get_run(run_id)
+        path = run.artifact_dir / "notification-log.json"
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return [NotificationDelivery.model_validate(item) for item in data]
 
     def approval(self, run_id: str) -> ApprovalRecord | None:
         run = self._get_run(run_id)
@@ -316,7 +332,7 @@ class ReviewService:
         run.published_url = None
         run.touch(RunStatus.APPROVED if receipt.approval is not None else RunStatus.NEEDS_REVIEW)
         self.repository.save(run)
-        self._append_audit_event(
+        self._record_audit_event(
             run,
             AuditEvent(
                 run_id=run_id,
@@ -496,6 +512,11 @@ class ReviewService:
             technical_depth=report.technical_depth,
         )
 
+    def _record_audit_event(self, run: RunRecord, event: AuditEvent) -> None:
+        self._append_audit_event(run, event)
+        delivery = self.notifier.notify(run, event)
+        self._append_notification_delivery(run, delivery)
+
     @staticmethod
     def _append_audit_event(run: RunRecord, event: AuditEvent) -> None:
         path = run.artifact_dir / "audit-log.json"
@@ -505,6 +526,16 @@ class ReviewService:
             events = []
         events.append(event.model_dump(mode="json"))
         path.write_text(json.dumps(events, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    @staticmethod
+    def _append_notification_delivery(run: RunRecord, delivery: NotificationDelivery) -> None:
+        path = run.artifact_dir / "notification-log.json"
+        if path.exists():
+            deliveries = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            deliveries = []
+        deliveries.append(delivery.model_dump(mode="json"))
+        path.write_text(json.dumps(deliveries, indent=2, ensure_ascii=False), encoding="utf-8")
 
     @staticmethod
     def _load_sources(run: RunRecord) -> list[Source]:

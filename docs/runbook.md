@@ -78,10 +78,12 @@ Publish only approved runs:
 ```powershell
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops notifications <run_id>
 ```
 
 Confirm that `publish-receipt.json` includes provider, URL, approval, file changes, backup
-artifacts, and rollback hints.
+artifacts, and rollback hints. Confirm that `notification-log.json` recorded local skipped
+deliveries or webhook delivery status for approve/publish events.
 
 ## 5. Published Content Inventory
 
@@ -148,6 +150,7 @@ Recommended AWS-backed setup:
 - S3 artifact mirroring for run artifacts, worker receipts, and evidence bundles.
 - EventBridge Scheduler for daily AI research jobs.
 - Secrets Manager for OpenAI, search provider, database, and operator API keys.
+- Optional webhook endpoint for review and publishing notifications.
 - CloudWatch alarms for failed worker tasks and API `5xx` responses.
 
 Mutating API and dashboard operations should use `CONTENTOPS_OPERATOR_API_KEY` in shared
