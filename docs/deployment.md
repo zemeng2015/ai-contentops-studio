@@ -93,6 +93,10 @@ readiness probes remain unauthenticated.
 Set `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` to deliver approve, reject, publish, and rollback events
 to an external incident, chat, or workflow system. Delivery attempts are written to
 `notification-log.json` beside each run.
+In Terraform deployments, pass `operator_api_key_secret_arn`,
+`openai_api_key_secret_arn`, `notification_webhook_url_secret_arn`,
+`require_read_api_key`, and `notification_timeout_seconds` to inject the corresponding ECS task
+configuration.
 
 Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions` unless
 `--receipt-dir` is provided. In ECS/EventBridge deployments, keep artifact mirroring enabled so

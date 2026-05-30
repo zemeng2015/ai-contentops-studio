@@ -79,6 +79,24 @@ variable "operator_api_key_secret_arn" {
   default     = ""
 }
 
+variable "require_read_api_key" {
+  description = "Whether read routes should require the operator API key."
+  type        = bool
+  default     = false
+}
+
+variable "notification_webhook_url_secret_arn" {
+  description = "Secrets Manager ARN containing an optional notification webhook URL."
+  type        = string
+  default     = ""
+}
+
+variable "notification_timeout_seconds" {
+  description = "Webhook notification timeout in seconds."
+  type        = number
+  default     = 5
+}
+
 variable "homepage_repo_path" {
   description = "Optional mounted path for homepage publisher in container deployments."
   type        = string
