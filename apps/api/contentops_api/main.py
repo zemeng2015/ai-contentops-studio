@@ -16,8 +16,10 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionListResponse,
     JobExecutionReport,
+    JobRecoveryPlan,
     get_job_execution_report,
     job_execution_dir,
+    job_recovery_plan,
     list_job_execution_reports,
 )
 from contentops_core.models import (
@@ -707,6 +709,21 @@ def list_job_executions(
 def get_job_execution(execution_id: str) -> JobExecutionReport:
     try:
         return get_job_execution_report(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/job-executions/{execution_id}/recovery-plan",
+    response_model=JobRecoveryPlan,
+    dependencies=[Depends(require_read_access)],
+)
+def get_job_recovery_plan(execution_id: str) -> JobRecoveryPlan:
+    try:
+        return job_recovery_plan(
             job_execution_dir(settings.artifact_root),
             execution_id,
         )
@@ -1514,6 +1531,7 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
         </thead>
         <tbody>{rows}</tbody>
       </table>
+      <p>Failed executions expose <code>/job-executions/&lt;id&gt;/recovery-plan</code>.</p>
     """
 
 

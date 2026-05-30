@@ -37,10 +37,13 @@ After the worker runs:
 ```powershell
 contentops job-executions --json
 contentops job-execution <execution_id>
+contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 
 Review the execution receipt for per-job failures, run ids, artifact directories, publish URLs, and
 duration. In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
+When failures occur, inspect the recovery plan before rerunning it with
+`contentops-worker run-pipeline recovery.yaml`.
 
 ## 3. Review Queue
 
@@ -117,6 +120,7 @@ The same catalog is available from:
 
 ```text
 GET /content?limit=20&offset=0
+GET /job-executions/{execution_id}/recovery-plan
 GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
 GET /audit-events?limit=20&offset=0
@@ -166,16 +170,18 @@ When a scheduled job fails:
 
 1. Inspect `contentops job-executions --json`.
 2. Open the failed `contentops job-execution <execution_id>` receipt.
-3. Run `contentops incident-reports --json` and `contentops incident-report <run_id>`.
-4. Check whether failures are research, generation, evaluation, publish, notification, or storage related.
-5. Run `contentops doctor --json`.
-6. Export the affected run with `contentops export-run <run_id> --output incident.zip`.
-7. Run `contentops verify-publish <run_id>` for published runs to detect target drift.
-8. Run `contentops release-readiness --json` to confirm whether the issue blocks release.
-9. Fix provider credentials, source URLs, publish target state, webhook state, or approval status.
-10. Rerun from the prior request:
+3. Generate `contentops job-recovery-plan <execution_id> --output recovery.yaml`.
+4. Run `contentops incident-reports --json` and `contentops incident-report <run_id>`.
+5. Check whether failures are research, generation, evaluation, publish, notification, or storage related.
+6. Run `contentops doctor --json`.
+7. Export the affected run with `contentops export-run <run_id> --output incident.zip`.
+8. Run `contentops verify-publish <run_id>` for published runs to detect target drift.
+9. Run `contentops release-readiness --json` to confirm whether the issue blocks release.
+10. Fix provider credentials, source URLs, publish target state, webhook state, or approval status.
+11. Rerun from the recovery plan or the prior request:
 
 ```powershell
+contentops-worker run-pipeline recovery.yaml
 contentops rerun <run_id>
 ```
 

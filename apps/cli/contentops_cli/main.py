@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
 from contentops_core.diagnostics import (
     deployment_manifest,
     release_readiness,
@@ -14,6 +15,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     get_job_execution_report,
     job_execution_dir,
+    job_recovery_plan,
     list_job_execution_reports,
 )
 from contentops_core.models import RunRequest, RunStatus, SourceAuditReport
@@ -216,6 +218,33 @@ def job_execution(execution_id: str) -> None:
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(report.model_dump_json(indent=2))
+
+
+@app.command("job-recovery-plan")
+def job_recovery_plan_command(
+    execution_id: str,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Optional YAML file to write."),
+    ] = None,
+) -> None:
+    settings = Settings()
+    try:
+        plan = job_recovery_plan(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if output is not None:
+        content = yaml.safe_dump(
+            plan.to_job_file().model_dump(mode="json"),
+            sort_keys=False,
+        )
+        output.write_text(content, encoding="utf-8")
+        typer.echo(f"Wrote recovery plan: {output}")
+        return
+    typer.echo(plan.model_dump_json(indent=2))
 
 
 @app.command("content")

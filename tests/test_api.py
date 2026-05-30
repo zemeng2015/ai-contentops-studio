@@ -348,6 +348,7 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
 
     list_response = client.get("/job-executions?limit=5")
     detail_response = client.get(f"/job-executions/{report.execution_id}")
+    recovery_response = client.get(f"/job-executions/{report.execution_id}/recovery-plan")
     dashboard_response = client.get("/dashboard")
 
     assert list_response.status_code == 200
@@ -357,6 +358,8 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     )
     assert detail_response.status_code == 200
     assert detail_response.json()["name"] == "api-job-history"
+    assert recovery_response.status_code == 200
+    assert recovery_response.json()["failed_count"] == 0
     assert dashboard_response.status_code == 200
     assert "Worker Executions" in dashboard_response.text
     assert report.execution_id in dashboard_response.text

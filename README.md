@@ -36,6 +36,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
 - run comparison for repeatable quality and source regression review
 - YAML-defined worker jobs for scheduled content calendars
+- worker recovery plans that rebuild failed scheduled jobs into rerunnable YAML
 - AWS-ready artifact storage and Terraform deployment skeleton
 - local-first development with AWS-ready deployment primitives
 
@@ -168,6 +169,7 @@ contentops audit-events --action publish --json
 contentops notifications <run_id>
 contentops job-executions --json
 contentops job-execution <execution_id>
+contentops job-recovery-plan <execution_id> --output recovery.yaml
 contentops retention-report --days 90 --json
 contentops content --json
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
@@ -205,6 +207,7 @@ GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
+GET  /job-executions/{execution_id}/recovery-plan
 GET  /retention-report?days=90&limit=100
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
@@ -294,6 +297,8 @@ tags, metadata, and errors. By default receipts are written under
 artifact mirroring.
 Receipts are queryable through `contentops job-executions`, `contentops job-execution`, and the
 `/job-executions` API endpoints, giving scheduled workers a durable execution history.
+Failed worker receipts can also produce a recovery plan, rebuilding failed jobs into a rerunnable
+YAML calendar with the original topic, source URLs, publish flag, tags, and metadata.
 
 Job files support a legacy single-job shape or a production-style batch:
 

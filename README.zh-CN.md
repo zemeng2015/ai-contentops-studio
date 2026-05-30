@@ -30,6 +30,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - API、CLI、worker、publisher 清晰分层
 - Review dashboard 可检查 artifact、source、evaluation、publish plan 和 run comparison
 - YAML 定义的 worker jobs，可用于每日或每周内容选题计划
+- worker recovery plans 可把失败的定时任务重建为可重跑 YAML
 - AWS-ready artifact storage、RDS、EventBridge 和 Terraform deployment skeleton
 
 ## 项目能力
@@ -148,6 +149,7 @@ contentops manifest <run_id>
 contentops audit-log <run_id>
 contentops audit-events --action publish --json
 contentops retention-report --days 90 --json
+contentops job-recovery-plan <execution_id> --output recovery.yaml
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
@@ -183,6 +185,7 @@ GET  /audit-events?action=publish&limit=20&offset=0
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
+GET  /job-executions/{execution_id}/recovery-plan
 GET  /retention-report?days=90&limit=100
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0

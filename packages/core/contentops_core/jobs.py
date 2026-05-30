@@ -43,6 +43,7 @@ class ContentJobFile(BaseModel):
 class JobRunResult(BaseModel):
     job_name: str
     topic: str
+    source_urls: list[str] = Field(default_factory=list)
     publish: bool = False
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
@@ -75,6 +76,19 @@ class JobExecutionListResponse(BaseModel):
     offset: int
 
 
+class JobRecoveryPlan(BaseModel):
+    execution_id: str
+    source_execution_name: str
+    failed_count: int
+    jobs: list[ContentJob]
+
+    def to_job_file(self) -> ContentJobFile:
+        return ContentJobFile(
+            name=f"{self.source_execution_name}-recovery",
+            jobs=self.jobs,
+        )
+
+
 class JobRunner:
     def __init__(self, pipeline: ContentOpsPipeline) -> None:
         self.pipeline = pipeline
@@ -90,6 +104,7 @@ class JobRunner:
                     JobRunResult(
                         job_name=job.name,
                         topic=job.topic,
+                        source_urls=job.source_urls,
                         publish=job.publish,
                         tags=job.tags,
                         metadata=job.metadata,
@@ -105,6 +120,7 @@ class JobRunner:
                     JobRunResult(
                         job_name=job.name,
                         topic=job.topic,
+                        source_urls=job.source_urls,
                         publish=job.publish,
                         tags=job.tags,
                         metadata=job.metadata,
@@ -134,6 +150,7 @@ class JobRunner:
             JobRunResult(
                 job_name=job.name,
                 topic=job.topic,
+                source_urls=job.source_urls,
                 publish=job.publish,
                 tags=job.tags,
                 metadata=job.metadata,
@@ -208,6 +225,31 @@ def get_job_execution_report(receipt_dir: Path, execution_id: str) -> JobExecuti
         if report.execution_id == normalized:
             return report
     raise FileNotFoundError(f"Job execution not found: {execution_id}")
+
+
+def job_recovery_plan(receipt_dir: Path, execution_id: str) -> JobRecoveryPlan:
+    report = get_job_execution_report(receipt_dir, execution_id)
+    failed_jobs = [
+        ContentJob(
+            name=result.job_name,
+            topic=result.topic,
+            source_urls=result.source_urls,
+            publish=result.publish,
+            tags=result.tags,
+            metadata={
+                **result.metadata,
+                "recovery_source_execution_id": report.execution_id,
+            },
+        )
+        for result in report.results
+        if result.error is not None or str(result.status) == "failed"
+    ]
+    return JobRecoveryPlan(
+        execution_id=report.execution_id,
+        source_execution_name=report.name,
+        failed_count=len(failed_jobs),
+        jobs=failed_jobs,
+    )
 
 
 def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:

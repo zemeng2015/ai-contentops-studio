@@ -4,8 +4,11 @@ from pathlib import Path
 
 from contentops_core.factory import build_pipeline
 from contentops_core.jobs import (
+    JobExecutionReport,
     JobRunner,
+    JobRunResult,
     get_job_execution_report,
+    job_recovery_plan,
     list_job_execution_reports,
     load_job_file,
     write_job_execution_report,
@@ -131,6 +134,46 @@ def test_job_execution_receipts_can_be_listed_and_loaded(tmp_path: Path) -> None
     assert report_list.items[0].receipt_path is not None
     assert loaded.name == "queryable"
     assert loaded.results[0].topic == "Queryable job history"
+
+
+def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    report = JobExecutionReport(
+        name="daily-calendar",
+        total=2,
+        succeeded=1,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="ok",
+                topic="Successful job",
+                status="needs_review",
+                run_id="run-ok",
+            ),
+            JobRunResult(
+                job_name="failed",
+                topic="Failed job",
+                source_urls=["https://example.com/source"],
+                publish=True,
+                tags=["retry"],
+                metadata={"owner": "zack"},
+                status="failed",
+                error="provider timeout",
+            ),
+        ],
+    )
+    write_job_execution_report(report, receipt_dir)
+
+    plan = job_recovery_plan(receipt_dir, report.execution_id)
+    job_file = plan.to_job_file()
+
+    assert plan.failed_count == 1
+    assert job_file.name == "daily-calendar-recovery"
+    assert len(job_file.jobs) == 1
+    assert job_file.jobs[0].name == "failed"
+    assert job_file.jobs[0].source_urls == ["https://example.com/source"]
+    assert job_file.jobs[0].publish is True
+    assert job_file.jobs[0].metadata["recovery_source_execution_id"] == report.execution_id
 
 
 def test_missing_job_execution_history_is_empty(tmp_path: Path) -> None:

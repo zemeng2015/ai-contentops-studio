@@ -231,6 +231,7 @@ def test_cli_job_execution_commands(
 
     list_result = runner.invoke(app, ["job-executions", "--json"])
     detail_result = runner.invoke(app, ["job-execution", report.execution_id])
+    recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
 
     assert list_result.exit_code == 0
     list_payload = json.loads(list_result.output)
@@ -239,6 +240,9 @@ def test_cli_job_execution_commands(
     assert detail_result.exit_code == 0
     detail_payload = json.loads(detail_result.output)
     assert detail_payload["name"] == "cli-job-history"
+    assert recovery_result.exit_code == 0
+    recovery_payload = json.loads(recovery_result.output)
+    assert recovery_payload["failed_count"] == 0
 
 
 def test_cli_approve_many_returns_per_run_results(

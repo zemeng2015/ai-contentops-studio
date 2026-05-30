@@ -170,6 +170,10 @@ auditable artifact even when stdout logs are rotated.
 The same receipt history is exposed through `GET /job-executions`, `GET /job-executions/{id}`,
 `contentops job-executions`, `contentops job-execution`, and a dashboard panel so operator review
 does not depend on cloud log retention.
+Failed executions also expose a recovery plan through
+`GET /job-executions/{id}/recovery-plan` and `contentops job-recovery-plan`. The plan rebuilds the
+failed jobs as a YAML-compatible content calendar while preserving topic, source URLs, publish
+intent, tags, and metadata for controlled reruns.
 
 ## Production path
 
