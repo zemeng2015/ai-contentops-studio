@@ -19,6 +19,7 @@ def test_health_endpoint() -> None:
     response = client.get("/health")
     ready_response = client.get("/ready")
     manifest_response = client.get("/deployment-manifest")
+    release_response = client.get("/release-readiness")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -38,6 +39,15 @@ def test_health_endpoint() -> None:
     assert manifest_payload["status"] in {"ok", "degraded"}
     assert manifest_payload["runtime"]["database_engine"] in {"sqlite", "postgresql"}
     assert "openai_api_key" not in manifest_response.text
+    assert release_response.status_code == 200
+    release_payload = release_response.json()
+    assert release_payload["status"] in {"pass", "warn", "fail"}
+    assert isinstance(release_payload["can_release"], bool)
+    assert {check["name"] for check in release_payload["checks"]} >= {
+        "system_readiness",
+        "incident_posture",
+        "operator_security",
+    }
 
 
 def test_ready_endpoint_reports_invalid_provider() -> None:
@@ -183,6 +193,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     incident_report_response = client.get(f"/runs/{run['id']}/incident-report")
     incident_reports_response = client.get("/incident-reports?limit=5")
     ops_summary_response = client.get("/ops-summary")
+    release_readiness_response = client.get("/release-readiness")
     generation_receipt_response = client.get(f"/runs/{run['id']}/generation-receipt")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
@@ -226,6 +237,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert ops_summary_response.status_code == 200
     assert ops_summary_response.json()["total_runs"] >= 1
     assert "needs_review" in ops_summary_response.json()["status_counts"]
+    assert release_readiness_response.status_code == 200
+    assert release_readiness_response.json()["operations"]["total_runs"] >= 1
     assert generation_receipt_response.status_code == 200
     assert generation_receipt_response.json()["provider"] == "template"
     assert generation_receipt_response.json()["total_tokens"] > 0

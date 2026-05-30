@@ -109,6 +109,10 @@ severity, and estimated token usage.
 The deployment manifest reuses readiness checks and adds redacted runtime, security, operations,
 and capability evidence. It is intended for release reviews, interview walkthroughs, and
 automation that needs to understand deployment posture without exposing secrets.
+Release readiness is the final gate above those operational surfaces. It combines readiness
+checks, deployment capability status, open incidents, quality pass rates, budget pass rates, and
+operator security into a `pass`, `warn`, or `fail` report with a machine-readable `can_release`
+decision for CI, runbooks, or manual launch reviews.
 Rollback uses that receipt to restore backed-up files or delete files created by the publish, then
 records `publish-rollback.json` and a `rollback_publish` audit event.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,

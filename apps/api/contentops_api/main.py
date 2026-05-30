@@ -7,7 +7,11 @@ from typing import Annotated
 from urllib.parse import urlencode
 from uuid import uuid4
 
-from contentops_core.diagnostics import deployment_manifest, system_status
+from contentops_core.diagnostics import (
+    deployment_manifest,
+    release_readiness,
+    system_status,
+)
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionListResponse,
@@ -31,6 +35,7 @@ from contentops_core.models import (
     PublishReceipt,
     PublishRollbackResult,
     PublishVerificationReport,
+    ReleaseReadinessReport,
     ReviewBatchRequest,
     ReviewBatchResult,
     RunComparison,
@@ -160,6 +165,18 @@ def ready(response: Response) -> SystemStatus:
 )
 def get_deployment_manifest() -> DeploymentManifest:
     return deployment_manifest(settings, repository)
+
+
+@app.get(
+    "/release-readiness",
+    response_model=ReleaseReadinessReport,
+    dependencies=[Depends(require_read_access)],
+)
+def get_release_readiness(
+    window_size: int = Query(default=100, ge=1, le=500),
+) -> ReleaseReadinessReport:
+    operations = review_service.operations_summary(window_size=window_size)
+    return release_readiness(settings, repository, operations)
 
 
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(require_read_access)])
@@ -1457,7 +1474,8 @@ def _operations_summary_html(summary: OperationsSummary) -> str:
     return f"""
       <p>
         <a href="/ops-summary">Operations summary JSON</a> |
-        <a href="/deployment-manifest">Deployment manifest JSON</a>
+        <a href="/deployment-manifest">Deployment manifest JSON</a> |
+        <a href="/release-readiness">Release readiness JSON</a>
       </p>
       <div class="metrics">
         <div><strong>{summary.total_runs}</strong><span>Total runs</span></div>

@@ -6,6 +6,9 @@ from contentops_core.models import (
     ComponentCheck,
     DeploymentCapability,
     DeploymentManifest,
+    OperationsSummary,
+    ReleaseGateCheck,
+    ReleaseReadinessReport,
     SystemStatus,
 )
 from contentops_core.repository import RunRepository
@@ -39,6 +42,30 @@ def deployment_manifest(
         operations=_operations_fields(settings),
         capabilities=_capabilities(settings, status),
         checks=status.checks,
+    )
+
+
+def release_readiness(
+    settings: Settings,
+    repository: RunRepository,
+    operations: OperationsSummary,
+) -> ReleaseReadinessReport:
+    deployment = deployment_manifest(settings, repository)
+    checks = [
+        _readiness_gate(deployment),
+        _deployment_capability_gate(deployment),
+        _incident_gate(operations),
+        _quality_gate(operations),
+        _budget_gate(operations),
+        _security_gate(deployment),
+    ]
+    status = _release_status(checks)
+    return ReleaseReadinessReport(
+        status=status,
+        can_release=status != "fail",
+        checks=checks,
+        operations=operations,
+        deployment=deployment,
     )
 
 
@@ -312,3 +339,151 @@ def _database_engine(database_url: str) -> str:
     if database_url.startswith("postgresql"):
         return "postgresql"
     return database_url.split(":", 1)[0] or "unknown"
+
+
+def _readiness_gate(deployment: DeploymentManifest) -> ReleaseGateCheck:
+    if deployment.status == "fail":
+        return ReleaseGateCheck(
+            name="system_readiness",
+            status="fail",
+            message="Readiness checks are failing.",
+            evidence={"status": deployment.status},
+        )
+    if deployment.status == "degraded":
+        return ReleaseGateCheck(
+            name="system_readiness",
+            status="warn",
+            message="Readiness checks are degraded but not failing.",
+            evidence={"status": deployment.status},
+        )
+    return ReleaseGateCheck(
+        name="system_readiness",
+        status="pass",
+        message="Readiness checks are passing.",
+        evidence={"status": deployment.status},
+    )
+
+
+def _deployment_capability_gate(deployment: DeploymentManifest) -> ReleaseGateCheck:
+    failed = [item.name for item in deployment.capabilities if item.status == "fail"]
+    degraded = [item.name for item in deployment.capabilities if item.status == "degraded"]
+    if failed:
+        return ReleaseGateCheck(
+            name="deployment_capabilities",
+            status="fail",
+            message="One or more deployment capabilities are failing.",
+            evidence={"failed": failed, "degraded": degraded},
+        )
+    if degraded:
+        return ReleaseGateCheck(
+            name="deployment_capabilities",
+            status="warn",
+            message="One or more deployment capabilities are degraded.",
+            evidence={"degraded": degraded},
+        )
+    return ReleaseGateCheck(
+        name="deployment_capabilities",
+        status="pass",
+        message="Deployment capabilities are ready.",
+    )
+
+
+def _incident_gate(operations: OperationsSummary) -> ReleaseGateCheck:
+    if operations.critical_incidents > 0 or operations.action_required_incidents > 0:
+        return ReleaseGateCheck(
+            name="incident_posture",
+            status="fail",
+            message="Open incidents require action before release.",
+            evidence={
+                "critical_incidents": operations.critical_incidents,
+                "action_required_incidents": operations.action_required_incidents,
+            },
+        )
+    if operations.failed_count > 0 or operations.warning_incidents > 0:
+        return ReleaseGateCheck(
+            name="incident_posture",
+            status="warn",
+            message="Recent failed runs or warning incidents should be reviewed.",
+            evidence={
+                "failed_count": operations.failed_count,
+                "warning_incidents": operations.warning_incidents,
+            },
+        )
+    return ReleaseGateCheck(
+        name="incident_posture",
+        status="pass",
+        message="No release-blocking incidents are open.",
+    )
+
+
+def _quality_gate(operations: OperationsSummary) -> ReleaseGateCheck:
+    if operations.total_runs == 0:
+        return ReleaseGateCheck(
+            name="quality_posture",
+            status="warn",
+            message="No runs exist yet, so quality posture is unproven.",
+        )
+    if operations.quality_pass_rate < 1:
+        return ReleaseGateCheck(
+            name="quality_posture",
+            status="warn",
+            message="Some recent runs did not pass quality gates.",
+            evidence={"quality_pass_rate": operations.quality_pass_rate},
+        )
+    return ReleaseGateCheck(
+        name="quality_posture",
+        status="pass",
+        message="Recent runs pass quality gates.",
+        evidence={"quality_pass_rate": operations.quality_pass_rate},
+    )
+
+
+def _budget_gate(operations: OperationsSummary) -> ReleaseGateCheck:
+    if operations.total_runs == 0:
+        return ReleaseGateCheck(
+            name="budget_posture",
+            status="warn",
+            message="No runs exist yet, so budget posture is unproven.",
+        )
+    if operations.budget_pass_rate < 1:
+        return ReleaseGateCheck(
+            name="budget_posture",
+            status="warn",
+            message="Some recent runs exceeded the token budget.",
+            evidence={"budget_pass_rate": operations.budget_pass_rate},
+        )
+    return ReleaseGateCheck(
+        name="budget_posture",
+        status="pass",
+        message="Recent runs pass budget gates.",
+        evidence={"budget_pass_rate": operations.budget_pass_rate},
+    )
+
+
+def _security_gate(deployment: DeploymentManifest) -> ReleaseGateCheck:
+    protected = bool(deployment.security.get("read_routes_protected"))
+    operator_configured = bool(
+        deployment.security.get("operator_credentials_configured")
+    )
+    if not operator_configured:
+        return ReleaseGateCheck(
+            name="operator_security",
+            status="warn",
+            message="Operator credentials are not configured.",
+            evidence={"read_routes_protected": protected},
+        )
+    return ReleaseGateCheck(
+        name="operator_security",
+        status="pass",
+        message="Operator credentials are configured.",
+        evidence={"read_routes_protected": protected},
+    )
+
+
+def _release_status(checks: list[ReleaseGateCheck]) -> str:
+    statuses = {check.status for check in checks}
+    if "fail" in statuses:
+        return "fail"
+    if "warn" in statuses:
+        return "warn"
+    return "pass"

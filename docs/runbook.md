@@ -11,6 +11,7 @@ Run these checks before a scheduled worker or manual publish window:
 contentops doctor --json
 contentops ops-summary --json
 contentops deployment-manifest
+contentops release-readiness --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 ```
 
@@ -19,6 +20,7 @@ Expected result:
 - `doctor` is `ok` or `degraded` with only intentional local-development warnings.
 - `ops-summary` shows no unexpected failed runs or action-required incidents.
 - `deployment-manifest` contains no secret values and shows expected runtime providers.
+- `release-readiness` is `pass` or expected `warn`; it must not be `fail`.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 
@@ -106,6 +108,7 @@ contentops content --json
 contentops scorecards --json
 contentops cost-reports --json
 contentops ops-summary --json
+contentops release-readiness --json
 ```
 
 The same catalog is available from:
@@ -117,6 +120,7 @@ GET /cost-reports?limit=20&offset=0
 GET /incident-reports?limit=20&offset=0
 GET /ops-summary?window_size=100
 GET /deployment-manifest
+GET /release-readiness?window_size=100
 ```
 
 Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,
@@ -160,8 +164,9 @@ When a scheduled job fails:
 5. Run `contentops doctor --json`.
 6. Export the affected run with `contentops export-run <run_id> --output incident.zip`.
 7. Run `contentops verify-publish <run_id>` for published runs to detect target drift.
-8. Fix provider credentials, source URLs, publish target state, webhook state, or approval status.
-9. Rerun from the prior request:
+8. Run `contentops release-readiness --json` to confirm whether the issue blocks release.
+9. Fix provider credentials, source URLs, publish target state, webhook state, or approval status.
+10. Rerun from the prior request:
 
 ```powershell
 contentops rerun <run_id>

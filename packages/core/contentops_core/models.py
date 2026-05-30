@@ -408,6 +408,22 @@ class DeploymentManifest(BaseModel):
     checks: list[ComponentCheck] = Field(default_factory=list)
 
 
+class ReleaseGateCheck(BaseModel):
+    name: str
+    status: str
+    message: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReleaseReadinessReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    can_release: bool
+    checks: list[ReleaseGateCheck]
+    operations: OperationsSummary
+    deployment: DeploymentManifest
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

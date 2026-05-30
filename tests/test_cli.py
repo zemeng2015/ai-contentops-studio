@@ -49,6 +49,7 @@ def test_cli_doctor_reports_system_status(
 
     result = runner.invoke(app, ["doctor", "--json"])
     manifest_result = runner.invoke(app, ["deployment-manifest"])
+    release_result = runner.invoke(app, ["release-readiness", "--json"])
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
@@ -64,6 +65,10 @@ def test_cli_doctor_reports_system_status(
     assert manifest_payload["status"] in {"ok", "degraded"}
     assert manifest_payload["runtime"]["database_engine"] == "sqlite"
     assert "openai_api_key" not in manifest_result.output
+    assert release_result.exit_code == 0
+    release_payload = json.loads(release_result.output)
+    assert release_payload["status"] in {"pass", "warn"}
+    assert release_payload["can_release"] is True
 
 
 def test_cli_approve_then_publish(
@@ -143,6 +148,7 @@ def test_cli_queue_and_manifest_commands(
         ["incident-reports", "--query", "searchable", "--json"],
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
+    release_readiness_result = runner.invoke(app, ["release-readiness", "--json"])
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
@@ -181,6 +187,9 @@ def test_cli_queue_and_manifest_commands(
     ops_summary_payload = json.loads(ops_summary_result.output)
     assert ops_summary_payload["total_runs"] == 1
     assert ops_summary_payload["review_queue_depth"] == 1
+    assert release_readiness_result.exit_code == 0
+    release_readiness_payload = json.loads(release_readiness_result.output)
+    assert release_readiness_payload["operations"]["total_runs"] == 1
     assert generation_receipt_result.exit_code == 0
     generation_receipt_payload = json.loads(generation_receipt_result.output)
     assert generation_receipt_payload["provider"] == "template"
