@@ -116,6 +116,12 @@ GET  /runs/{run_id}/artifacts/{artifact_name}
 POST /runs/{run_id}/publish
 ```
 
+API 同时提供一个轻量 dashboard：
+
+```text
+GET /dashboard
+```
+
 ## Provider 配置
 
 默认配置不需要任何外部密钥：

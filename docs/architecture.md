@@ -52,6 +52,9 @@ later:
 This separates generation from publication and creates a natural seam for a dashboard or approval
 queue.
 
+The FastAPI app includes a lightweight server-rendered dashboard at `/dashboard` so the project has
+a usable review surface before a larger React dashboard is introduced.
+
 ## Production path
 
 Local defaults:

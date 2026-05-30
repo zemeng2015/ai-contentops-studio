@@ -15,6 +15,7 @@ dependencies = [
   "jinja2>=3.1.0",
   "pydantic>=2.8.0",
   "pydantic-settings>=2.4.0",
+  "python-multipart>=0.0.20",
   "python-slugify>=8.0.4",
   "pyyaml>=6.0.2",
   "sqlalchemy>=2.0.0",

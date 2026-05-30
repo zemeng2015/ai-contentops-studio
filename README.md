@@ -119,6 +119,12 @@ GET  /runs/{run_id}/artifacts/{artifact_name}
 POST /runs/{run_id}/publish
 ```
 
+The API also serves a lightweight dashboard at:
+
+```text
+GET /dashboard
+```
+
 ## Provider configuration
 
 The default stack runs without external credentials:

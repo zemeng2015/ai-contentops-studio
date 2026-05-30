@@ -28,3 +28,13 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert artifact_response.status_code == 200
     assert publish_response.status_code == 200
     assert publish_response.json()["status"] == "published"
+
+
+def test_dashboard_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert "AI ContentOps Studio" in response.text
+    assert "Create run" in response.text
