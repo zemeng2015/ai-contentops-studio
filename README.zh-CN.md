@@ -18,6 +18,7 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - approve、reject、publish 等操作会追加写入 audit log
 - 全局 audit event 查询可跨 run 检索 approve、reject、publish 和 rollback 动作
 - source audit reports，包含来源评分、风险原因和 reviewer 建议
+- artifact retention reports 用于统计 artifact 占用并规划归档/清理
 - publish receipts record file hashes, backup artifacts, and rollback hints
 - publish receipt 会审计 provider、URL、approval 和变更文件
 - incident reports 汇总失败、质量退化、预算超限、发布漂移和通知失败的运行信号
@@ -146,6 +147,7 @@ contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
 contentops audit-log <run_id>
 contentops audit-events --action publish --json
+contentops retention-report --days 90 --json
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
@@ -181,6 +183,7 @@ GET  /audit-events?action=publish&limit=20&offset=0
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
+GET  /retention-report?days=90&limit=100
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0

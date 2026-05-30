@@ -22,6 +22,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - global audit event queries across approve, reject, publish, and rollback actions
 - notification delivery logs for review and publishing events, with optional webhook delivery
 - source audit reports with scoring, risk reasons, and reviewer recommendations
+- artifact retention reports for storage hygiene and archive planning
 - generation receipts that audit model provider, retry attempts, fallback, and usage tokens
 - publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
 - publish verification reports that prove target files still match their receipt hashes
@@ -167,6 +168,7 @@ contentops audit-events --action publish --json
 contentops notifications <run_id>
 contentops job-executions --json
 contentops job-execution <execution_id>
+contentops retention-report --days 90 --json
 contentops content --json
 contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
@@ -203,6 +205,7 @@ GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
+GET  /retention-report?days=90&limit=100
 GET  /content?limit=20&offset=0
 GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
@@ -271,6 +274,8 @@ The global audit event view scans recent run audit logs and exposes filterable a
 publish, and rollback history for release review.
 They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
 the same events are delivered to an external webhook without blocking the review workflow.
+Artifact retention reports estimate artifact count and bytes per recent run and identify runs older
+than the configured retention window for archive or cleanup planning.
 
 ## Scheduled worker jobs
 

@@ -154,6 +154,7 @@ def test_cli_queue_and_manifest_commands(
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
     release_readiness_result = runner.invoke(app, ["release-readiness", "--json"])
+    retention_result = runner.invoke(app, ["retention-report", "--days", "3650", "--json"])
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
@@ -195,6 +196,10 @@ def test_cli_queue_and_manifest_commands(
     assert release_readiness_result.exit_code == 0
     release_readiness_payload = json.loads(release_readiness_result.output)
     assert release_readiness_payload["operations"]["total_runs"] == 1
+    assert retention_result.exit_code == 0
+    retention_payload = json.loads(retention_result.output)
+    assert retention_payload["total_runs_scanned"] == 1
+    assert retention_payload["total_size_bytes"] > 0
     assert generation_receipt_result.exit_code == 0
     generation_receipt_payload = json.loads(generation_receipt_result.output)
     assert generation_receipt_payload["provider"] == "template"

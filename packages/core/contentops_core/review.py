@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from typing import TypeVar
@@ -37,6 +37,8 @@ from contentops_core.models import (
     PublishVerificationItem,
     PublishVerificationReport,
     ResearchPacket,
+    RetentionCandidate,
+    RetentionReport,
     ReviewActionResult,
     ReviewBatchResult,
     RunComparison,
@@ -547,6 +549,43 @@ class ReviewService:
             estimated_total_tokens=sum(
                 item.estimated_total_tokens for item in cost_reports
             ),
+        )
+
+    def retention_report(
+        self,
+        retention_days: int = 90,
+        limit: int = 100,
+    ) -> RetentionReport:
+        retention_days = max(0, retention_days)
+        limit = max(1, limit)
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+        runs = self.repository.list(limit=limit)
+        candidates: list[RetentionCandidate] = []
+        total_size = 0
+        for run in runs:
+            artifact_count, size_bytes = _artifact_dir_stats(run.artifact_dir)
+            total_size += size_bytes
+            updated_at = _ensure_utc(run.updated_at)
+            if updated_at <= cutoff:
+                candidates.append(
+                    RetentionCandidate(
+                        run_id=run.id,
+                        status=run.status,
+                        topic=run.topic,
+                        updated_at=updated_at,
+                        artifact_dir=str(run.artifact_dir),
+                        artifact_count=artifact_count,
+                        size_bytes=size_bytes,
+                        reason=f"Run has not changed for at least {retention_days} day(s).",
+                    )
+                )
+        return RetentionReport(
+            retention_days=retention_days,
+            total_runs_scanned=len(runs),
+            total_size_bytes=total_size,
+            candidate_count=len(candidates),
+            candidate_size_bytes=sum(item.size_bytes for item in candidates),
+            candidates=candidates,
         )
 
     def compare(self, base_run_id: str, candidate_run_id: str) -> RunComparison:
@@ -1155,6 +1194,25 @@ def _pass_rate(values: Iterable[bool]) -> float:
     if not items:
         return 0.0
     return round(sum(1 for item in items if item) / len(items), 3)
+
+
+def _artifact_dir_stats(path: Path) -> tuple[int, int]:
+    if not path.exists():
+        return 0, 0
+    files = [item for item in path.rglob("*") if item.is_file()]
+    size_bytes = 0
+    for item in files:
+        try:
+            size_bytes += item.stat().st_size
+        except OSError:
+            continue
+    return len(files), size_bytes
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _max_severity(severities: Iterable[IncidentSeverity]) -> IncidentSeverity:

@@ -123,6 +123,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     incident_report = review_service.incident_report(result.run.id)
     incident_reports = review_service.incident_reports(limit=5)
     operations_summary = review_service.operations_summary()
+    retention_report = review_service.retention_report(retention_days=3650)
     audit_events = review_service.audit_log(result.run.id)
     global_audit_events = review_service.audit_events(action="publish")
     notifications = review_service.notification_log(result.run.id)
@@ -184,6 +185,9 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert operations_summary.action_required_incidents == 0
     assert operations_summary.quality_pass_rate == 1
     assert operations_summary.budget_pass_rate == 1
+    assert retention_report.total_runs_scanned == 1
+    assert retention_report.total_size_bytes > 0
+    assert retention_report.candidate_count == 0
     assert [event.action for event in audit_events] == ["approve", "publish"]
     assert global_audit_events.total == 1
     assert global_audit_events.items[0].run_id == result.run.id

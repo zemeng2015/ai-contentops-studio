@@ -37,6 +37,7 @@ from contentops_core.models import (
     PublishRollbackResult,
     PublishVerificationReport,
     ReleaseReadinessReport,
+    RetentionReport,
     ReviewBatchRequest,
     ReviewBatchResult,
     RunComparison,
@@ -201,6 +202,7 @@ def dashboard(
     cost_reports = review_service.cost_reports(limit=5)
     incident_reports = review_service.incident_reports(limit=5)
     audit_events = review_service.audit_events(limit=5)
+    retention_report = review_service.retention_report()
     operations_summary = review_service.operations_summary()
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
@@ -282,6 +284,11 @@ def dashboard(
               <h2>Operations Summary</h2>
               <p>Portfolio-wide run health, queue depth, incident severity, and cost posture.</p>
               {_operations_summary_html(operations_summary)}
+            </section>
+            <section class="hero compact">
+              <h2>Artifact Retention</h2>
+              <p>Storage hygiene report for old run artifacts that can be archived or pruned.</p>
+              {_retention_report_html(retention_report)}
             </section>
             <section class="hero compact">
               <h2>Audit Events</h2>
@@ -795,6 +802,18 @@ def list_audit_events(
         query=q,
         action=action,
     )
+
+
+@app.get(
+    "/retention-report",
+    response_model=RetentionReport,
+    dependencies=[Depends(require_read_access)],
+)
+def get_retention_report(
+    days: int = Query(default=90, ge=0, le=3650),
+    limit: int = Query(default=100, ge=1, le=1000),
+) -> RetentionReport:
+    return review_service.retention_report(retention_days=days, limit=limit)
 
 
 @app.get(
@@ -1553,6 +1572,43 @@ def _audit_events_html(events: AuditEventListResponse) -> str:
           <tr>
             <th>Run</th><th>Action</th><th>Actor</th><th>Previous</th><th>New</th><th>Time</th>
           </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _retention_report_html(report: RetentionReport) -> str:
+    if not report.candidates:
+        return f"""
+          <p>
+            <a href="/retention-report">Retention report JSON</a> |
+            Scanned <strong>{report.total_runs_scanned}</strong> runs |
+            Total size: <strong>{report.total_size_bytes}</strong> bytes |
+            No candidates older than <strong>{report.retention_days}</strong> day(s).
+          </p>
+        """
+    rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td>{escape(item.status.value)}</td>
+          <td>{item.artifact_count}</td>
+          <td>{item.size_bytes}</td>
+          <td>{escape(item.updated_at.isoformat())}</td>
+        </tr>
+        """
+        for item in report.candidates[:10]
+    )
+    return f"""
+      <p>
+        <a href="/retention-report">Retention report JSON</a> |
+        Candidates: <strong>{report.candidate_count}</strong> |
+        Candidate size: <strong>{report.candidate_size_bytes}</strong> bytes
+      </p>
+      <table>
+        <thead>
+          <tr><th>Run</th><th>Status</th><th>Artifacts</th><th>Bytes</th><th>Updated</th></tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>

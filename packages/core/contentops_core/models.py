@@ -388,6 +388,27 @@ class OperationsSummary(BaseModel):
     estimated_total_tokens: int = Field(ge=0)
 
 
+class RetentionCandidate(BaseModel):
+    run_id: str
+    status: RunStatus
+    topic: str
+    updated_at: datetime
+    artifact_dir: str
+    artifact_count: int = Field(ge=0)
+    size_bytes: int = Field(ge=0)
+    reason: str
+
+
+class RetentionReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    retention_days: int = Field(ge=0)
+    total_runs_scanned: int = Field(ge=0)
+    total_size_bytes: int = Field(ge=0)
+    candidate_count: int = Field(ge=0)
+    candidate_size_bytes: int = Field(ge=0)
+    candidates: list[RetentionCandidate] = Field(default_factory=list)
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str

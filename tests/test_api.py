@@ -194,6 +194,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     incident_reports_response = client.get("/incident-reports?limit=5")
     ops_summary_response = client.get("/ops-summary")
     release_readiness_response = client.get("/release-readiness")
+    retention_response = client.get("/retention-report?days=3650")
     generation_receipt_response = client.get(f"/runs/{run['id']}/generation-receipt")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
@@ -240,6 +241,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "needs_review" in ops_summary_response.json()["status_counts"]
     assert release_readiness_response.status_code == 200
     assert release_readiness_response.json()["operations"]["total_runs"] >= 1
+    assert retention_response.status_code == 200
+    assert retention_response.json()["total_runs_scanned"] >= 1
+    assert retention_response.json()["total_size_bytes"] > 0
     assert generation_receipt_response.status_code == 200
     assert generation_receipt_response.json()["provider"] == "template"
     assert generation_receipt_response.json()["total_tokens"] > 0
@@ -395,6 +399,7 @@ def test_dashboard_renders() -> None:
     assert "Incident Reports" in response.text
     assert "Operations Summary" in response.text
     assert "Audit Events" in response.text
+    assert "Artifact Retention" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

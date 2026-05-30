@@ -124,6 +124,9 @@ The same review and publishing actions produce `notification-log.json` delivery 
 default the local provider records skipped deliveries for auditability; when
 `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, events are posted to an external webhook and
 success or failure is recorded without blocking the operator workflow.
+Artifact retention reports scan recent run artifact directories, estimate file counts and storage
+bytes, and identify runs older than a configured retention window. The report is intentionally
+read-only so archive and cleanup decisions can be reviewed before any destructive operation.
 Published runs are projected into a content catalog exposed through `/content`, `contentops content`,
 and the dashboard. The catalog combines run metadata, publish receipts, URLs, providers, publish
 timestamps, and evaluation scores so the platform can be reviewed as a content inventory instead

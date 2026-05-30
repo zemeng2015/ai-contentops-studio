@@ -405,6 +405,34 @@ def audit_events(
         )
 
 
+@app.command("retention-report")
+def retention_report(
+    days: Annotated[
+        int,
+        typer.Option(help="Artifact retention window in days."),
+    ] = 90,
+    limit: Annotated[int, typer.Option(help="Number of recent runs to scan.")] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    report = service.retention_report(retention_days=days, limit=limit)
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    typer.echo(f"Scanned runs: {report.total_runs_scanned}")
+    typer.echo(f"Total artifact bytes: {report.total_size_bytes}")
+    typer.echo(f"Candidates: {report.candidate_count}")
+    typer.echo(f"Candidate bytes: {report.candidate_size_bytes}")
+    for item in report.candidates:
+        typer.echo(
+            f"{item.run_id}  {item.status.value:13}  "
+            f"{item.artifact_count:3} files  {item.size_bytes:8} bytes  {item.topic}"
+        )
+
+
 @app.command("incident-report")
 def incident_report(run_id: str) -> None:
     service = build_review_service(Settings())
