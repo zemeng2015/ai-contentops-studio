@@ -43,6 +43,7 @@ class ContentOpsPipeline:
         record = RunRecord.create(request, self.artifact_store.root)
         trace = RunTrace()
         self.artifact_store.prepare(record)
+        self.artifact_store.write_json(record, "request.json", request)
         self.repository.save(record)
         try:
             record.touch(RunStatus.RESEARCHING)

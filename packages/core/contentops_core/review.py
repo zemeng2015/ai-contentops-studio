@@ -14,6 +14,7 @@ from contentops_core.models import (
     PublishPlan,
     RunMetrics,
     RunRecord,
+    RunRequest,
     RunStatus,
 )
 from contentops_core.repository import RunRepository
@@ -60,6 +61,9 @@ class ReviewService:
 
     def metrics(self, run_id: str) -> RunMetrics:
         return self.metrics_service.run_metrics(self._get_run(run_id))
+
+    def request(self, run_id: str) -> RunRequest:
+        return self._load_json(self._get_run(run_id), "request.json", RunRequest)
 
     def _get_run(self, run_id: str) -> RunRecord:
         run = self.repository.get(run_id)

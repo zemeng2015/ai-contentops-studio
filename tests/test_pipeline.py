@@ -21,6 +21,7 @@ def test_pipeline_creates_reviewable_artifacts(tmp_path: Path) -> None:
     result = pipeline.run(RunRequest(topic="LLM observability for enterprise RAG"))
 
     assert result.run.status == RunStatus.NEEDS_REVIEW
+    assert (result.run.artifact_dir / "request.json").exists()
     assert (result.run.artifact_dir / "research.json").exists()
     assert (result.run.artifact_dir / "outline.md").exists()
     assert (result.run.artifact_dir / "draft.md").exists()
@@ -78,6 +79,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     artifacts = review_service.list_artifacts(result.run.id)
     plan = review_service.publish_plan(result.run.id)
     metrics = review_service.metrics(result.run.id)
+    original_request = review_service.request(result.run.id)
     published = review_service.publish(result.run.id)
 
     assert "draft.json" in artifacts
@@ -87,6 +89,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert metrics.run_id == result.run.id
     assert metrics.total_duration_ms is not None
     assert metrics.publish_ready is True
+    assert original_request.topic == "Reviewable AI article"
     assert {step.step for step in metrics.step_metrics} >= {"research", "planning", "drafting"}
     assert published.status == RunStatus.PUBLISHED
     assert published.published_url is not None

@@ -144,6 +144,9 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
               <h3>Publish Plan</h3>
               {plan_html}
               {publish_action}
+              <form method="post" action="/dashboard/runs/{escape(run_id)}/rerun">
+                <button type="submit">Rerun with same request</button>
+              </form>
             </section>
             <section class="grid">
               <div>
@@ -187,6 +190,13 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
 def dashboard_publish_run(run_id: str) -> RedirectResponse:
     review_service.publish(run_id)
     return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
+
+
+@app.post("/dashboard/runs/{run_id}/rerun")
+def dashboard_rerun(run_id: str) -> RedirectResponse:
+    request = review_service.request(run_id)
+    result = pipeline.run(request)
+    return RedirectResponse(f"/dashboard/runs/{result.run.id}", status_code=303)
 
 
 @app.post("/runs", response_model=RunRecord)
@@ -236,6 +246,17 @@ def publish_run(run_id: str, force: bool = False) -> RunRecord:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/runs/{run_id}/rerun", response_model=RunRecord)
+def rerun(run_id: str, publish: bool | None = None) -> RunRecord:
+    try:
+        request = review_service.request(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if publish is not None:
+        request.publish = publish
+    return pipeline.run(request).run
 
 
 @app.get("/runs/{run_id}/publish-plan")

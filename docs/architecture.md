@@ -60,6 +60,9 @@ The dashboard and API expose run metrics derived from `trace.json`: total durati
 durations, source count, and publish readiness. This keeps observability tied to persisted run
 artifacts rather than transient process logs.
 
+Each run now persists `request.json`, which enables reproducible reruns through the CLI, API, and
+dashboard without relying on operator memory or external logs.
+
 ## Production path
 
 Local defaults:

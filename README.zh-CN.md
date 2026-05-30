@@ -110,6 +110,7 @@ contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>
 contentops metrics <run_id>
+contentops rerun <run_id>
 contentops publish <run_id>
 ```
 
@@ -120,6 +121,7 @@ GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
+POST /runs/{run_id}/rerun
 POST /runs/{run_id}/publish
 ```
 

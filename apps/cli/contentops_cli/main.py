@@ -99,6 +99,25 @@ def metrics(run_id: str) -> None:
 
 
 @app.command()
+def rerun(
+    run_id: str,
+    publish: Annotated[
+        bool | None,
+        typer.Option(help="Override publish flag for the new run."),
+    ] = None,
+) -> None:
+    settings = Settings()
+    service = build_review_service(settings)
+    request = service.request(run_id)
+    if publish is not None:
+        request.publish = publish
+    result = build_pipeline(settings).run(request)
+    typer.echo(f"Run: {result.run.id}")
+    typer.echo(f"Status: {result.run.status.value}")
+    typer.echo(f"Artifacts: {result.run.artifact_dir}")
+
+
+@app.command()
 def init_config(
     path: Annotated[Path, typer.Option(help="Config file to create.")] = Path(".env"),
 ) -> None:
