@@ -15,6 +15,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - API, CLI, worker, and publisher boundaries
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
 - run comparison for repeatable quality and source regression review
+- YAML-defined worker jobs for scheduled content calendars
 - AWS-ready artifact storage and Terraform deployment skeleton
 - local-first development with AWS-ready deployment primitives
 
@@ -101,6 +102,7 @@ tests/                     Unit and integration tests
 - FastAPI `POST /runs` and `GET /runs`
 - FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
 - FastAPI metrics, rerun, publish-plan, and run-comparison endpoints
+- Worker entrypoint for single-job or batch YAML content calendars
 - CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
   `contentops publish`, plus review commands for metrics, rerun, publish-plan, and compare
 - pytest coverage for pipeline behavior
@@ -145,6 +147,26 @@ Run details include a timeline derived from `trace.json`, including step duratio
 The dashboard create form accepts optional source URLs, one per line.
 The dashboard list supports status/topic filters, and run detail pages can compare two runs to
 spot evaluation deltas, source-count changes, and source overlap before publishing.
+
+## Scheduled worker jobs
+
+The worker can validate or execute YAML-defined content calendars:
+
+```powershell
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+```
+
+Job files support a legacy single-job shape or a production-style batch:
+
+```yaml
+name: daily-ai-roundup
+jobs:
+  - name: production-llm-systems
+    topic: "AI engineering signals for production LLM systems"
+    publish: true
+    source_urls: []
+```
 
 ## Provider configuration
 

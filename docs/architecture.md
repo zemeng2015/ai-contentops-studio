@@ -63,6 +63,32 @@ artifacts rather than transient process logs.
 Each run now persists `request.json`, which enables reproducible reruns through the CLI, API, and
 dashboard without relying on operator memory or external logs.
 
+Run comparison is part of the review layer. It compares duration, source counts, source overlap,
+publish readiness, and evaluation score deltas between a base run and a candidate run. This makes
+regeneration and prompt/provider changes reviewable instead of subjective.
+
+## Worker jobs
+
+The worker accepts YAML job files in either a single-job shape or a batch `jobs:` shape. Batch job
+files are the production path for content calendars, scheduled digests, and daily AI research
+roundups.
+
+```yaml
+name: daily-ai-roundup
+jobs:
+  - name: production-llm-systems
+    topic: "AI engineering signals for production LLM systems"
+    publish: true
+    source_urls: []
+```
+
+The worker supports dry-run validation for deployment checks and JSON output for automation logs:
+
+```powershell
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+```
+
 ## Production path
 
 Local defaults:

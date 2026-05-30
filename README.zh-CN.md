@@ -13,6 +13,7 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 - 可观测的运行历史、trace 和 artifacts
 - API、CLI、worker、publisher 清晰分层
 - Review dashboard：可检查 artifact、source、evaluation、publish plan 和 run comparison
+- YAML 定义的 worker jobs：可用于每日/每周内容选题计划
 - AWS-ready artifact storage 和 Terraform deployment skeleton
 - 本地优先开发，同时预留 AWS 生产化部署边界
 
@@ -97,6 +98,7 @@ tests/                     单元测试和集成测试
 - Static site publisher
 - FastAPI `POST /runs` 和 `GET /runs`
 - FastAPI artifact、metrics、rerun、publish-plan、publish、compare endpoints
+- Worker 支持单任务或批量 YAML content calendar
 - CLI `contentops run`、`contentops runs`、`contentops show`、`contentops artifacts`、`contentops publish`、`contentops metrics`、`contentops rerun`、`contentops publish-plan`、`contentops compare`
 - Review dashboard 支持运行列表筛选、详情页审查、发布预览、运行时间线和 run comparison
 - 覆盖核心 pipeline 行为的 pytest 测试
@@ -135,6 +137,26 @@ GET /dashboard
 ```
 
 Dashboard 支持按 topic、run id 和 status 筛选运行记录。Run detail 页面包含 Source Review、Publish Plan、Run Timeline，以及对比两个 run 的入口。Run comparison 会展示 evaluation delta、source count delta、shared sources 和只存在于某个 run 的 sources，用于判断重新生成是否真的变好。
+
+## Scheduled worker jobs
+
+Worker 可以校验或执行 YAML 定义的内容选题计划：
+
+```powershell
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+```
+
+Job file 兼容旧的单任务格式，也支持更接近生产环境的批量任务：
+
+```yaml
+name: daily-ai-roundup
+jobs:
+  - name: production-llm-systems
+    topic: "AI engineering signals for production LLM systems"
+    publish: true
+    source_urls: []
+```
 
 ## Provider 配置
 

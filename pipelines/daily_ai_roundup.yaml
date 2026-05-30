@@ -1,5 +1,16 @@
 name: daily-ai-roundup
-topic: "AI engineering signals for production LLM systems"
-publish: true
-source_urls: []
-
+jobs:
+  - name: production-llm-systems
+    topic: "AI engineering signals for production LLM systems"
+    publish: true
+    source_urls: []
+    tags:
+      - ai-engineering
+      - portfolio
+  - name: agent-platform-watch
+    topic: "Agent workflow reliability patterns for applied AI teams"
+    publish: false
+    source_urls: []
+    tags:
+      - agents
+      - evaluation
