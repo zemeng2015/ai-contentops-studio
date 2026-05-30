@@ -291,6 +291,8 @@ CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2
 CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
 CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 # CONTENTOPS_OPERATOR_API_KEY=
+# CONTENTOPS_READ_API_KEY=
+CONTENTOPS_REQUIRE_READ_API_KEY=false
 CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5
 # CONTENTOPS_NOTIFICATION_WEBHOOK_URL=
 CONTENTOPS_LATENCY_SLO_MS=120000
@@ -338,11 +340,13 @@ Protect write operations in shared environments:
 CONTENTOPS_OPERATOR_API_KEY=replace-with-a-long-random-secret
 ```
 
-When configured, mutating API and dashboard actions require `X-ContentOps-Api-Key` or an
-`api_key` query parameter. Read-only endpoints remain available for dashboards and integrations.
+When configured, mutating API and dashboard actions require `CONTENTOPS_OPERATOR_API_KEY` through
+`X-ContentOps-Api-Key` or an `api_key` query parameter. Read-only endpoints remain available for
+dashboards and integrations.
 Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` to protect dashboard pages, artifact downloads, source
-audits, evidence bundles, job receipts, and the published-content catalog with the same operator
-key. `/health` and `/ready` remain open for load balancers and deployment probes.
+audits, evidence bundles, job receipts, and the published-content catalog. Read routes accept
+`CONTENTOPS_READ_API_KEY` or the operator key; write routes accept only the operator key.
+`/health` and `/ready` remain open for load balancers and deployment probes.
 Every API response includes `X-ContentOps-Request-Id`; clients can provide that header to correlate
 dashboard/API errors with logs and exported evidence bundles.
 

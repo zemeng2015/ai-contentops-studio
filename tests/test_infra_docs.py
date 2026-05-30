@@ -18,6 +18,7 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "iam:PassRole" in main
     assert "CONTENTOPS_DATABASE_URL" in main
     assert "CONTENTOPS_OPERATOR_API_KEY" in main
+    assert "CONTENTOPS_READ_API_KEY" in main
     assert "CONTENTOPS_OPENAI_API_KEY" in main
     assert "CONTENTOPS_REQUIRE_READ_API_KEY" in main
     assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in main

@@ -56,13 +56,16 @@ def test_ready_endpoint_reports_invalid_provider() -> None:
 def test_ready_endpoint_reports_read_protection_without_key() -> None:
     client = TestClient(app)
     original_key = settings.operator_api_key
+    original_read_key = settings.read_api_key
     original_read_required = settings.require_read_api_key
     settings.operator_api_key = None
+    settings.read_api_key = None
     settings.require_read_api_key = True
     try:
         response = client.get("/ready")
     finally:
         settings.operator_api_key = original_key
+        settings.read_api_key = original_read_key
         settings.require_read_api_key = original_read_required
 
     assert response.status_code == 503
@@ -77,8 +80,10 @@ def test_read_routes_can_require_operator_key() -> None:
     client = TestClient(app)
     run = client.post("/runs", json={"topic": "Read route protection"}).json()
     original_key = settings.operator_api_key
+    original_read_key = settings.read_api_key
     original_read_required = settings.require_read_api_key
     settings.operator_api_key = SecretStr("read-secret")
+    settings.read_api_key = None
     settings.require_read_api_key = True
     try:
         health_response = client.get("/health")
@@ -91,6 +96,7 @@ def test_read_routes_can_require_operator_key() -> None:
         allowed_run_response = client.get(f"/runs/{run['id']}?api_key=read-secret")
     finally:
         settings.operator_api_key = original_key
+        settings.read_api_key = original_read_key
         settings.require_read_api_key = original_read_required
 
     assert health_response.status_code == 200
@@ -103,6 +109,36 @@ def test_read_routes_can_require_operator_key() -> None:
     assert allowed_runs_response.status_code == 200
     assert allowed_run_response.status_code == 200
     assert allowed_run_response.json()["id"] == run["id"]
+
+
+def test_read_routes_accept_dedicated_read_key_without_write_access() -> None:
+    client = TestClient(app)
+    original_key = settings.operator_api_key
+    original_read_key = settings.read_api_key
+    original_read_required = settings.require_read_api_key
+    settings.operator_api_key = SecretStr("write-secret")
+    settings.read_api_key = SecretStr("read-secret")
+    settings.require_read_api_key = True
+    try:
+        read_response = client.get("/runs", headers={"x-contentops-api-key": "read-secret"})
+        blocked_write_response = client.post(
+            "/runs",
+            headers={"x-contentops-api-key": "read-secret"},
+            json={"topic": "Read key cannot write"},
+        )
+        write_response = client.post(
+            "/runs",
+            headers={"x-contentops-api-key": "write-secret"},
+            json={"topic": "Write key can write"},
+        )
+    finally:
+        settings.operator_api_key = original_key
+        settings.read_api_key = original_read_key
+        settings.require_read_api_key = original_read_required
+
+    assert read_response.status_code == 200
+    assert blocked_write_response.status_code == 401
+    assert write_response.status_code == 200
 
 
 def test_api_preserves_client_request_id_on_errors() -> None:

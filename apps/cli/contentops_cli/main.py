@@ -579,6 +579,7 @@ def init_config(
                 "CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true",
                 "# CONTENTOPS_OPENAI_API_KEY=",
                 "# CONTENTOPS_OPERATOR_API_KEY=",
+                "# CONTENTOPS_READ_API_KEY=",
                 "CONTENTOPS_REQUIRE_READ_API_KEY=false",
                 "# CONTENTOPS_NOTIFICATION_WEBHOOK_URL=",
                 "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5",

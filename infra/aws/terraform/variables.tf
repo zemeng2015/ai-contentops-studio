@@ -79,8 +79,14 @@ variable "operator_api_key_secret_arn" {
   default     = ""
 }
 
+variable "read_api_key_secret_arn" {
+  description = "Secrets Manager ARN containing the optional read-only API key."
+  type        = string
+  default     = ""
+}
+
 variable "require_read_api_key" {
-  description = "Whether read routes should require the operator API key."
+  description = "Whether read routes should require a read or operator API key."
   type        = bool
   default     = false
 }

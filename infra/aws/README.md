@@ -21,6 +21,7 @@ before Terraform or CDK resources are added.
 - RDS Postgres run metadata storage
 - Secrets Manager storage for `CONTENTOPS_DATABASE_URL`
 - optional Secrets Manager injection for `CONTENTOPS_OPERATOR_API_KEY`,
+  `CONTENTOPS_READ_API_KEY`,
   `CONTENTOPS_OPENAI_API_KEY`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL`
 - ECS Fargate task definitions for API and worker
 - task execution and artifact access IAM roles
@@ -46,7 +47,9 @@ The recurring worker schedule is disabled by default. Set `worker_schedule_enabl
 image, networking, RDS metadata store, and publishing target are ready.
 Set `operator_api_key_secret_arn` to require an operator key for write actions in shared
 deployments.
-Set `require_read_api_key=true` to protect dashboard and artifact read routes with the same key.
+Set `read_api_key_secret_arn` and `require_read_api_key=true` to protect dashboard and artifact
+read routes with a read-only key. The operator key also works on read routes, but read keys cannot
+perform write actions.
 Set `notification_webhook_url_secret_arn` to deliver review and publishing events to an external
 webhook while retaining local `notification-log.json` receipts.
 Tune `latency_slo_ms` and `min_source_count` to make the dashboard and `/scorecards` API reflect

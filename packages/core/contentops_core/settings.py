@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     openai_retry_backoff_seconds: float = 0.5
     openai_fallback_on_failure: bool = True
     operator_api_key: SecretStr | None = None
+    read_api_key: SecretStr | None = None
     require_read_api_key: bool = False
     notification_webhook_url: str | None = None
     notification_timeout_seconds: float = 5.0

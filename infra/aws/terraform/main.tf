@@ -170,6 +170,7 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
         aws_secretsmanager_secret.database_url.arn,
         var.openai_api_key_secret_arn,
         var.operator_api_key_secret_arn,
+        var.read_api_key_secret_arn,
         var.notification_webhook_url_secret_arn
       ])
     }]
@@ -262,6 +263,12 @@ resource "aws_ecs_task_definition" "api" {
             valueFrom = var.operator_api_key_secret_arn
           }
         ] : [],
+        var.read_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_READ_API_KEY"
+            valueFrom = var.read_api_key_secret_arn
+          }
+        ] : [],
         var.notification_webhook_url_secret_arn != "" ? [
           {
             name      = "CONTENTOPS_NOTIFICATION_WEBHOOK_URL"
@@ -326,6 +333,12 @@ resource "aws_ecs_task_definition" "worker" {
           {
             name      = "CONTENTOPS_OPERATOR_API_KEY"
             valueFrom = var.operator_api_key_secret_arn
+          }
+        ] : [],
+        var.read_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_READ_API_KEY"
+            valueFrom = var.read_api_key_secret_arn
           }
         ] : [],
         var.notification_webhook_url_secret_arn != "" ? [

@@ -8,6 +8,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRequest, RunStatus
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
+from pydantic import SecretStr
 
 
 def test_pipeline_creates_reviewable_artifacts(tmp_path: Path) -> None:
@@ -509,3 +510,21 @@ def test_system_status_validates_token_budget_settings(tmp_path: Path) -> None:
     assert status.status == "fail"
     provider_check = next(check for check in status.checks if check.name == "provider_config")
     assert "token budget per run must be at least 1" in provider_check.fields["failures"]
+
+
+def test_system_status_accepts_dedicated_read_key_for_read_protection(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        require_read_api_key=True,
+        read_api_key=SecretStr("read-secret"),
+        operator_api_key=SecretStr("write-secret"),
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    security_check = next(check for check in status.checks if check.name == "operator_security")
+    assert security_check.status == "ok"
+    assert security_check.fields["read_routes_protected"] is True
+    assert security_check.fields["read_api_key_configured"] is True

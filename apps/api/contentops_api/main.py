@@ -120,12 +120,19 @@ async def require_operator(request: Request) -> None:
 async def require_read_access(request: Request) -> None:
     if not settings.require_read_api_key:
         return
-    if settings.operator_api_key is None:
+    allowed_keys = [
+        configured.get_secret_value()
+        for configured in (settings.read_api_key, settings.operator_api_key)
+        if configured is not None
+    ]
+    if not allowed_keys:
         raise HTTPException(
             status_code=503,
-            detail="Read access protection requires an operator API key.",
+            detail="Read access protection requires a read or operator API key.",
         )
-    await require_operator(request)
+    provided = request.headers.get("x-contentops-api-key") or request.query_params.get("api_key")
+    if provided is None or not any(secrets.compare_digest(provided, key) for key in allowed_keys):
+        raise HTTPException(status_code=401, detail="Valid read API key required.")
 
 
 @app.get("/health")

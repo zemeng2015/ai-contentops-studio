@@ -22,7 +22,8 @@ docker run --rm -p 8000:8000 ai-contentops-studio
 - Artifacts: S3 bucket partitioned by run date
 - Metadata: RDS Postgres, exposed to tasks through a Secrets Manager
   `CONTENTOPS_DATABASE_URL`
-- Secrets: AWS Secrets Manager for database URLs, model credentials, and optional operator keys
+- Secrets: AWS Secrets Manager for database URLs, model credentials, optional operator keys,
+  and optional read-only keys
 - Logs and metrics: CloudWatch
 
 The code uses provider and publisher boundaries so local filesystem/SQLite can be replaced by
@@ -57,6 +58,8 @@ CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
 CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 CONTENTOPS_OPENAI_API_KEY=
 CONTENTOPS_OPERATOR_API_KEY=
+CONTENTOPS_READ_API_KEY=
+CONTENTOPS_REQUIRE_READ_API_KEY=false
 CONTENTOPS_HOMEPAGE_REPO_PATH=
 CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
 ```
@@ -89,11 +92,12 @@ through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set
 require `X-ContentOps-Api-Key` or an `api_key` query parameter.
 Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` when dashboard pages, artifacts, source audits, job
 receipts, content inventory, or evidence bundles should not be publicly readable. Health and
-readiness probes remain unauthenticated.
+readiness probes remain unauthenticated. Read routes accept `CONTENTOPS_READ_API_KEY` or the
+operator key; mutating routes accept only the operator key.
 Set `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` to deliver approve, reject, publish, and rollback events
 to an external incident, chat, or workflow system. Delivery attempts are written to
 `notification-log.json` beside each run.
-In Terraform deployments, pass `operator_api_key_secret_arn`,
+In Terraform deployments, pass `operator_api_key_secret_arn`, `read_api_key_secret_arn`,
 `openai_api_key_secret_arn`, `notification_webhook_url_secret_arn`,
 `require_read_api_key`, and `notification_timeout_seconds` to inject the corresponding ECS task
 configuration.
