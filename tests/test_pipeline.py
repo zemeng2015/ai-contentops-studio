@@ -137,9 +137,14 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert receipt.url == published.published_url
     assert receipt.approval is not None
     assert receipt.approval.reviewer == "zack"
+    assert len(receipt.file_changes) == 3
+    assert {change.action for change in receipt.file_changes} == {"created"}
+    assert all(change.after_sha256 for change in receipt.file_changes)
+    assert all("roll back" in change.rollback_hint for change in receipt.file_changes)
     assert [event.action for event in audit_events] == ["approve", "publish"]
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED
+    assert audit_events[1].fields["changed_files"] == 3
     assert (result.run.artifact_dir / "publish-receipt.json").exists()
     assert (result.run.artifact_dir / "audit-log.json").exists()
 
@@ -166,6 +171,36 @@ def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None
     assert published.status == RunStatus.PUBLISHED
     assert receipt is not None
     assert receipt.force is False
+
+
+def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        public_base_url="https://example.com",
+        min_publish_score=0.5,
+    )
+    pipeline = build_pipeline(settings)
+    review_service = build_review_service(settings)
+
+    first = pipeline.run(RunRequest(topic="Overwrite publish metadata")).run
+    review_service.approve(first.id, reviewer="zack")
+    review_service.publish(first.id)
+    second = pipeline.run(RunRequest(topic="Overwrite publish metadata")).run
+    review_service.approve(second.id, reviewer="zack")
+    review_service.publish(second.id)
+    receipt = review_service.publish_receipt(second.id)
+
+    assert receipt is not None
+    assert {change.action for change in receipt.file_changes} <= {"updated", "unchanged"}
+    assert any(change.action == "updated" for change in receipt.file_changes)
+    assert all(change.before_sha256 for change in receipt.file_changes)
+    assert all(change.after_sha256 for change in receipt.file_changes)
+    assert all(change.backup_artifact for change in receipt.file_changes)
+    for change in receipt.file_changes:
+        assert change.backup_artifact is not None
+        assert (second.artifact_dir / change.backup_artifact).exists()
 
 
 def test_review_service_rejects_run(tmp_path: Path) -> None:

@@ -83,7 +83,9 @@ system a real editorial control point instead of treating publish as a casual bu
 The review queue supports batch approve and reject operations through the API, CLI, and dashboard;
 each item returns its own result so one invalid run does not mask the rest of the batch.
 Successful publishes write `publish-receipt.json`, which links the public URL back to the run,
-publisher, approval record, force flag, and publish plan items.
+publisher, approval record, force flag, publish plan items, before/after file hashes, and rollback
+hints. Existing publish targets are backed up under the run artifact directory before they are
+overwritten.
 Review actions append to `audit-log.json`, giving operators an immutable trail of approve, reject,
 and publish transitions in addition to the latest run state.
 

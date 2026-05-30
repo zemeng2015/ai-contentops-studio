@@ -19,6 +19,7 @@ from contentops_core.models import (
     AuditEvent,
     Draft,
     EvaluationReport,
+    PublishFileChange,
     PublishPlan,
     PublishReceipt,
     ResearchPacket,
@@ -91,9 +92,18 @@ class ReviewService:
         plan = self.publisher.plan(run, draft, report)
         if not plan.ready and not force:
             raise ValueError("; ".join(plan.warnings))
+        before_snapshot = self._snapshot_publish_targets(plan)
+        backups = self._backup_publish_targets(run, plan)
         run.touch(RunStatus.PUBLISHING)
         self.repository.save(run)
         run.published_url = self.publisher.publish(run, draft, report)
+        after_snapshot = self._snapshot_publish_targets(plan)
+        file_changes = self._publish_file_changes(
+            plan,
+            before_snapshot=before_snapshot,
+            after_snapshot=after_snapshot,
+            backups=backups,
+        )
         self._write_publish_receipt(
             run,
             PublishReceipt(
@@ -101,6 +111,7 @@ class ReviewService:
                 provider=plan.provider,
                 url=run.published_url,
                 plan_items=plan.items,
+                file_changes=file_changes,
                 approval=approval,
                 force=force,
             ),
@@ -120,6 +131,7 @@ class ReviewService:
                     "force": force,
                     "provider": plan.provider,
                     "url": run.published_url,
+                    "changed_files": len(file_changes),
                 },
             ),
         )
@@ -411,3 +423,71 @@ class ReviewService:
     @staticmethod
     def _source_key(source: Source) -> str:
         return (source.canonical_url or source.url or source.title).strip().casefold()
+
+    @staticmethod
+    def _snapshot_publish_targets(plan: PublishPlan) -> dict[str, str | None]:
+        snapshot: dict[str, str | None] = {}
+        for item in plan.items:
+            path = Path(item.path)
+            snapshot[item.path] = sha256(path.read_bytes()).hexdigest() if path.exists() else None
+        return snapshot
+
+    @staticmethod
+    def _backup_publish_targets(run: RunRecord, plan: PublishPlan) -> dict[str, str]:
+        backups: dict[str, str] = {}
+        backup_dir = run.artifact_dir / "publish-backups"
+        for index, item in enumerate(plan.items, start=1):
+            path = Path(item.path)
+            if not path.exists() or not path.is_file():
+                continue
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            backup_name = f"{index}-{sha256(item.path.encode('utf-8')).hexdigest()[:12]}.bak"
+            backup_path = backup_dir / backup_name
+            backup_path.write_bytes(path.read_bytes())
+            backups[item.path] = str(backup_path.relative_to(run.artifact_dir))
+        return backups
+
+    @staticmethod
+    def _publish_file_changes(
+        plan: PublishPlan,
+        *,
+        before_snapshot: dict[str, str | None],
+        after_snapshot: dict[str, str | None],
+        backups: dict[str, str],
+    ) -> list[PublishFileChange]:
+        changes: list[PublishFileChange] = []
+        for item in plan.items:
+            before_sha = before_snapshot.get(item.path)
+            after_sha = after_snapshot.get(item.path)
+            if before_sha == after_sha:
+                action = "unchanged"
+            elif before_sha is None and after_sha is not None:
+                action = "created"
+            elif before_sha is not None and after_sha is None:
+                action = "deleted"
+            else:
+                action = "updated"
+            backup_artifact = backups.get(item.path)
+            changes.append(
+                PublishFileChange(
+                    path=item.path,
+                    action=action,
+                    existed_before=before_sha is not None,
+                    exists_after=after_sha is not None,
+                    before_sha256=before_sha,
+                    after_sha256=after_sha,
+                    backup_artifact=backup_artifact,
+                    rollback_hint=_rollback_hint(action, backup_artifact),
+                )
+            )
+        return changes
+
+
+def _rollback_hint(action: str, backup_artifact: str | None) -> str:
+    if backup_artifact:
+        return f"Restore artifact {backup_artifact} to this path."
+    if action == "created":
+        return "Delete this created file to roll back."
+    if action == "unchanged":
+        return "No rollback action needed."
+    return "No backup artifact is available; inspect version control or deployment history."

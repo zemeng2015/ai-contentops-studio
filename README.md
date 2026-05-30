@@ -18,7 +18,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - explicit approval records before reviewed runs are published
 - append-only audit logs for review and publishing actions
 - source audit reports with scoring, risk reasons, and reviewer recommendations
-- publish receipts that audit provider, URL, approval, and changed files
+- publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
 - optional operator API key protection for mutating API and dashboard actions
 - readiness checks and CLI diagnostics for production deployments
 - API, CLI, worker, and publisher boundaries
@@ -184,7 +184,9 @@ overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
 Each decision is persisted as `approval.json` beside the other run artifacts.
 Each successful publish writes `publish-receipt.json`, which records the provider, target URL,
-publish plan items, approval record, force flag, and timestamp.
+publish plan items, approval record, force flag, timestamp, before/after file hashes, and rollback
+hints. Existing publish targets are copied into `publish-backups/` under the run artifact
+directory before they are overwritten.
 Review and publishing actions are appended to `audit-log.json` for operational traceability.
 
 ## Scheduled worker jobs

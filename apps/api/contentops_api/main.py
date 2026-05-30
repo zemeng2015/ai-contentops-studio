@@ -877,6 +877,19 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
         """
         for item in receipt.plan_items
     )
+    change_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(change.action)}</td>
+          <td>{escape(change.path)}</td>
+          <td><code>{escape((change.before_sha256 or "none")[:12])}</code></td>
+          <td><code>{escape((change.after_sha256 or "none")[:12])}</code></td>
+          <td>{escape(change.backup_artifact or "n/a")}</td>
+          <td>{escape(change.rollback_hint)}</td>
+        </tr>
+        """
+        for change in receipt.file_changes
+    )
     reviewer = receipt.approval.reviewer if receipt.approval is not None else "force"
     return f"""
       <p>
@@ -889,6 +902,15 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
       <table>
         <thead><tr><th>Action</th><th>Path</th><th>Description</th></tr></thead>
         <tbody>{item_rows}</tbody>
+      </table>
+      <h4>File Changes</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Change</th><th>Path</th><th>Before</th><th>After</th><th>Backup</th><th>Rollback</th>
+          </tr>
+        </thead>
+        <tbody>{change_rows}</tbody>
       </table>
     """
 

@@ -146,11 +146,23 @@ class ReviewBatchResult(BaseModel):
     results: list[ReviewActionResult]
 
 
+class PublishFileChange(BaseModel):
+    path: str
+    action: str
+    existed_before: bool
+    exists_after: bool
+    before_sha256: str | None = None
+    after_sha256: str | None = None
+    backup_artifact: str | None = None
+    rollback_hint: str
+
+
 class PublishReceipt(BaseModel):
     run_id: str
     provider: str
     url: str
     plan_items: list[PublishPlanItem]
+    file_changes: list[PublishFileChange] = Field(default_factory=list)
     approval: ApprovalRecord | None = None
     force: bool = False
     published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
