@@ -4,6 +4,7 @@ import json
 import secrets
 from html import escape
 from typing import Annotated
+from urllib.parse import urlencode
 
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
@@ -11,9 +12,11 @@ from contentops_core.models import (
     PublishPlan,
     PublishReceipt,
     RunComparison,
+    RunListResponse,
     RunMetrics,
     RunRecord,
     RunRequest,
+    RunStatus,
 )
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -52,16 +55,22 @@ def health() -> dict[str, str]:
 def dashboard(
     q: str = Query(default=""),
     status: str = Query(default=""),
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     api_key: str = Query(default=""),
 ) -> HTMLResponse:
-    all_runs = repository.list(limit=100)
-    runs = _filter_runs(all_runs, q, status)[:50]
+    status_filter = _parse_status_filter(status)
+    runs = repository.list(limit=limit, offset=offset, status=status_filter, query=q)
+    total = repository.count(status=status_filter, query=q)
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
     )
     published = sum(1 for run in runs if run.status.value == "published")
+    needs_review = repository.count(status=RunStatus.NEEDS_REVIEW)
+    approved = repository.count(status=RunStatus.APPROVED)
     avg_duration = _avg_duration(metrics)
+    pagination = _pagination_html(q, status, limit, offset, total, api_key)
     rows = "\n".join(
         f"""
         <tr>
@@ -80,8 +89,10 @@ def dashboard(
             <section class="hero">
               <p>Review generated research, drafts, evaluation reports, and publishing state.</p>
               <div class="metrics">
-                <div><strong>{len(runs)}</strong><span>Runs</span></div>
-                <div><strong>{published}</strong><span>Published</span></div>
+                <div><strong>{total}</strong><span>Matching runs</span></div>
+                <div><strong>{needs_review}</strong><span>Needs review</span></div>
+                <div><strong>{approved}</strong><span>Approved</span></div>
+                <div><strong>{published}</strong><span>Published on page</span></div>
                 <div><strong>{completed}</strong><span>Traced</span></div>
                 <div><strong>{avg_duration}</strong><span>Avg duration</span></div>
               </div>
@@ -101,6 +112,8 @@ def dashboard(
                 <select name="status">
                   {_status_options(status)}
                 </select>
+                <input type="hidden" name="limit" value="{limit}">
+                {_api_key_hidden(api_key)}
                 <button type="submit">Filter runs</button>
               </form>
             </section>
@@ -108,6 +121,7 @@ def dashboard(
               <thead><tr><th>Run</th><th>Status</th><th>Topic</th><th>Updated</th></tr></thead>
               <tbody>{rows}</tbody>
             </table>
+            {pagination}
             """,
         )
     )
@@ -328,8 +342,39 @@ def create_run(
 
 
 @app.get("/runs", response_model=list[RunRecord])
-def list_runs(limit: int = 20) -> list[RunRecord]:
-    return repository.list(limit=limit)
+def list_runs(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=""),
+    q: str = Query(default=""),
+) -> list[RunRecord]:
+    return repository.list(
+        limit=limit,
+        offset=offset,
+        status=_parse_status_filter(status),
+        query=q,
+    )
+
+
+@app.get("/review-queue", response_model=RunListResponse)
+def review_queue(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=RunStatus.NEEDS_REVIEW.value),
+    q: str = Query(default=""),
+) -> RunListResponse:
+    status_filter = _parse_status_filter(status)
+    return RunListResponse(
+        items=repository.list(
+            limit=limit,
+            offset=offset,
+            status=status_filter,
+            query=q,
+        ),
+        total=repository.count(status=status_filter, query=q),
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.get("/runs/{run_id}", response_model=RunRecord)
@@ -488,7 +533,7 @@ def _page(title: str, body: str) -> str:
           form {{ display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }}
           .metrics {{
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 10px;
             margin: 18px 0;
           }}
@@ -524,6 +569,21 @@ def _page(title: str, body: str) -> str:
           table {{ width: 100%; border-collapse: collapse; overflow: hidden; }}
           th, td {{ padding: 14px; border-bottom: 1px solid #edf0ec; text-align: left; }}
           th {{ color: #5f6965; font-size: 13px; text-transform: uppercase; }}
+          .pager {{
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+            margin-top: 14px;
+            color: #5f6965;
+            font-weight: 800;
+          }}
+          .pager-link {{
+            border: 1px solid #d8ddd7;
+            border-radius: 6px;
+            padding: 8px 12px;
+            background: #fff;
+          }}
           .grid {{ display: grid; grid-template-columns: 0.4fr 0.6fr; gap: 18px; }}
           .grid > div {{ padding: 22px; min-width: 0; }}
           pre {{ overflow: auto; padding: 16px; background: #101816; color: #e6f0ec; }}
@@ -548,25 +608,25 @@ def _api_key_query(api_key: str) -> str:
     return f"?api_key={escape(api_key, quote=True)}"
 
 
-def _filter_runs(runs: list[RunRecord], query: str, status: str) -> list[RunRecord]:
-    normalized_query = query.strip().casefold()
-    normalized_status = status.strip().casefold()
-    filtered: list[RunRecord] = []
-    for run in runs:
-        matches_query = not normalized_query or (
-            normalized_query in run.id.casefold()
-            or normalized_query in run.topic.casefold()
-            or normalized_query in run.slug.casefold()
-        )
-        matches_status = not normalized_status or run.status.value == normalized_status
-        if matches_query and matches_status:
-            filtered.append(run)
-    return filtered
+def _api_key_hidden(api_key: str) -> str:
+    if not api_key:
+        return ""
+    return f'<input type="hidden" name="api_key" value="{escape(api_key, quote=True)}">'
+
+
+def _parse_status_filter(status: str) -> RunStatus | None:
+    normalized = status.strip().casefold()
+    if not normalized:
+        return None
+    try:
+        return RunStatus(normalized)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Unknown run status: {status}") from exc
 
 
 def _status_options(selected: str) -> str:
     statuses = ["", "created", "researching", "planning", "drafting", "evaluating"]
-    statuses += ["needs_review", "publishing", "published", "failed"]
+    statuses += ["needs_review", "approved", "rejected", "publishing", "published", "failed"]
     rows: list[str] = []
     normalized = selected.strip().casefold()
     for status in statuses:
@@ -576,6 +636,44 @@ def _status_options(selected: str) -> str:
             f'<option value="{escape(status)}"{selected_attr}>{escape(label)}</option>'
         )
     return "\n".join(rows)
+
+
+def _pagination_html(
+    q: str,
+    status: str,
+    limit: int,
+    offset: int,
+    total: int,
+    api_key: str,
+) -> str:
+    if total <= limit and offset == 0:
+        return ""
+    previous_offset = max(offset - limit, 0)
+    next_offset = offset + limit
+    previous = ""
+    next_link = ""
+    if offset > 0:
+        previous_url = _dashboard_url(q, status, limit, previous_offset, api_key)
+        previous = f'<a class="pager-link" href="{previous_url}">Previous</a>'
+    if next_offset < total:
+        next_url = _dashboard_url(q, status, limit, next_offset, api_key)
+        next_link = f'<a class="pager-link" href="{next_url}">Next</a>'
+    showing_start = 0 if total == 0 else offset + 1
+    showing_end = min(offset + limit, total)
+    return f"""
+      <nav class="pager">
+        <span>Showing {showing_start}-{showing_end} of {total}</span>
+        {previous}
+        {next_link}
+      </nav>
+    """
+
+
+def _dashboard_url(q: str, status: str, limit: int, offset: int, api_key: str) -> str:
+    params = {"q": q, "status": status, "limit": str(limit), "offset": str(offset)}
+    if api_key:
+        params["api_key"] = api_key
+    return f"/dashboard?{urlencode(params)}"
 
 
 def _comparison_html(comparison: RunComparison) -> str:

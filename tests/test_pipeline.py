@@ -64,6 +64,27 @@ def test_repository_round_trips_run_metadata(tmp_path: Path) -> None:
     assert repo.list(limit=1)[0].id == result.run.id
 
 
+def test_repository_filters_and_counts_run_queue(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    pipeline = build_pipeline(settings)
+    first = pipeline.run(RunRequest(topic="Queue searchable RAG review")).run
+    second = pipeline.run(RunRequest(topic="Queue unrelated agent article")).run
+    repo = RunRepository(settings.database_url)
+
+    filtered = repo.list(status=RunStatus.NEEDS_REVIEW, query="searchable")
+    paged = repo.list(limit=1, offset=1, status=RunStatus.NEEDS_REVIEW)
+
+    assert [run.id for run in filtered] == [first.id]
+    assert repo.count() == 2
+    assert repo.count(status=RunStatus.NEEDS_REVIEW) == 2
+    assert repo.count(status=RunStatus.NEEDS_REVIEW, query=second.slug) == 1
+    assert len(paged) == 1
+
+
 def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",

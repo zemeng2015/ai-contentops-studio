@@ -12,6 +12,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - content planning before generation
 - deterministic quality evaluation
 - observable run history and artifacts
+- queryable review queue with status/search filters and pagination
 - explicit approval records before reviewed runs are published
 - publish receipts that audit provider, URL, approval, and changed files
 - optional operator API key protection for mutating API and dashboard actions
@@ -105,6 +106,7 @@ tests/                     Unit and integration tests
 - Filesystem artifact store
 - Static site publisher
 - FastAPI `POST /runs` and `GET /runs`
+- FastAPI `GET /review-queue` with status/search filters and pagination metadata
 - FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
 - FastAPI metrics, rerun, publish-plan, and run-comparison endpoints
 - Worker entrypoint for single-job or batch YAML content calendars
@@ -139,6 +141,7 @@ GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
+GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
 POST /runs/{run_id}/rerun
@@ -156,8 +159,9 @@ quality before publishing.
 Run details also include a Publish Plan that lists file-level changes before the publish action.
 Run details include a timeline derived from `trace.json`, including step durations and fields.
 The dashboard create form accepts optional source URLs, one per line.
-The dashboard list supports status/topic filters, and run detail pages can compare two runs to
-spot evaluation deltas, source-count changes, and source overlap before publishing.
+The dashboard list supports database-backed status/topic filters, queue counts, and pagination.
+Run detail pages can compare two runs to spot evaluation deltas, source-count changes, and source
+overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
 Each decision is persisted as `approval.json` beside the other run artifacts.
 Each successful publish writes `publish-receipt.json`, which records the provider, target URL,

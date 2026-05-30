@@ -76,6 +76,22 @@ def test_compare_endpoint() -> None:
     assert payload["source_count_delta"] >= 1
 
 
+def test_review_queue_filters_and_paginates() -> None:
+    client = TestClient(app)
+
+    client.post("/runs", json={"topic": "Review queue searchable"})
+    response = client.get("/review-queue?q=searchable&status=needs_review&limit=1")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] >= 1
+    assert payload["limit"] == 1
+    assert payload["offset"] == 0
+    assert len(payload["items"]) == 1
+    assert payload["items"][0]["status"] == "needs_review"
+    assert "searchable" in payload["items"][0]["topic"].lower()
+
+
 def test_dashboard_renders() -> None:
     client = TestClient(app)
 
@@ -96,6 +112,7 @@ def test_dashboard_filters_runs() -> None:
     assert response.status_code == 200
     assert "Dashboard filter needle" in response.text
     assert "Filter runs" in response.text
+    assert "Matching runs" in response.text
 
 
 def test_dashboard_run_detail_shows_source_review() -> None:

@@ -55,6 +55,8 @@ queue.
 
 The FastAPI app includes a lightweight server-rendered dashboard at `/dashboard` so the project has
 a usable review surface before a larger React dashboard is introduced.
+The dashboard list and `/review-queue` endpoint use repository-level filtering, counting, and
+pagination so operators can review larger queues without loading only the most recent local slice.
 
 The dashboard and API expose run metrics derived from `trace.json`: total duration, per-step
 durations, source count, and publish readiness. This keeps observability tied to persisted run

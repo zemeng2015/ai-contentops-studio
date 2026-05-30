@@ -195,6 +195,13 @@ class RunRecord(BaseModel):
         return self
 
 
+class RunListResponse(BaseModel):
+    items: list[RunRecord]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 class ArtifactManifest(BaseModel):
     run_id: str
     artifacts: dict[str, str] = Field(default_factory=dict)

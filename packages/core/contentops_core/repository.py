@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import DateTime, String, Text, create_engine, select
+from sqlalchemy import DateTime, String, Text, create_engine, func, or_, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.sql import Select
 
 from contentops_core.models import RunRecord, RunStatus
 
@@ -49,16 +50,53 @@ class RunRepository:
             row.updated_at = run.updated_at
             session.commit()
 
-    def list(self, limit: int = 20) -> list[RunRecord]:
+    def list(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        status: RunStatus | None = None,
+        query: str = "",
+    ) -> list[RunRecord]:
         with self.session_factory() as session:
-            query = select(RunRow).order_by(RunRow.created_at.desc()).limit(limit)
-            rows = session.scalars(query).all()
+            statement = (
+                self._filtered_statement(status=status, query=query)
+                .order_by(RunRow.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+            rows = session.scalars(statement).all()
             return [self._to_record(row) for row in rows]
+
+    def count(self, status: RunStatus | None = None, query: str = "") -> int:
+        with self.session_factory() as session:
+            statement = (
+                self._filtered_statement(status=status, query=query)
+                .with_only_columns(func.count(), maintain_column_froms=True)
+                .order_by(None)
+            )
+            return int(session.scalar(statement) or 0)
 
     def get(self, run_id: str) -> RunRecord | None:
         with self.session_factory() as session:
             row = session.get(RunRow, run_id)
             return self._to_record(row) if row else None
+
+    @staticmethod
+    def _filtered_statement(status: RunStatus | None, query: str) -> Select[tuple[RunRow]]:
+        statement = select(RunRow)
+        if status is not None:
+            statement = statement.where(RunRow.status == status.value)
+        normalized_query = query.strip()
+        if normalized_query:
+            pattern = f"%{normalized_query}%"
+            statement = statement.where(
+                or_(
+                    RunRow.id.ilike(pattern),
+                    RunRow.topic.ilike(pattern),
+                    RunRow.slug.ilike(pattern),
+                )
+            )
+        return statement
 
     @staticmethod
     def _to_record(row: RunRow) -> RunRecord:

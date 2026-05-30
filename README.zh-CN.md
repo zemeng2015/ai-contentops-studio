@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平台，用于自动化完成技术情报研究、基于来源的内容生成、质量评估、运行产物追踪和发布。
+AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台，用于自动化完成技术情报研究、基于来源的内容生成、质量评估、产物追踪和发布。
 
 这个项目不是简单的 prompt demo，而是用来展示成熟 Applied AI Engineering 能力的工程化系统：
 
@@ -10,17 +10,17 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 - 基于来源的 research packet
 - 先规划再生成的内容生产流程
 - 可重复、可测试的质量评估
+- 可查询的 review queue，支持状态、关键词筛选和分页
 - 可观测的运行历史、trace 和 artifacts
 - reviewed run 发布前必须有显式 approval record
 - publish receipt 会审计 provider、URL、approval 和变更文件
-- 可选 operator API key，用于保护写操作和 Dashboard mutation
+- 可选 operator API key，用于保护 API 和 Dashboard 的写操作
 - API、CLI、worker、publisher 清晰分层
-- Review dashboard：可检查 artifact、source、evaluation、publish plan 和 run comparison
-- YAML 定义的 worker jobs：可用于每日/每周内容选题计划
-- AWS-ready artifact storage 和 Terraform deployment skeleton
-- 本地优先开发，同时预留 AWS 生产化部署边界
+- Review dashboard 可检查 artifact、source、evaluation、publish plan 和 run comparison
+- YAML 定义的 worker jobs，可用于每日或每周内容选题计划
+- AWS-ready artifact storage、RDS、EventBridge 和 Terraform deployment skeleton
 
-## 项目能做什么
+## 项目能力
 
 给定一个技术主题或一组真实网页来源，系统会创建一次内容运行任务：
 
@@ -32,7 +32,7 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 6. 保留为待 review 状态，审核批准或拒绝后再发布
 7. 持久化 artifacts、run metadata 和 trace，方便回溯、审查和对比
 
-第一版 pipeline 采用本地 deterministic 模式，因此不需要 API key 也能在 CI 中运行。OpenAI、搜索 API、GitHub、AWS 等外部能力都通过 provider adapter 接入，后续可以扩展而不需要重写核心领域层。
+默认 pipeline 采用本地 deterministic 模式，不需要 API key 也能在 CI 中运行。OpenAI、搜索 API、GitHub、AWS 等外部能力都通过 provider adapter 接入，后续扩展时不需要重写核心领域层。
 
 ## 快速开始
 
@@ -89,26 +89,26 @@ tests/                     单元测试和集成测试
 ## 当前能力
 
 - 本地 research provider 和 deterministic source packet
-- URL research provider：可抓取并标准化用户提供的网页来源
-- Feed research provider：可从 RSS/Atom feed 自动发现候选来源
-- Discovery research provider：组合 feed discovery、用户 URL 和本地 portfolio context
+- URL research provider，可抓取并标准化用户提供的网页来源
+- Feed research provider，可从 RSS/Atom feed 自动发现候选来源
+- Discovery research provider，组合 feed discovery、用户 URL 和本地 portfolio context
 - Source 去重，以及 extraction status、quality、content length 元数据
 - 可选 OpenAI Responses API generator，并且放在 provider 边界后面
-- 可选 homepage publisher：可发布到 Zack 的 GitHub Pages 个人主页仓库
+- 可选 homepage publisher，可发布到 Zack 的 GitHub Pages 个人主页仓库
 - Markdown 和 HTML 文章生成
 - 内容质量评估报告
-- SQLite run metadata
-- Filesystem artifact store
-- S3-ready artifact mirroring
+- SQLite run metadata，AWS 部署可替换为 RDS/Postgres
+- Filesystem artifact store，AWS 部署可镜像到 S3
 - Static site publisher
-- FastAPI `POST /runs` 和 `GET /runs`
+- FastAPI `POST /runs`、`GET /runs` 和 `GET /review-queue`
 - FastAPI artifact、metrics、rerun、publish-plan、publish、compare endpoints
 - Worker 支持单任务或批量 YAML content calendar
-- CLI `contentops run`、`contentops runs`、`contentops show`、`contentops artifacts`、`contentops publish`、`contentops metrics`、`contentops rerun`、`contentops publish-plan`、`contentops compare`
-- Review dashboard 支持运行列表筛选、详情页审查、发布预览、运行时间线和 run comparison
+- CLI `contentops run`、`contentops runs`、`contentops show`、`contentops artifacts`
+- CLI review 命令包括 `publish`、`metrics`、`rerun`、`publish-plan`、`compare`
+- Review dashboard 支持运行列表筛选、分页、队列统计、详情页审查、发布预览、运行时间线和 run comparison
 - 覆盖核心 pipeline 行为的 pytest 测试
 
-## Review workflow
+## Review Workflow
 
 先生成，检查 artifacts，再发布：
 
@@ -125,9 +125,11 @@ contentops publish <run_id>
 contentops publish-receipt <run_id>
 ```
 
-API 也暴露同样的生命周期：
+API 暴露同样的生命周期：
 
 ```text
+GET  /runs
+GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
@@ -147,11 +149,11 @@ Dashboard 地址：
 GET /dashboard
 ```
 
-Dashboard 支持按 topic、run id 和 status 筛选运行记录。Run detail 页面包含 Source Review、Publish Plan、Run Timeline，以及对比两个 run 的入口。Run comparison 会展示 evaluation delta、source count delta、shared sources 和只存在于某个 run 的 sources，用于判断重新生成是否真的变好。
-待 review 的 run 必须先 approve 才能 publish，除非操作员显式使用 `force=true`。每次 approve/reject 都会写入 `approval.json`，和其他 run artifacts 一起保留。
-每次成功发布都会写入 `publish-receipt.json`，记录 publisher provider、目标 URL、publish plan items、approval record、force flag 和发布时间。
+Dashboard 支持数据库层面的 topic、run id、slug、status 筛选，并带有队列统计和分页。Run detail 页面包含 Source Review、Publish Plan、Run Timeline、Approval、Publish Receipt，以及对比两个 run 的入口。
 
-## Scheduled worker jobs
+待 review 的 run 必须先 approve 才能 publish，除非操作员显式使用 `force=true`。每次 approve 或 reject 都会写入 `approval.json`，每次成功发布都会写入 `publish-receipt.json`。
+
+## Scheduled Worker Jobs
 
 Worker 可以校验或执行 YAML 定义的内容选题计划：
 
@@ -173,7 +175,7 @@ jobs:
 
 ## Provider 配置
 
-默认配置不需要任何外部密钥。`hybrid` 在没有 URL 时完全本地运行；`discovery` 会抓取配置好的 RSS/Atom feeds，更适合每日 AI 技术雷达：
+默认配置不需要任何外部密钥。`hybrid` 在没有 URL 时完全本地运行；`discovery` 会抓取配置好的 RSS/Atom feeds，适合每日 AI 技术雷达：
 
 ```text
 CONTENTOPS_RESEARCH_PROVIDER=discovery
@@ -200,8 +202,7 @@ CONTENTOPS_ARTIFACT_S3_BUCKET=your-artifact-bucket
 CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```
 
-启用 S3 镜像前需要安装可选 AWS 依赖：
-该依赖也会安装 RDS/Postgres 部署所需的 Postgres driver。
+启用 S3 镜像前需要安装可选 AWS 依赖。该依赖也会安装 RDS/Postgres 部署所需的 Postgres driver：
 
 ```powershell
 pip install -e ".[aws]"
@@ -213,14 +214,13 @@ pip install -e ".[aws]"
 CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
 ```
 
-在共享或部署环境中保护写操作：
+保护共享环境中的写操作：
 
 ```text
 CONTENTOPS_OPERATOR_API_KEY=replace-with-a-long-random-secret
 ```
 
-配置后，创建 run、approve/reject、publish、rerun 等 mutation 需要
-`X-ContentOps-Api-Key` header 或 `api_key` query 参数；只读接口仍可用于 dashboard 和集成。
+配置后，创建 run、approve、reject、publish、rerun 等 mutation 需要 `X-ContentOps-Api-Key` header 或 `api_key` query 参数；只读接口仍可用于 dashboard 和集成。
 
 使用真实网页来源：
 
@@ -252,6 +252,7 @@ CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepag
 - source-grounded generation
 - evaluation gates
 - artifact tracking
+- review queue and approval workflow
 - API/CLI/worker 分层
 - observability
 - cloud-ready architecture
