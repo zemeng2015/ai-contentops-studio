@@ -154,6 +154,92 @@ def test_search_research_parses_brave_style_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeResponse:
+        headers = {"content-type": "text/html; charset=utf-8"}
+        encoding = "utf-8"
+
+        def __init__(self, payload: dict[str, object] | None = None, text: str = "") -> None:
+            self._payload = payload or {}
+            self.text = text
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str, params: dict[str, object] | None = None) -> FakeResponse:
+            if params is not None:
+                assert params["q"] == "Agent evaluation"
+                return FakeResponse(
+                    payload={
+                        "web": {
+                            "results": [
+                                {
+                                    "title": "Agent evaluation platform",
+                                    "url": "https://example.com/agents?ref=search",
+                                    "description": (
+                                        "A detailed article about agent evaluation, workflow "
+                                        "tracing, and production reliability."
+                                    ),
+                                },
+                                {
+                                    "title": "LLM release notes",
+                                    "url": "https://example.com/releases",
+                                    "description": "New model release.",
+                                },
+                            ]
+                        }
+                    }
+                )
+            if url == "https://example.com/agents?ref=search":
+                return FakeResponse(
+                    text=(
+                        "<html><head><title>Agent evaluation deep dive</title>"
+                        '<meta name="description" content="A field guide to agent '
+                        "evaluation, trace inspection, regression gates, production "
+                        'reliability, and reviewer workflows."></head><body>'
+                        + ("workflow traces and evaluator evidence " * 120)
+                        + "</body></html>"
+                    )
+                )
+            return FakeResponse(
+                text="<html><head><title>LLM release notes</title></head><body>short</body></html>"
+            )
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = SearchResearchProvider(
+        endpoint="https://search.example.com",
+        api_key="secret",
+        max_sources=2,
+    ).collect(RunRequest(topic="Agent evaluation"))
+
+    assert len(packet.sources) == 2
+    assert packet.sources[0].title == "Agent evaluation deep dive"
+    assert packet.sources[0].canonical_url == "https://example.com/agents"
+    assert packet.sources[0].extraction_status == "search_enriched"
+    assert packet.sources[0].extraction_quality > 0.68
+    assert packet.sources[0].publisher == "example.com"
+
+
+def test_search_research_falls_back_when_enrichment_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        headers = {"content-type": "application/json"}
+        text = ""
+        encoding = "utf-8"
+
         def raise_for_status(self) -> None:
             return None
 
@@ -162,18 +248,13 @@ def test_search_research_parses_brave_style_results(
                 "web": {
                     "results": [
                         {
-                            "title": "Agent evaluation platform",
-                            "url": "https://example.com/agents?ref=search",
+                            "title": "Workflow reliability",
+                            "url": "https://offline.example.com/report",
                             "description": (
-                                "A detailed article about agent evaluation, workflow tracing, "
-                                "and production reliability."
+                                "Search snippet about workflow reliability, evaluation, and "
+                                "operator review."
                             ),
-                        },
-                        {
-                            "title": "LLM release notes",
-                            "url": "https://example.com/releases",
-                            "description": "New model release.",
-                        },
+                        }
                     ]
                 }
             }
@@ -188,23 +269,22 @@ def test_search_research_parses_brave_style_results(
         def __exit__(self, *args: object) -> None:
             return None
 
-        def get(self, url: str, params: dict[str, object]) -> FakeResponse:
-            assert params["q"] == "Agent evaluation"
-            return FakeResponse()
+        def get(self, url: str, params: dict[str, object] | None = None) -> FakeResponse:
+            if params is not None:
+                return FakeResponse()
+            raise TimeoutError(f"{url} is unavailable")
 
     monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
 
     packet = SearchResearchProvider(
         endpoint="https://search.example.com",
         api_key="secret",
-        max_sources=2,
-    ).collect(RunRequest(topic="Agent evaluation"))
+        max_sources=1,
+    ).collect(RunRequest(topic="Workflow reliability"))
 
-    assert len(packet.sources) == 2
-    assert packet.sources[0].title == "Agent evaluation platform"
-    assert packet.sources[0].canonical_url == "https://example.com/agents"
+    assert packet.sources[0].title == "Workflow reliability"
     assert packet.sources[0].extraction_status == "search"
-    assert packet.sources[0].publisher == "example.com"
+    assert packet.sources[0].summary.startswith("Search snippet")
 
 
 def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch) -> None:

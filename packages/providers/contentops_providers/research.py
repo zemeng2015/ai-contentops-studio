@@ -117,7 +117,7 @@ class URLResearchProvider:
         self.timeout_seconds = timeout_seconds
 
     def collect(self, request: RunRequest) -> ResearchPacket:
-        sources = dedupe_sources([self._fetch_source(url) for url in request.source_urls])
+        sources = dedupe_sources([self.fetch_source(url) for url in request.source_urls])
         claims = [
             Claim(
                 text=f"{source.title} is relevant to {request.topic} because {source.summary}",
@@ -147,6 +147,9 @@ class URLResearchProvider:
                 "Keep raw source metadata in artifacts for auditability.",
             ],
         )
+
+    def fetch_source(self, url: str) -> Source:
+        return self._fetch_source(url)
 
     def _fetch_source(self, url: str) -> Source:
         try:
@@ -407,16 +410,19 @@ class SearchResearchProvider:
         api_key: str,
         max_sources: int = 6,
         timeout_seconds: float = 12.0,
+        enrich_results: bool = True,
     ) -> None:
         self.endpoint = endpoint
         self.api_key = api_key
         self.max_sources = max_sources
         self.timeout_seconds = timeout_seconds
+        self.enrich_results = enrich_results
+        self.url_provider = URLResearchProvider(timeout_seconds=timeout_seconds)
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         results = self._search(request.topic)
         selected = results[: self.max_sources]
-        sources = dedupe_sources([self._result_to_source(result) for result in selected])
+        sources = dedupe_sources(self._sources_from_results(selected))
         claims = [
             Claim(
                 text=f"{source.title} is a search-discovered source for {request.topic}.",
@@ -442,6 +448,26 @@ class SearchResearchProvider:
                 "Use search provider credentials in deployed workers for daily AI monitoring.",
                 "Persist search metadata so review and evaluation stay auditable.",
             ],
+        )
+
+    def _sources_from_results(self, results: list[SearchResult]) -> list[Source]:
+        if not self.enrich_results:
+            return [self._result_to_source(result) for result in results]
+        return [self._enrich_result(result) for result in results]
+
+    def _enrich_result(self, result: SearchResult) -> Source:
+        fallback = self._result_to_source(result)
+        if not result.url:
+            return fallback
+        fetched = self.url_provider.fetch_source(result.url)
+        if fetched.extraction_status != "ok":
+            return fallback
+        return fetched.model_copy(
+            update={
+                "credibility": max(fetched.credibility, fallback.credibility),
+                "extraction_status": "search_enriched",
+                "extraction_quality": max(fetched.extraction_quality, fallback.extraction_quality),
+            }
         )
 
     def _search(self, topic: str) -> list[SearchResult]:

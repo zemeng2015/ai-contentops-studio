@@ -101,7 +101,7 @@ tests/                     Unit and integration tests
 - Local research provider with deterministic source packets
 - URL research provider that fetches and normalizes operator-supplied sources
 - Feed research provider that discovers sources from RSS/Atom feeds
-- Search research provider for Brave-compatible web search APIs
+- Search research provider for Brave-compatible web search APIs, with optional page enrichment
 - Discovery research provider that combines feed discovery, operator URLs, and local context
 - Source deduplication plus extraction status, quality, and content-length metadata
 - Optional OpenAI Responses API generator behind a provider boundary
@@ -214,6 +214,7 @@ CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search
 # CONTENTOPS_RESEARCH_SEARCH_API_KEY=
+CONTENTOPS_RESEARCH_SEARCH_ENRICH=true
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
 # CONTENTOPS_OPERATOR_API_KEY=
@@ -225,7 +226,7 @@ Research provider modes:
 - `url`: fetch and normalize operator-supplied URLs
 - `hybrid`: URL sources plus deterministic local context
 - `feed`: discover sources from RSS/Atom feeds or Atom search endpoints
-- `search`: discover sources from a Brave-compatible web search API
+- `search`: discover sources from a Brave-compatible web search API and enrich result URLs
 - `discovery`: feed discovery plus operator URLs plus local portfolio context
 
 Mirror artifacts to S3 in AWS deployments:

@@ -322,6 +322,7 @@ def init_config(
                 "CONTENTOPS_RESEARCH_MAX_SOURCES=6",
                 "CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search",
                 "# CONTENTOPS_RESEARCH_SEARCH_API_KEY=",
+                "CONTENTOPS_RESEARCH_SEARCH_ENRICH=true",
                 "CONTENTOPS_GENERATOR_PROVIDER=template",
                 "CONTENTOPS_PUBLISHER_PROVIDER=static",
                 "CONTENTOPS_OPENAI_MODEL=gpt-5-mini",

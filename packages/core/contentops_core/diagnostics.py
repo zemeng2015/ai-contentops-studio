@@ -118,6 +118,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         message=message,
         fields={
             "research_provider": settings.research_provider,
+            "research_search_enrich": settings.research_search_enrich,
             "generator_provider": settings.generator_provider,
             "publisher_provider": settings.publisher_provider,
             "warnings": warnings,

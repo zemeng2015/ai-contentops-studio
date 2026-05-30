@@ -63,6 +63,7 @@ def _build_research_provider(
             endpoint=settings.research_search_endpoint,
             api_key=settings.research_search_api_key,
             max_sources=settings.research_max_sources,
+            enrich_results=settings.research_search_enrich,
         )
     if settings.research_provider == "discovery":
         return DiscoveryResearchProvider(
