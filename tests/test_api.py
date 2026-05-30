@@ -21,6 +21,7 @@ def test_health_endpoint() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+    assert response.headers["x-contentops-request-id"]
     assert ready_response.status_code == 200
     ready_payload = ready_response.json()
     assert ready_payload["status"] in {"ok", "degraded"}
@@ -95,9 +96,30 @@ def test_read_routes_can_require_operator_key() -> None:
     assert health_response.status_code == 200
     assert blocked_runs_response.status_code == 401
     assert blocked_dashboard_response.status_code == 401
+    assert blocked_runs_response.json()["error"]["code"] == "unauthorized"
+    assert blocked_runs_response.json()["error"]["request_id"] == (
+        blocked_runs_response.headers["x-contentops-request-id"]
+    )
     assert allowed_runs_response.status_code == 200
     assert allowed_run_response.status_code == 200
     assert allowed_run_response.json()["id"] == run["id"]
+
+
+def test_api_preserves_client_request_id_on_errors() -> None:
+    client = TestClient(app)
+
+    response = client.get(
+        "/runs/missing-run",
+        headers={"x-contentops-request-id": "req-test-123"},
+    )
+
+    assert response.status_code == 404
+    assert response.headers["x-contentops-request-id"] == "req-test-123"
+    assert response.json()["error"] == {
+        "code": "not_found",
+        "message": "Run not found",
+        "request_id": "req-test-123",
+    }
 
 
 def test_run_artifact_and_publish_endpoints() -> None:

@@ -154,3 +154,5 @@ Mutating API and dashboard operations should use `CONTENTOPS_OPERATOR_API_KEY` i
 deployments.
 Use `CONTENTOPS_REQUIRE_READ_API_KEY=true` when generated artifacts, source audits, job execution
 receipts, content inventory, or evidence bundles are not safe for public read access.
+Capture `X-ContentOps-Request-Id` from failed API or dashboard requests and include it in incident
+notes so application responses, logs, and exported evidence bundles can be correlated.

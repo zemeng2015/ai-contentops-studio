@@ -5,6 +5,7 @@ import secrets
 from html import escape
 from typing import Annotated
 from urllib.parse import urlencode
+from uuid import uuid4
 
 from contentops_core.diagnostics import system_status
 from contentops_core.factory import build_pipeline, build_review_service
@@ -37,7 +38,9 @@ from contentops_core.models import (
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from starlette.middleware.base import RequestResponseEndpoint
 
 settings = Settings()
 pipeline = build_pipeline(settings)
@@ -49,6 +52,53 @@ app = FastAPI(
     version="0.1.0",
     description="Research, evaluation, and publishing automation for technical content.",
 )
+
+
+@app.middleware("http")
+async def request_context(request: Request, call_next: RequestResponseEndpoint) -> Response:
+    request_id = request.headers.get("x-contentops-request-id") or uuid4().hex
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["x-contentops-request-id"] = request_id
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_error_response(request: Request, exc: HTTPException) -> JSONResponse:
+    request_id = _request_id(request)
+    headers = dict(exc.headers or {})
+    headers["x-contentops-request-id"] = request_id
+    return JSONResponse(
+        status_code=exc.status_code,
+        headers=headers,
+        content={
+            "error": {
+                "code": _error_code(exc.status_code),
+                "message": str(exc.detail),
+                "request_id": request_id,
+            }
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_response(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    request_id = _request_id(request)
+    return JSONResponse(
+        status_code=422,
+        headers={"x-contentops-request-id": request_id},
+        content={
+            "error": {
+                "code": "validation_error",
+                "message": "Request validation failed.",
+                "request_id": request_id,
+                "fields": exc.errors(),
+            }
+        },
+    )
 
 
 async def require_operator(request: Request) -> None:
@@ -927,6 +977,25 @@ def _api_key_hidden(api_key: str) -> str:
     if not api_key:
         return ""
     return f'<input type="hidden" name="api_key" value="{escape(api_key, quote=True)}">'
+
+
+def _request_id(request: Request) -> str:
+    value = getattr(request.state, "request_id", "")
+    return str(value) if value else uuid4().hex
+
+
+def _error_code(status_code: int) -> str:
+    labels = {
+        400: "bad_request",
+        401: "unauthorized",
+        403: "forbidden",
+        404: "not_found",
+        409: "conflict",
+        422: "validation_error",
+        500: "internal_error",
+        503: "service_unavailable",
+    }
+    return labels.get(status_code, "http_error")
 
 
 def _parse_status_filter(status: str) -> RunStatus | None:

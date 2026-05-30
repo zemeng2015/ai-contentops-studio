@@ -311,6 +311,8 @@ When configured, mutating API and dashboard actions require `X-ContentOps-Api-Ke
 Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` to protect dashboard pages, artifact downloads, source
 audits, evidence bundles, job receipts, and the published-content catalog with the same operator
 key. `/health` and `/ready` remain open for load balancers and deployment probes.
+Every API response includes `X-ContentOps-Request-Id`; clients can provide that header to correlate
+dashboard/API errors with logs and exported evidence bundles.
 
 Use real source URLs:
 
