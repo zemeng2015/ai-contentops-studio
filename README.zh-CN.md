@@ -12,6 +12,7 @@ AI ContentOps Studio 是一个面向生产级场景设计的 AI 内容运营平�
 - 可重复、可测试的质量评估
 - 可观测的运行历史、trace 和 artifacts
 - reviewed run 发布前必须有显式 approval record
+- publish receipt 会审计 provider、URL、approval 和变更文件
 - API、CLI、worker、publisher 清晰分层
 - Review dashboard：可检查 artifact、source、evaluation、publish plan 和 run comparison
 - YAML 定义的 worker jobs：可用于每日/每周内容选题计划
@@ -120,6 +121,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
+contentops publish-receipt <run_id>
 ```
 
 API 也暴露同样的生命周期：
@@ -130,6 +132,7 @@ GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/approval
+GET  /runs/{run_id}/publish-receipt
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
@@ -145,6 +148,7 @@ GET /dashboard
 
 Dashboard 支持按 topic、run id 和 status 筛选运行记录。Run detail 页面包含 Source Review、Publish Plan、Run Timeline，以及对比两个 run 的入口。Run comparison 会展示 evaluation delta、source count delta、shared sources 和只存在于某个 run 的 sources，用于判断重新生成是否真的变好。
 待 review 的 run 必须先 approve 才能 publish，除非操作员显式使用 `force=true`。每次 approve/reject 都会写入 `approval.json`，和其他 run artifacts 一起保留。
+每次成功发布都会写入 `publish-receipt.json`，记录 publisher provider、目标 URL、publish plan items、approval record、force flag 和发布时间。
 
 ## Scheduled worker jobs
 

@@ -27,6 +27,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     approve_response = client.post(f"/runs/{run['id']}/approve?reviewer=zack&notes=ready")
     approval_response = client.get(f"/runs/{run['id']}/approval")
     publish_response = client.post(f"/runs/{run['id']}/publish")
+    receipt_response = client.get(f"/runs/{run['id']}/publish-receipt")
 
     assert create_response.status_code == 200
     assert artifacts_response.status_code == 200
@@ -46,6 +47,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert approval_response.json()["reviewer"] == "zack"
     assert publish_response.status_code == 200
     assert publish_response.json()["status"] == "published"
+    assert receipt_response.status_code == 200
+    assert receipt_response.json()["url"] == publish_response.json()["published_url"]
+    assert receipt_response.json()["approval"]["reviewer"] == "zack"
 
 
 def test_compare_endpoint() -> None:
@@ -104,6 +108,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Source Review" in detail_response.text
     assert "Publish Plan" in detail_response.text
     assert "Approval" in detail_response.text
+    assert "Publish Receipt" in detail_response.text
     assert "Run Timeline" in detail_response.text
     assert "Rerun with same request" in detail_response.text
     assert "Compare runs" in detail_response.text

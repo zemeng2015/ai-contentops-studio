@@ -13,6 +13,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - deterministic quality evaluation
 - observable run history and artifacts
 - explicit approval records before reviewed runs are published
+- publish receipts that audit provider, URL, approval, and changed files
 - API, CLI, worker, and publisher boundaries
 - review dashboard with artifact, source, evaluation, and publish-plan inspection
 - run comparison for repeatable quality and source regression review
@@ -124,6 +125,7 @@ contentops compare <base_run_id> <candidate_run_id>
 contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
 contentops rerun <run_id>
 contentops publish <run_id>
+contentops publish-receipt <run_id>
 ```
 
 The API exposes the same lifecycle:
@@ -134,6 +136,7 @@ GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/approval
+GET  /runs/{run_id}/publish-receipt
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 POST /runs/{run_id}/approve
 POST /runs/{run_id}/reject
@@ -156,6 +159,8 @@ The dashboard list supports status/topic filters, and run detail pages can compa
 spot evaluation deltas, source-count changes, and source overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
 Each decision is persisted as `approval.json` beside the other run artifacts.
+Each successful publish writes `publish-receipt.json`, which records the provider, target URL,
+publish plan items, approval record, force flag, and timestamp.
 
 ## Scheduled worker jobs
 

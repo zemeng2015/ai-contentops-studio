@@ -87,6 +87,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     )
     published = review_service.publish(result.run.id)
     approval = review_service.approval(result.run.id)
+    receipt = review_service.publish_receipt(result.run.id)
 
     assert "draft.json" in artifacts
     assert "eval-report.json" in artifacts
@@ -103,6 +104,12 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert approval.reviewer == "zack"
     assert published.status == RunStatus.PUBLISHED
     assert published.published_url is not None
+    assert receipt is not None
+    assert receipt.provider == "static"
+    assert receipt.url == published.published_url
+    assert receipt.approval is not None
+    assert receipt.approval.reviewer == "zack"
+    assert (result.run.artifact_dir / "publish-receipt.json").exists()
 
 
 def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None:
@@ -122,8 +129,11 @@ def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None
 
     review_service.approve(result.run.id)
     published = review_service.publish(result.run.id)
+    receipt = review_service.publish_receipt(result.run.id)
 
     assert published.status == RunStatus.PUBLISHED
+    assert receipt is not None
+    assert receipt.force is False
 
 
 def test_review_service_rejects_run(tmp_path: Path) -> None:
@@ -143,6 +153,27 @@ def test_review_service_rejects_run(tmp_path: Path) -> None:
     assert approval is not None
     assert approval.decision.value == "rejected"
     assert approval.notes == "Needs a better angle."
+
+
+def test_review_service_records_forced_publish_receipt(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        public_base_url="https://example.com",
+        min_publish_score=0.5,
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Forced publish receipt"))
+    review_service = build_review_service(settings)
+
+    published = review_service.publish(result.run.id, force=True)
+    receipt = review_service.publish_receipt(result.run.id)
+
+    assert published.status == RunStatus.PUBLISHED
+    assert receipt is not None
+    assert receipt.force is True
+    assert receipt.approval is None
 
 
 def test_review_service_compares_runs(tmp_path: Path) -> None:

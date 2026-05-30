@@ -128,6 +128,19 @@ def approval(run_id: str) -> None:
     typer.echo(decision.model_dump_json(indent=2))
 
 
+@app.command("publish-receipt")
+def publish_receipt(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        receipt = service.publish_receipt(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if receipt is None:
+        typer.echo("No publish receipt recorded.")
+        return
+    typer.echo(receipt.model_dump_json(indent=2))
+
+
 @app.command("publish-plan")
 def publish_plan(run_id: str) -> None:
     service = build_review_service(Settings())

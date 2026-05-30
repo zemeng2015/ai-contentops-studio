@@ -14,6 +14,7 @@ from contentops_core.models import (
     Draft,
     EvaluationReport,
     PublishPlan,
+    PublishReceipt,
     ResearchPacket,
     RunComparison,
     RunMetrics,
@@ -60,6 +61,17 @@ class ReviewService:
         run.touch(RunStatus.PUBLISHING)
         self.repository.save(run)
         run.published_url = self.publisher.publish(run, draft, report)
+        self._write_publish_receipt(
+            run,
+            PublishReceipt(
+                run_id=run_id,
+                provider=plan.provider,
+                url=run.published_url,
+                plan_items=plan.items,
+                approval=approval,
+                force=force,
+            ),
+        )
         run.touch(RunStatus.PUBLISHED)
         self.repository.save(run)
         return run
@@ -106,6 +118,13 @@ class ReviewService:
         if not path.exists():
             return None
         return ApprovalRecord.model_validate(json.loads(path.read_text(encoding="utf-8")))
+
+    def publish_receipt(self, run_id: str) -> PublishReceipt | None:
+        run = self._get_run(run_id)
+        path = run.artifact_dir / "publish-receipt.json"
+        if not path.exists():
+            return None
+        return PublishReceipt.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
     def publish_plan(self, run_id: str) -> PublishPlan:
         run = self._get_run(run_id)
@@ -205,6 +224,11 @@ class ReviewService:
     def _write_approval(run: RunRecord, approval: ApprovalRecord) -> None:
         path = run.artifact_dir / "approval.json"
         path.write_text(approval.model_dump_json(indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _write_publish_receipt(run: RunRecord, receipt: PublishReceipt) -> None:
+        path = run.artifact_dir / "publish-receipt.json"
+        path.write_text(receipt.model_dump_json(indent=2), encoding="utf-8")
 
     @staticmethod
     def _load_sources(run: RunRecord) -> list[Source]:

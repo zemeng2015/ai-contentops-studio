@@ -48,8 +48,12 @@ def test_cli_approve_then_publish(
     )
     approve_result = runner.invoke(app, ["approve", run_id, "--reviewer", "zack"])
     publish_result = runner.invoke(app, ["publish", run_id])
+    receipt_result = runner.invoke(app, ["publish-receipt", run_id])
 
     assert approve_result.exit_code == 0
     assert "Status: approved" in approve_result.output
     assert publish_result.exit_code == 0
     assert "Status: published" in publish_result.output
+    assert receipt_result.exit_code == 0
+    assert '"provider": "static"' in receipt_result.output
+    assert '"reviewer": "zack"' in receipt_result.output

@@ -71,6 +71,8 @@ Approval is also part of the review layer. A generated run normally enters `need
 operator can approve or reject it, and the decision is written to `approval.json`. Publishing a
 reviewed run requires approval unless the operator uses an explicit force override. This gives the
 system a real editorial control point instead of treating publish as a casual button click.
+Successful publishes write `publish-receipt.json`, which links the public URL back to the run,
+publisher, approval record, force flag, and publish plan items.
 
 ```text
 needs_review -> approved -> publishing -> published

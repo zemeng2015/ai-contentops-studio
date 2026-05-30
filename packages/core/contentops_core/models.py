@@ -106,6 +106,16 @@ class ApprovalRecord(BaseModel):
     decided_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PublishReceipt(BaseModel):
+    run_id: str
+    provider: str
+    url: str
+    plan_items: list[PublishPlanItem]
+    approval: ApprovalRecord | None = None
+    force: bool = False
+    published_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class TraceEvent(BaseModel):
     timestamp: datetime
     step: str

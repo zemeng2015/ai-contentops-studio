@@ -8,6 +8,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
     ApprovalRecord,
     PublishPlan,
+    PublishReceipt,
     RunComparison,
     RunMetrics,
     RunRecord,
@@ -141,6 +142,7 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
     if "research.json" in artifacts:
         source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
     approval_html = _approval_html(review_service.approval(run_id))
+    receipt_html = _publish_receipt_html(review_service.publish_receipt(run_id))
     publish_action = (
         f'<form method="post" action="/dashboard/runs/{escape(run_id)}/publish">'
         '<button type="submit">Publish run</button></form>'
@@ -177,6 +179,8 @@ def dashboard_run_detail(run_id: str) -> HTMLResponse:
                 <button type="submit">Reject run</button>
               </form>
               {publish_action}
+              <h3>Publish Receipt</h3>
+              {receipt_html}
               <form method="post" action="/dashboard/runs/{escape(run_id)}/rerun">
                 <button type="submit">Rerun with same request</button>
               </form>
@@ -360,6 +364,14 @@ def reject_run(run_id: str, reviewer: str = "operator", notes: str = "") -> RunR
 def get_approval(run_id: str) -> ApprovalRecord | None:
     try:
         return review_service.approval(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/runs/{run_id}/publish-receipt", response_model=PublishReceipt | None)
+def get_publish_receipt(run_id: str) -> PublishReceipt | None:
+    try:
+        return review_service.publish_receipt(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -563,6 +575,35 @@ def _approval_html(approval: ApprovalRecord | None) -> str:
         At: {escape(approval.decided_at.isoformat())}
       </p>
       <p>{escape(approval.notes or "No notes.")}</p>
+    """
+
+
+def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
+    if receipt is None:
+        return "<p>No publish receipt recorded.</p>"
+    item_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.action)}</td>
+          <td>{escape(item.path)}</td>
+          <td>{escape(item.description)}</td>
+        </tr>
+        """
+        for item in receipt.plan_items
+    )
+    reviewer = receipt.approval.reviewer if receipt.approval is not None else "force"
+    return f"""
+      <p>
+        Provider: <strong>{escape(receipt.provider)}</strong> |
+        Reviewer: <strong>{escape(reviewer)}</strong> |
+        Force: <strong>{str(receipt.force).lower()}</strong>
+      </p>
+      <p>URL: <a href="{escape(receipt.url)}">{escape(receipt.url)}</a></p>
+      <p>Published at: {escape(receipt.published_at.isoformat())}</p>
+      <table>
+        <thead><tr><th>Action</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>{item_rows}</tbody>
+      </table>
     """
 
 
