@@ -245,6 +245,38 @@ class RunMetrics(BaseModel):
     step_metrics: list[StepMetric]
 
 
+class RunScorecard(BaseModel):
+    run_id: str
+    status: RunStatus
+    topic: str
+    slug: str
+    published_url: str | None = None
+    source_count: int = 0
+    total_duration_ms: int | None = None
+    latency_slo_ms: int
+    min_source_count: int
+    publish_ready: bool | None = None
+    groundedness: float | None = None
+    source_coverage: float | None = None
+    source_quality: float | None = None
+    career_relevance: float | None = None
+    technical_depth: float | None = None
+    quality_pass: bool | None = None
+    latency_slo_pass: bool | None = None
+    sources_slo_pass: bool
+    overall_pass: bool
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ScorecardListResponse(BaseModel):
+    items: list[RunScorecard]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    quality_pass_rate: float = Field(ge=0, le=1)
+    avg_duration_ms: int | None = None
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str

@@ -97,6 +97,18 @@ variable "notification_timeout_seconds" {
   default     = 5
 }
 
+variable "latency_slo_ms" {
+  description = "Run duration SLO in milliseconds for operational scorecards."
+  type        = number
+  default     = 120000
+}
+
+variable "min_source_count" {
+  description = "Minimum source count expected by operational scorecards."
+  type        = number
+  default     = 1
+}
+
 variable "homepage_repo_path" {
   description = "Optional mounted path for homepage publisher in container deployments."
   type        = string

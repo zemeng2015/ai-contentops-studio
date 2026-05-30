@@ -238,6 +238,8 @@ resource "aws_ecs_task_definition" "api" {
         { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" },
         { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) },
         { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) },
+        { name = "CONTENTOPS_LATENCY_SLO_MS", value = tostring(var.latency_slo_ms) },
+        { name = "CONTENTOPS_MIN_SOURCE_COUNT", value = tostring(var.min_source_count) },
         { name = "CONTENTOPS_HOMEPAGE_REPO_PATH", value = var.homepage_repo_path }
       ]
       secrets = concat(
@@ -301,7 +303,9 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "CONTENTOPS_GENERATOR_PROVIDER", value = "template" },
         { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" },
         { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) },
-        { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) }
+        { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) },
+        { name = "CONTENTOPS_LATENCY_SLO_MS", value = tostring(var.latency_slo_ms) },
+        { name = "CONTENTOPS_MIN_SOURCE_COUNT", value = tostring(var.min_source_count) }
       ]
       secrets = concat(
         [

@@ -12,6 +12,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - content planning before generation
 - deterministic quality evaluation
 - observable run history and artifacts
+- operational scorecards for quality, latency SLOs, and source-count checks
 - artifact manifests with size, type, timestamp, and content hash metadata
 - queryable review queue with status/search filters and pagination
 - batch approve/reject workflow for review queues
@@ -122,7 +123,7 @@ Operational docs:
 - FastAPI `POST /runs` and `GET /runs`
 - FastAPI `GET /review-queue` with status/search filters and pagination metadata
 - FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
-- FastAPI metrics, rerun, publish-plan, and run-comparison endpoints
+- FastAPI metrics, scorecard, rerun, publish-plan, and run-comparison endpoints
 - Worker entrypoint for single-job or batch YAML content calendars
 - CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
   `contentops publish`, plus review commands for metrics, source-audit, rerun, publish-plan,
@@ -140,6 +141,8 @@ contentops show <run_id> --artifact eval-report.json
 contentops export-run <run_id> --output run-evidence.zip
 contentops publish-plan <run_id>
 contentops metrics <run_id>
+contentops scorecard <run_id>
+contentops scorecards --status needs_review --json
 contentops source-audit <run_id>
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
@@ -166,6 +169,7 @@ GET  /runs/{run_id}/bundle
 GET  /runs/{run_id}/artifacts/{artifact_name}
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/metrics
+GET  /runs/{run_id}/scorecard
 GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/approval
 GET  /runs/{run_id}/publish-receipt
@@ -176,6 +180,7 @@ GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
 GET  /content?limit=20&offset=0
+GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject
@@ -204,6 +209,8 @@ The dashboard also surfaces recent worker executions from job receipts so schedu
 can be reviewed from the same operational surface.
 It also includes a Published Content catalog with shipped URLs, providers, timestamps, and
 evaluation scores for portfolio and operations review.
+It also includes Quality Scorecards that combine evaluation readiness, run duration SLOs, and
+source-count thresholds for production-style operational review.
 Run detail pages can compare two runs to spot evaluation deltas, source-count changes, and source
 overlap before publishing.
 Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
@@ -271,6 +278,8 @@ CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 # CONTENTOPS_OPERATOR_API_KEY=
 CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5
 # CONTENTOPS_NOTIFICATION_WEBHOOK_URL=
+CONTENTOPS_LATENCY_SLO_MS=120000
+CONTENTOPS_MIN_SOURCE_COUNT=1
 ```
 
 Research provider modes:

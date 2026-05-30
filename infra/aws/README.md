@@ -49,3 +49,5 @@ deployments.
 Set `require_read_api_key=true` to protect dashboard and artifact read routes with the same key.
 Set `notification_webhook_url_secret_arn` to deliver review and publishing events to an external
 webhook while retaining local `notification-log.json` receipts.
+Tune `latency_slo_ms` and `min_source_count` to make the dashboard and `/scorecards` API reflect
+the production quality bar for recurring content runs.

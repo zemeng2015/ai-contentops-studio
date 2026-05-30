@@ -131,6 +131,8 @@ def build_review_service(settings: Settings | None = None) -> ReviewService:
         repository=RunRepository(settings.database_url),
         publisher=_build_publisher(settings),
         notifier=_build_notifier(settings),
+        latency_slo_ms=settings.latency_slo_ms,
+        min_source_count=settings.min_source_count,
     )
 
 

@@ -34,7 +34,9 @@ from contentops_core.models import (
     RunMetrics,
     RunRecord,
     RunRequest,
+    RunScorecard,
     RunStatus,
+    ScorecardListResponse,
     Source,
     SourceOverlap,
 )
@@ -50,10 +52,14 @@ class ReviewService:
         repository: RunRepository,
         publisher: Publisher,
         notifier: NotificationPublisher | None = None,
+        latency_slo_ms: int = 120000,
+        min_source_count: int = 1,
     ) -> None:
         self.repository = repository
         self.publisher = publisher
         self.notifier = notifier or LocalNotificationPublisher()
+        self.latency_slo_ms = latency_slo_ms
+        self.min_source_count = min_source_count
         self.metrics_service = MetricsService()
 
     def list_artifacts(self, run_id: str) -> list[str]:
@@ -358,6 +364,32 @@ class ReviewService:
     def metrics(self, run_id: str) -> RunMetrics:
         return self.metrics_service.run_metrics(self._get_run(run_id))
 
+    def scorecard(self, run_id: str) -> RunScorecard:
+        return self._scorecard_for_run(self._get_run(run_id))
+
+    def scorecards(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        status: RunStatus | None = None,
+        query: str = "",
+    ) -> ScorecardListResponse:
+        runs = self.repository.list(limit=limit, offset=offset, status=status, query=query)
+        items = [self._scorecard_for_run(run) for run in runs]
+        evaluated = [item for item in items if item.quality_pass is not None]
+        passing = sum(1 for item in evaluated if item.quality_pass)
+        durations = [
+            item.total_duration_ms for item in items if item.total_duration_ms is not None
+        ]
+        return ScorecardListResponse(
+            items=items,
+            total=self.repository.count(status=status, query=query),
+            limit=limit,
+            offset=offset,
+            quality_pass_rate=round(passing / len(evaluated), 3) if evaluated else 0.0,
+            avg_duration_ms=round(sum(durations) / len(durations)) if durations else None,
+        )
+
     def request(self, run_id: str) -> RunRequest:
         return self._load_json(self._get_run(run_id), "request.json", RunRequest)
 
@@ -512,6 +544,57 @@ class ReviewService:
             technical_depth=report.technical_depth,
         )
 
+    def _scorecard_for_run(self, run: RunRecord) -> RunScorecard:
+        metrics = self.metrics_service.run_metrics(run)
+        warnings: list[str] = []
+        report = self._load_optional_json(run, "eval-report.json", EvaluationReport)
+        quality_pass: bool | None = None
+        if report is None:
+            warnings.append("Evaluation report is missing.")
+        else:
+            quality_pass = report.publish_ready
+            if not report.publish_ready:
+                warnings.append("Evaluation report is not publish-ready.")
+            warnings.extend(report.findings)
+        latency_slo_pass: bool | None = None
+        if metrics.total_duration_ms is None:
+            warnings.append("Run duration is unavailable.")
+        else:
+            latency_slo_pass = metrics.total_duration_ms <= self.latency_slo_ms
+            if not latency_slo_pass:
+                warnings.append(
+                    f"Run exceeded latency SLO of {self.latency_slo_ms}ms."
+                )
+        sources_slo_pass = metrics.source_count >= self.min_source_count
+        if not sources_slo_pass:
+            warnings.append(
+                f"Run has fewer than {self.min_source_count} source(s)."
+            )
+        return RunScorecard(
+            run_id=run.id,
+            status=run.status,
+            topic=run.topic,
+            slug=run.slug,
+            published_url=run.published_url,
+            source_count=metrics.source_count,
+            total_duration_ms=metrics.total_duration_ms,
+            latency_slo_ms=self.latency_slo_ms,
+            min_source_count=self.min_source_count,
+            publish_ready=report.publish_ready if report is not None else None,
+            groundedness=report.groundedness if report is not None else None,
+            source_coverage=report.source_coverage if report is not None else None,
+            source_quality=report.source_quality if report is not None else None,
+            career_relevance=report.career_relevance if report is not None else None,
+            technical_depth=report.technical_depth if report is not None else None,
+            quality_pass=quality_pass,
+            latency_slo_pass=latency_slo_pass,
+            sources_slo_pass=sources_slo_pass,
+            overall_pass=quality_pass is True
+            and latency_slo_pass is not False
+            and sources_slo_pass,
+            warnings=warnings,
+        )
+
     def _record_audit_event(self, run: RunRecord, event: AuditEvent) -> None:
         self._append_audit_event(run, event)
         delivery = self.notifier.notify(run, event)
@@ -544,6 +627,14 @@ class ReviewService:
             return []
         packet = ResearchPacket.model_validate(json.loads(path.read_text(encoding="utf-8")))
         return packet.sources
+
+    @staticmethod
+    def _load_optional_json(run: RunRecord, artifact_name: str, model: type[T]) -> T | None:
+        path = run.artifact_dir / artifact_name
+        if not path.exists():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return model.model_validate(data)
 
     @classmethod
     def _source_overlap(

@@ -134,6 +134,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
     source_audit_response = client.get(f"/runs/{run['id']}/source-audit")
     metrics_response = client.get(f"/runs/{run['id']}/metrics")
+    scorecard_response = client.get(f"/runs/{run['id']}/scorecard")
+    scorecards_response = client.get("/scorecards?limit=5")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
     approve_response = client.post(f"/runs/{run['id']}/approve?reviewer=zack&notes=ready")
@@ -158,6 +160,11 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert source_audit_response.json()["source_count"] >= 1
     assert metrics_response.status_code == 200
     assert metrics_response.json()["source_count"] >= 1
+    assert scorecard_response.status_code == 200
+    assert scorecard_response.json()["overall_pass"] is True
+    assert scorecard_response.json()["source_count"] >= 1
+    assert scorecards_response.status_code == 200
+    assert any(item["run_id"] == run["id"] for item in scorecards_response.json()["items"])
     assert rerun_response.status_code == 200
     assert rerun_response.json()["id"] != run["id"]
     assert rerun_response.json()["topic"] == run["topic"]
@@ -297,6 +304,7 @@ def test_dashboard_renders() -> None:
     assert "Create run" in response.text
     assert "Optional source URLs" in response.text
     assert "Published Content" in response.text
+    assert "Quality Scorecards" in response.text
 
 
 def test_dashboard_filters_runs() -> None:
@@ -325,6 +333,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Publish Receipt" in detail_response.text
     assert "Audit Log" in detail_response.text
     assert "Notification Deliveries" in detail_response.text
+    assert "Quality Scorecard" in detail_response.text
     assert "Manifest JSON" in detail_response.text
     assert "Download evidence bundle" in detail_response.text
     assert "Run Timeline" in detail_response.text

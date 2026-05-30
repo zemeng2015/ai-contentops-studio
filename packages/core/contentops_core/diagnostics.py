@@ -111,6 +111,10 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("research retry backoff cannot be negative")
     if settings.notification_timeout_seconds <= 0:
         failures.append("notification timeout must be greater than 0")
+    if settings.latency_slo_ms <= 0:
+        failures.append("latency SLO must be greater than 0")
+    if settings.min_source_count < 1:
+        failures.append("minimum source count must be at least 1")
     if settings.publisher_provider == "homepage" and settings.homepage_repo_path is None:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
@@ -141,6 +145,8 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             "publisher_provider": settings.publisher_provider,
             "notification_webhook_configured": settings.notification_webhook_url is not None,
             "notification_timeout_seconds": settings.notification_timeout_seconds,
+            "latency_slo_ms": settings.latency_slo_ms,
+            "min_source_count": settings.min_source_count,
             "warnings": warnings,
         },
     )

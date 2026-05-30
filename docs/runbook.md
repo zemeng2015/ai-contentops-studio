@@ -50,10 +50,12 @@ For each candidate:
 contentops manifest <run_id>
 contentops source-audit <run_id> --json
 contentops metrics <run_id>
+contentops scorecard <run_id>
 contentops show <run_id> --artifact eval-report.json
 ```
 
-Approve only when source quality, groundedness, and technical depth are acceptable:
+Approve only when source quality, groundedness, technical depth, and the run scorecard are
+acceptable:
 
 ```powershell
 contentops approve <run_id> --reviewer "Zack" --notes "Sources and evaluation reviewed."
@@ -91,15 +93,18 @@ Track shipped content as an operational catalog:
 
 ```powershell
 contentops content --json
+contentops scorecards --json
 ```
 
 The same catalog is available from:
 
 ```text
 GET /content?limit=20&offset=0
+GET /scorecards?limit=20&offset=0
 ```
 
-Use it to review shipped URLs, providers, publish timestamps, and evaluation scores.
+Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,
+latency SLOs, and source-count SLOs.
 
 ## 6. Evidence Export
 
@@ -152,6 +157,7 @@ Recommended AWS-backed setup:
 - Secrets Manager for OpenAI, search provider, database, and operator API keys.
 - Optional webhook endpoint for review and publishing notifications.
 - CloudWatch alarms for failed worker tasks and API `5xx` responses.
+- `CONTENTOPS_LATENCY_SLO_MS` and `CONTENTOPS_MIN_SOURCE_COUNT` tuned for the content workflow.
 
 Mutating API and dashboard operations should use `CONTENTOPS_OPERATOR_API_KEY` in shared
 deployments.

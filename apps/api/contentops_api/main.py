@@ -32,7 +32,9 @@ from contentops_core.models import (
     RunMetrics,
     RunRecord,
     RunRequest,
+    RunScorecard,
     RunStatus,
+    ScorecardListResponse,
     SourceAuditReport,
     SystemStatus,
 )
@@ -153,6 +155,7 @@ def dashboard(
         limit=5,
     )
     published_content = review_service.published_content(limit=5)
+    scorecards = review_service.scorecards(limit=5)
     metrics = [_safe_metrics(run.id) for run in runs]
     completed = sum(
         1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -239,6 +242,11 @@ def dashboard(
               <p>Operational catalog of shipped articles and their evaluation scores.</p>
               {_published_content_html(published_content)}
             </section>
+            <section class="hero compact">
+              <h2>Quality Scorecards</h2>
+              <p>Operational SLO and quality view for recent AI content runs.</p>
+              {_scorecards_html(scorecards)}
+            </section>
             """,
         )
     )
@@ -288,6 +296,7 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
     if "eval-report.json" in artifacts:
         eval_report = review_service.read_artifact(run_id, "eval-report.json")
     metrics = review_service.metrics(run_id)
+    scorecard = review_service.scorecard(run_id)
     timeline_rows = _timeline_rows(metrics)
     plan_html = ""
     try:
@@ -337,6 +346,8 @@ def dashboard_run_detail(run_id: str, api_key: str = Query(default="")) -> HTMLR
               </div>
               <h3>Publish Plan</h3>
               {plan_html}
+              <h3>Quality Scorecard</h3>
+              {_scorecard_html(scorecard)}
               <h3>Approval</h3>
               {approval_html}
               <form method="post" action="{approve_action}">
@@ -624,6 +635,25 @@ def list_published_content(
 
 
 @app.get(
+    "/scorecards",
+    response_model=ScorecardListResponse,
+    dependencies=[Depends(require_read_access)],
+)
+def list_scorecards(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str = Query(default=""),
+    q: str = Query(default=""),
+) -> ScorecardListResponse:
+    return review_service.scorecards(
+        limit=limit,
+        offset=offset,
+        status=_parse_status_filter(status),
+        query=q,
+    )
+
+
+@app.get(
     "/runs/{run_id}",
     response_model=RunRecord,
     dependencies=[Depends(require_read_access)],
@@ -846,6 +876,18 @@ def get_publish_plan(run_id: str) -> dict[str, object]:
 def get_run_metrics(run_id: str) -> RunMetrics:
     try:
         return review_service.metrics(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/runs/{run_id}/scorecard",
+    response_model=RunScorecard,
+    dependencies=[Depends(require_read_access)],
+)
+def get_run_scorecard(run_id: str) -> RunScorecard:
+    try:
+        return review_service.scorecard(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -1245,6 +1287,71 @@ def _published_content_html(catalog: PublishedContentListResponse) -> str:
     """
 
 
+def _scorecards_html(scorecards: ScorecardListResponse) -> str:
+    if not scorecards.items:
+        return "<p>No scorecards recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td>{escape(item.status.value)}</td>
+          <td>{escape(item.topic)}</td>
+          <td>{_pass_label(item.overall_pass)}</td>
+          <td>{_optional_score(item.groundedness)}</td>
+          <td>{_optional_score(item.source_quality)}</td>
+          <td>{_duration_label(item.total_duration_ms)}</td>
+          <td>{item.source_count}</td>
+        </tr>
+        """
+        for item in scorecards.items
+    )
+    return f"""
+      <p>
+        <a href="/scorecards">Scorecards JSON</a> |
+        Quality pass rate: <strong>{scorecards.quality_pass_rate:.0%}</strong> |
+        Avg duration: <strong>{_duration_label(scorecards.avg_duration_ms)}</strong>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Status</th><th>Topic</th><th>Pass</th><th>Grounded</th>
+            <th>Source quality</th><th>Duration</th><th>Sources</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _scorecard_html(scorecard: RunScorecard) -> str:
+    warnings = "".join(f"<li>{escape(warning)}</li>" for warning in scorecard.warnings)
+    return f"""
+      <p><a href="/runs/{escape(scorecard.run_id)}/scorecard">Scorecard JSON</a></p>
+      <div class="metrics">
+        <div><strong>{_pass_label(scorecard.overall_pass)}</strong><span>Overall</span></div>
+        <div><strong>{_optional_bool(scorecard.quality_pass)}</strong><span>Quality</span></div>
+        <div>
+          <strong>{_optional_bool(scorecard.latency_slo_pass)}</strong>
+          <span>Latency SLO</span>
+        </div>
+        <div><strong>{_pass_label(scorecard.sources_slo_pass)}</strong><span>Source SLO</span></div>
+        <div><strong>{_duration_label(scorecard.total_duration_ms)}</strong><span>Total</span></div>
+        <div><strong>{scorecard.source_count}</strong><span>Sources</span></div>
+      </div>
+      <table>
+        <thead><tr><th>Score</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Groundedness</td><td>{_optional_score(scorecard.groundedness)}</td></tr>
+          <tr><td>Source coverage</td><td>{_optional_score(scorecard.source_coverage)}</td></tr>
+          <tr><td>Source quality</td><td>{_optional_score(scorecard.source_quality)}</td></tr>
+          <tr><td>Career relevance</td><td>{_optional_score(scorecard.career_relevance)}</td></tr>
+          <tr><td>Technical depth</td><td>{_optional_score(scorecard.technical_depth)}</td></tr>
+        </tbody>
+      </table>
+      <ul>{warnings}</ul>
+    """
+
+
 def _audit_log_html(events: list[AuditEvent]) -> str:
     if not events:
         return "<p>No audit events recorded.</p>"
@@ -1375,6 +1482,20 @@ def _duration_label(duration_ms: int | None) -> str:
     if duration_ms < 1000:
         return f"{duration_ms}ms"
     return f"{duration_ms / 1000:.2f}s"
+
+
+def _optional_score(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.2f}"
+
+
+def _optional_bool(value: bool | None) -> str:
+    if value is None:
+        return "n/a"
+    return _pass_label(value)
+
+
+def _pass_label(value: bool) -> str:
+    return "pass" if value else "fail"
 
 
 def _publish_plan_html(plan: PublishPlan) -> str:
