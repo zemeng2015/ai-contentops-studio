@@ -5,11 +5,6 @@ from html import escape
 from typing import Annotated
 from uuid import uuid4
 
-from contentops_core.diagnostics import (
-    deployment_manifest,
-    release_readiness,
-    system_status,
-)
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionListResponse,
@@ -26,7 +21,6 @@ from contentops_core.models import (
     AuditEvent,
     AuditEventListResponse,
     CostReportListResponse,
-    DeploymentManifest,
     GenerationReceipt,
     IncidentReportListResponse,
     NotificationDelivery,
@@ -35,7 +29,6 @@ from contentops_core.models import (
     PublishReceipt,
     PublishRollbackResult,
     PublishVerificationReport,
-    ReleaseReadinessReport,
     RetentionReport,
     ReviewBatchRequest,
     ReviewBatchResult,
@@ -50,7 +43,6 @@ from contentops_core.models import (
     RunStatus,
     ScorecardListResponse,
     SourceAuditReport,
-    SystemStatus,
 )
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -59,6 +51,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import RequestResponseEndpoint
 
+from contentops_api.routes.ops import build_ops_router
 from contentops_api.views import (
     _api_key_hidden,
     _api_key_query,
@@ -178,38 +171,14 @@ async def require_read_access(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Valid read API key required.")
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/ready", response_model=SystemStatus)
-def ready(response: Response) -> SystemStatus:
-    status = system_status(settings, repository)
-    if status.status == "fail":
-        response.status_code = 503
-    return status
-
-
-@app.get(
-    "/deployment-manifest",
-    response_model=DeploymentManifest,
-    dependencies=[Depends(require_read_access)],
+app.include_router(
+    build_ops_router(
+        settings=settings,
+        repository=repository,
+        review_service=review_service,
+        require_read_access=require_read_access,
+    )
 )
-def get_deployment_manifest() -> DeploymentManifest:
-    return deployment_manifest(settings, repository)
-
-
-@app.get(
-    "/release-readiness",
-    response_model=ReleaseReadinessReport,
-    dependencies=[Depends(require_read_access)],
-)
-def get_release_readiness(
-    window_size: int = Query(default=100, ge=1, le=500),
-) -> ReleaseReadinessReport:
-    operations = review_service.operations_summary(window_size=window_size)
-    return release_readiness(settings, repository, operations)
 
 
 @app.get("/", response_class=HTMLResponse, dependencies=[Depends(require_read_access)])
