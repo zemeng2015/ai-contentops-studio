@@ -34,6 +34,19 @@ AI ContentOps Studio 是一个面向生产场景设计的 AI 内容运营平台�
 - worker recovery plans 可把失败的定时任务重建为可重跑 YAML
 - AWS-ready artifact storage、RDS、EventBridge 和 Terraform deployment skeleton
 
+## 3 分钟 Demo
+
+```powershell
+docker compose up --build -d api
+docker compose run --rm demo-seed
+```
+
+然后打开 `http://localhost:8000/dashboard`。`demo-seed` 会生成 published、approved 和
+needs-review 三类 run，方便直接检查 dashboard、artifacts、receipts、scorecards、incidents
+和静态站点输出。
+
+完整流程见 [Demo Walkthrough](docs/demo.md)。
+
 ## 项目能力
 
 给定一个技术主题或一组真实网页来源，系统会创建一次内容运行任务：
@@ -131,6 +144,7 @@ tests/                     单元测试和集成测试
 
 ```powershell
 contentops run --topic "AI quality gates for RAG systems"
+contentops demo-seed
 contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops publish-plan <run_id>

@@ -24,6 +24,12 @@ from contentops_core.settings import Settings
 
 app = typer.Typer(help="AI ContentOps Studio command line tools.")
 
+DEMO_TOPICS = [
+    "Production LLM evaluation workflow for enterprise RAG",
+    "Agent workflow reliability patterns for applied AI teams",
+    "AI engineering observability signals for content operations",
+]
+
 
 @app.command()
 def run(
@@ -42,6 +48,67 @@ def run(
     typer.echo(f"Artifacts: {result.run.artifact_dir}")
     if result.published_url:
         typer.echo(f"Published: {result.published_url}")
+
+
+@app.command("demo-seed")
+def demo_seed(
+    topic: Annotated[
+        list[str] | None,
+        typer.Option("--topic", help="Demo topic to generate. Repeat for multiple runs."),
+    ] = None,
+    publish_first: Annotated[
+        bool,
+        typer.Option(help="Approve and publish the first generated demo run."),
+    ] = True,
+    approve_second: Annotated[
+        bool,
+        typer.Option(help="Approve the second generated demo run without publishing it."),
+    ] = True,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    pipeline = build_pipeline(settings)
+    service = build_review_service(settings)
+    topics = topic or DEMO_TOPICS
+    seeded: list[dict[str, str | None]] = []
+
+    for index, run_topic in enumerate(topics):
+        result = pipeline.run(RunRequest(topic=run_topic, publish=False))
+        run = result.run
+        action = "created"
+        error: str | None = None
+        try:
+            if index == 0 and publish_first:
+                run = service.approve(run.id, reviewer="demo", notes="Seeded demo approval")
+                run = service.publish(run.id)
+                action = "published"
+            elif index == 1 and approve_second:
+                run = service.approve(run.id, reviewer="demo", notes="Seeded demo approval")
+                action = "approved"
+        except ValueError as exc:
+            error = str(exc)
+            action = "created"
+        seeded.append(
+            {
+                "id": run.id,
+                "topic": run.topic,
+                "status": run.status.value,
+                "action": action,
+                "published_url": run.published_url,
+                "error": error,
+            }
+        )
+
+    if json_output:
+        typer.echo(json.dumps({"runs": seeded}, indent=2))
+        return
+    typer.echo(f"Seeded {len(seeded)} demo run(s)")
+    for item in seeded:
+        suffix = f" -> {item['published_url']}" if item["published_url"] else ""
+        typer.echo(f"- {item['id']}  {item['status']}  {item['topic']}{suffix}")
 
 
 @app.command("runs")

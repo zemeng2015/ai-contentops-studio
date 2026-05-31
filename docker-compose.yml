@@ -1,0 +1,39 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      CONTENTOPS_ARTIFACT_ROOT: /data/artifacts
+      CONTENTOPS_DATABASE_URL: sqlite:////data/contentops.db
+      CONTENTOPS_SITE_OUTPUT_DIR: /data/site
+      CONTENTOPS_PUBLIC_BASE_URL: http://localhost:8000/site
+      CONTENTOPS_RESEARCH_PROVIDER: local
+      CONTENTOPS_GENERATOR_PROVIDER: template
+      CONTENTOPS_PUBLISHER_PROVIDER: static
+      CONTENTOPS_REQUIRE_READ_API_KEY: "false"
+    volumes:
+      - contentops-data:/data
+
+  demo-seed:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile
+    profiles:
+      - demo
+    environment:
+      CONTENTOPS_ARTIFACT_ROOT: /data/artifacts
+      CONTENTOPS_DATABASE_URL: sqlite:////data/contentops.db
+      CONTENTOPS_SITE_OUTPUT_DIR: /data/site
+      CONTENTOPS_PUBLIC_BASE_URL: http://localhost:8000/site
+      CONTENTOPS_RESEARCH_PROVIDER: local
+      CONTENTOPS_GENERATOR_PROVIDER: template
+      CONTENTOPS_PUBLISHER_PROVIDER: static
+    volumes:
+      - contentops-data:/data
+    command: ["contentops", "demo-seed", "--json"]
+
+volumes:
+  contentops-data:

@@ -41,6 +41,19 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - AWS-ready artifact storage and Terraform deployment skeleton
 - local-first development with AWS-ready deployment primitives
 
+## 3-minute demo
+
+```powershell
+docker compose up --build -d api
+docker compose run --rm demo-seed
+```
+
+Then open `http://localhost:8000/dashboard`. The demo seed creates published, approved, and
+needs-review runs so reviewers can inspect the dashboard, artifacts, receipts, scorecards,
+incidents, and static site output immediately.
+
+See [Demo Walkthrough](docs/demo.md) for the full local and Docker flow.
+
 ## What it does
 
 Given a topic, URL, or repository, the system creates a content run:
@@ -106,6 +119,7 @@ Operational docs:
 
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
+- [Demo Walkthrough](docs/demo.md)
 - [Production runbook](docs/runbook.md)
 
 ## Architecture principles
@@ -148,6 +162,7 @@ Generate first, inspect artifacts, then publish:
 
 ```powershell
 contentops run --topic "AI quality gates for RAG systems"
+contentops demo-seed
 contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
 contentops export-run <run_id> --output run-evidence.zip

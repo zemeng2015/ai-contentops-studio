@@ -124,6 +124,29 @@ def test_cli_approve_then_publish(
     assert '"action": "rollback_publish"' in notifications_result.output
 
 
+def test_cli_demo_seed_creates_reviewable_dashboard_data(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("CONTENTOPS_PUBLIC_BASE_URL", "https://example.com")
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["demo-seed", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert [item["status"] for item in payload["runs"]] == [
+        "published",
+        "approved",
+        "needs_review",
+    ]
+    assert payload["runs"][0]["published_url"] is not None
+    assert (tmp_path / "site" / "index.html").exists()
+
+
 def test_cli_queue_and_manifest_commands(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
