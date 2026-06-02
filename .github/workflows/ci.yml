@@ -30,6 +30,14 @@ jobs:
           alembic upgrade head
       - name: Worker dry run
         run: contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
+      - name: Release evidence
+        run: |
+          export CONTENTOPS_DATABASE_URL=sqlite:///release-evidence.db
+          python scripts/generate_release_evidence.py --output-dir release-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: release-evidence/*.json
       - name: Test
         run: pytest
 

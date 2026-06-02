@@ -13,4 +13,5 @@ build/
 artifacts/
 contentops.db
 site/
-
+release-evidence*/
+release-evidence.db

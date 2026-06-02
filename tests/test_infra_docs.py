@@ -31,6 +31,8 @@ def test_ci_validates_terraform() -> None:
     assert "hashicorp/setup-terraform" in workflow
     assert "terraform fmt -check" in workflow
     assert "terraform validate" in workflow
+    assert "scripts/generate_release_evidence.py" in workflow
+    assert "actions/upload-artifact" in workflow
 
 
 def test_docker_image_contains_release_profile() -> None:

@@ -117,6 +117,20 @@ Set `CONTENTOPS_OPENAI_API_KEY` for the OpenAI generation smoke test,
 `CONTENTOPS_RESEARCH_SEARCH_API_KEY` for the Brave-compatible search smoke test, and
 `CONTENTOPS_HOMEPAGE_REPO_PATH` for the read-only homepage publisher plan check.
 
+## Release evidence
+
+Every CI run generates release evidence JSON artifacts that can be attached to release notes or
+reviewed during deployment approval:
+
+```powershell
+python scripts/generate_release_evidence.py --output-dir release-evidence
+```
+
+The evidence bundle includes system status, a redacted deployment manifest, operations summary,
+release readiness gates, and a summary file with the commit SHA. The command exits non-zero only
+when release readiness is `fail`; local-development `warn` states remain inspectable without
+blocking ordinary CI.
+
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:
 
