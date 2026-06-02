@@ -120,6 +120,7 @@ Operational docs:
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
 - [Demo Walkthrough](docs/demo.md)
+- [Integration Smoke Tests](docs/integration-smoke.md)
 - [Production runbook](docs/runbook.md)
 
 ## Architecture principles
@@ -445,6 +446,16 @@ CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 The OpenAI provider retries transient timeouts, connection errors, `429`, and `5xx` responses.
 When `CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true`, exhausted provider failures fall back to the
 deterministic template generator so scheduled runs can still produce reviewable artifacts.
+
+Optional live provider smoke tests can verify OpenAI, Brave-compatible search, public feeds, and
+the configured homepage publisher path when credentials are available:
+
+```powershell
+$env:CONTENTOPS_RUN_INTEGRATION="1"
+pytest -m integration tests/test_integration_smoke.py
+```
+
+See [Integration Smoke Tests](docs/integration-smoke.md) for the required provider variables.
 
 Publish into the portfolio homepage repository:
 

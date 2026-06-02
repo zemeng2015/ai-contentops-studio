@@ -65,6 +65,9 @@ pythonpath = [
   "packages/publishing",
   "packages/observability",
 ]
+markers = [
+  "integration: optional live provider smoke tests that require CONTENTOPS_RUN_INTEGRATION=1 and provider credentials",
+]
 
 [tool.ruff]
 line-length = 100

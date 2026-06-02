@@ -90,6 +90,20 @@ The migration environment reads `CONTENTOPS_DATABASE_URL` through the same setti
 the API, CLI, and worker. This keeps SQLite useful for local development while giving RDS/Postgres
 deployments an explicit, reviewable schema version history.
 
+## Live provider smoke tests
+
+After provider credentials are injected into the target environment, run the optional smoke tests
+to verify external connectivity and response parsing before enabling scheduled jobs:
+
+```powershell
+$env:CONTENTOPS_RUN_INTEGRATION="1"
+pytest -m integration tests/test_integration_smoke.py
+```
+
+Set `CONTENTOPS_OPENAI_API_KEY` for the OpenAI generation smoke test,
+`CONTENTOPS_RESEARCH_SEARCH_API_KEY` for the Brave-compatible search smoke test, and
+`CONTENTOPS_HOMEPAGE_REPO_PATH` for the read-only homepage publisher plan check.
+
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:
 
