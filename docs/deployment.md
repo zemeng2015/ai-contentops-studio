@@ -15,6 +15,19 @@ docker build -f infra/docker/Dockerfile -t ai-contentops-studio .
 docker run --rm -p 8000:8000 ai-contentops-studio
 ```
 
+For a production-shaped container start, pass the release profile variables and run migrations at
+startup:
+
+```powershell
+Copy-Item config/production.env.example .env.production
+# Edit .env.production with real bucket, database, provider, and API key values.
+docker run --rm -p 8000:8000 --env-file .env.production ai-contentops-studio
+```
+
+`CONTENTOPS_RUN_MIGRATIONS=true` tells the image entrypoint to run `alembic upgrade head` before
+starting Uvicorn. The image also includes a `/ready` healthcheck so container platforms can detect
+database, artifact store, and provider configuration failures.
+
 ## AWS target architecture
 
 - API: ECS Fargate service behind ALB, or Lambda behind API Gateway

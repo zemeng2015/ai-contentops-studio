@@ -20,6 +20,7 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "CONTENTOPS_OPERATOR_API_KEY" in main
     assert "CONTENTOPS_READ_API_KEY" in main
     assert "CONTENTOPS_OPENAI_API_KEY" in main
+    assert "CONTENTOPS_RUN_MIGRATIONS" in main
     assert "CONTENTOPS_REQUIRE_READ_API_KEY" in main
     assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in main
 
@@ -30,3 +31,27 @@ def test_ci_validates_terraform() -> None:
     assert "hashicorp/setup-terraform" in workflow
     assert "terraform fmt -check" in workflow
     assert "terraform validate" in workflow
+
+
+def test_docker_image_contains_release_profile() -> None:
+    dockerfile = Path("infra/docker/Dockerfile").read_text(encoding="utf-8")
+    entrypoint = Path("infra/docker/entrypoint.py").read_text(encoding="utf-8")
+
+    assert "COPY alembic.ini" in dockerfile
+    assert "COPY migrations" in dockerfile
+    assert "ENTRYPOINT" in dockerfile
+    assert "HEALTHCHECK" in dockerfile
+    assert "CONTENTOPS_RUN_MIGRATIONS" in entrypoint
+    assert "alembic" in entrypoint
+    assert "os.execvp" in entrypoint
+
+
+def test_production_env_template_documents_required_release_settings() -> None:
+    template = Path("config/production.env.example").read_text(encoding="utf-8")
+
+    assert "CONTENTOPS_RUN_MIGRATIONS=true" in template
+    assert "CONTENTOPS_DATABASE_URL=postgresql+psycopg://" in template
+    assert "CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3" in template
+    assert "CONTENTOPS_GENERATOR_PROVIDER=openai" in template
+    assert "CONTENTOPS_RESEARCH_PROVIDER=discovery" in template
+    assert "CONTENTOPS_REQUIRE_READ_API_KEY=true" in template

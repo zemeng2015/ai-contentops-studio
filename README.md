@@ -39,6 +39,7 @@ It is designed to prove applied AI engineering skills beyond a prompt demo:
 - YAML-defined worker jobs for scheduled content calendars
 - worker recovery plans that rebuild failed scheduled jobs into rerunnable YAML
 - AWS-ready artifact storage and Terraform deployment skeleton
+- container release profile with optional startup migrations and health checks
 - local-first development with AWS-ready deployment primitives
 
 ## 3-minute demo
@@ -408,6 +409,11 @@ The Alembic environment reads the same `CONTENTOPS_DATABASE_URL` setting as the 
 local SQLite, Docker, and RDS/Postgres deployments use one schema path. The repository still creates
 tables automatically for zero-config local development, but production deployments should treat
 migrations as the controlled database change mechanism.
+
+Container deployments can set `CONTENTOPS_RUN_MIGRATIONS=true` to run `alembic upgrade head`
+before the API process starts. The Docker image includes the migration files and a `/ready`
+healthcheck; use [config/production.env.example](config/production.env.example) as the production
+environment profile.
 
 Protect write operations in shared environments:
 
