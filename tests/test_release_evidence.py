@@ -15,6 +15,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
     monkeypatch.setenv("CONTENTOPS_GIT_SHA", "test-sha")
     output_dir = tmp_path / "release-evidence"
 
