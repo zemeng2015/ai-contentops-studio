@@ -78,6 +78,18 @@ For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy ca
 pip install -e ".[aws]"
 ```
 
+Run schema migrations against the target database before API or worker tasks begin accepting
+traffic:
+
+```powershell
+$env:CONTENTOPS_DATABASE_URL="postgresql+psycopg://contentops:password@host:5432/contentops"
+alembic upgrade head
+```
+
+The migration environment reads `CONTENTOPS_DATABASE_URL` through the same settings object used by
+the API, CLI, and worker. This keeps SQLite useful for local development while giving RDS/Postgres
+deployments an explicit, reviewable schema version history.
+
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:
 

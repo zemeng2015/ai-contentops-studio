@@ -397,6 +397,17 @@ Use Postgres/RDS for run metadata:
 CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
 ```
 
+Apply database migrations before starting shared API or worker deployments:
+
+```powershell
+alembic upgrade head
+```
+
+The Alembic environment reads the same `CONTENTOPS_DATABASE_URL` setting as the application, so
+local SQLite, Docker, and RDS/Postgres deployments use one schema path. The repository still creates
+tables automatically for zero-config local development, but production deployments should treat
+migrations as the controlled database change mechanism.
+
 Protect write operations in shared environments:
 
 ```text
