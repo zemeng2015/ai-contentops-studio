@@ -11,10 +11,12 @@ from contentops_core.jobs import (
     JobExecutionListResponse,
     JobExecutionReport,
     JobRecoveryPlan,
+    WorkerJobCatalogResponse,
     get_job_execution_report,
     job_execution_dir,
     job_recovery_plan,
     list_job_execution_reports,
+    list_worker_job_catalog,
 )
 from contentops_core.models import (
     AuditEventListResponse,
@@ -94,6 +96,14 @@ def build_ops_router(
             review_service=review_service,
             window_size=window_size,
         )
+
+    @router.get(
+        "/worker-jobs",
+        response_model=WorkerJobCatalogResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def list_worker_jobs() -> WorkerJobCatalogResponse:
+        return list_worker_job_catalog(settings.pipeline_dir)
 
     @router.get(
         "/job-executions",

@@ -164,3 +164,6 @@ configuration.
 Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions` unless
 `--receipt-dir` is provided. In ECS/EventBridge deployments, keep artifact mirroring enabled so
 these receipts are copied to S3 with the rest of the run artifacts.
+Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
+`contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
+reviewed before EventBridge launches them.

@@ -279,6 +279,37 @@ def test_cli_job_execution_commands(
     assert recovery_payload["failed_count"] == 0
 
 
+def test_cli_worker_jobs_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: cli-calendar
+jobs:
+  - name: aws-ai
+    topic: AWS AI content operations
+    publish: true
+    tags: [aws, ai]
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(pipeline_dir))
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["worker-jobs", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["total"] == 1
+    assert payload["job_count"] == 1
+    assert payload["publish_count"] == 1
+    assert payload["items"][0]["name"] == "cli-calendar"
+    assert payload["items"][0]["jobs"][0]["tags"] == ["aws", "ai"]
+
+
 def test_cli_approve_many_returns_per_run_results(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

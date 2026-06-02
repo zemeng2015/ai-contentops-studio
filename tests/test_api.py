@@ -367,8 +367,40 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert recovery_response.status_code == 200
     assert recovery_response.json()["failed_count"] == 0
     assert dashboard_response.status_code == 200
+    assert "Worker Job Catalog" in dashboard_response.text
     assert "Worker Executions" in dashboard_response.text
     assert report.execution_id in dashboard_response.text
+
+
+def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:
+    client = TestClient(app)
+    original_pipeline_dir = settings.pipeline_dir
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: portfolio-calendar
+jobs:
+  - name: ai-roundup
+    topic: AI engineering roundup
+    publish: true
+    tags: [ai, aws]
+""",
+        encoding="utf-8",
+    )
+    settings.pipeline_dir = pipeline_dir
+    try:
+        response = client.get("/worker-jobs")
+    finally:
+        settings.pipeline_dir = original_pipeline_dir
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["job_count"] == 1
+    assert payload["publish_count"] == 1
+    assert payload["items"][0]["path"] == "calendar.yaml"
+    assert payload["items"][0]["jobs"][0]["topic"] == "AI engineering roundup"
 
 
 def test_review_queue_batch_approve_returns_per_run_results() -> None:
@@ -409,6 +441,7 @@ def test_dashboard_renders() -> None:
     assert "Operations Summary" in response.text
     assert "Audit Events" in response.text
     assert "Artifact Retention" in response.text
+    assert "Worker Job Catalog" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

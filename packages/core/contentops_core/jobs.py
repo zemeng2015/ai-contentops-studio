@@ -76,6 +76,28 @@ class JobExecutionListResponse(BaseModel):
     offset: int
 
 
+class WorkerJobCatalogItem(BaseModel):
+    path: str
+    name: str
+    valid: bool = True
+    total: int = 0
+    publish_count: int = 0
+    review_count: int = 0
+    topics: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
+    jobs: list[ContentJob] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class WorkerJobCatalogResponse(BaseModel):
+    items: list[WorkerJobCatalogItem]
+    total: int
+    job_count: int
+    publish_count: int
+    review_count: int
+    invalid_count: int
+
+
 class JobRecoveryPlan(BaseModel):
     execution_id: str
     source_execution_name: str
@@ -186,6 +208,20 @@ def load_job_file(path: Path) -> ContentJobFile:
     return ContentJobFile.from_mapping(data)
 
 
+def list_worker_job_catalog(pipeline_dir: Path) -> WorkerJobCatalogResponse:
+    items: list[WorkerJobCatalogItem] = []
+    for path in _worker_job_paths(pipeline_dir):
+        items.append(_worker_job_catalog_item(path, pipeline_dir))
+    return WorkerJobCatalogResponse(
+        items=items,
+        total=len(items),
+        job_count=sum(item.total for item in items),
+        publish_count=sum(item.publish_count for item in items),
+        review_count=sum(item.review_count for item in items),
+        invalid_count=sum(1 for item in items if not item.valid),
+    )
+
+
 def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) -> Path:
     receipt_dir.mkdir(parents=True, exist_ok=True)
     path = (
@@ -199,6 +235,48 @@ def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) ->
 
 def job_execution_dir(artifact_root: Path) -> Path:
     return artifact_root / "job-executions"
+
+
+def _worker_job_paths(pipeline_dir: Path) -> list[Path]:
+    if pipeline_dir.is_file():
+        return [pipeline_dir]
+    if not pipeline_dir.exists():
+        return []
+    paths = [*pipeline_dir.glob("*.yaml"), *pipeline_dir.glob("*.yml")]
+    return sorted({path.resolve() for path in paths}, key=lambda path: path.name)
+
+
+def _worker_job_catalog_item(path: Path, pipeline_dir: Path) -> WorkerJobCatalogItem:
+    display_path = _display_path(path, pipeline_dir)
+    try:
+        job_file = load_job_file(path)
+    except Exception as exc:
+        return WorkerJobCatalogItem(
+            path=display_path,
+            name=path.stem,
+            valid=False,
+            errors=[str(exc)],
+        )
+    tags = sorted({tag for job in job_file.jobs for tag in job.tags})
+    publish_count = sum(1 for job in job_file.jobs if job.publish)
+    return WorkerJobCatalogItem(
+        path=display_path,
+        name=job_file.name,
+        valid=True,
+        total=len(job_file.jobs),
+        publish_count=publish_count,
+        review_count=len(job_file.jobs) - publish_count,
+        topics=[job.topic for job in job_file.jobs],
+        tags=tags,
+        jobs=job_file.jobs,
+    )
+
+
+def _display_path(path: Path, pipeline_dir: Path) -> str:
+    try:
+        return str(path.relative_to(pipeline_dir.resolve()))
+    except ValueError:
+        return str(path)
 
 
 def list_job_execution_reports(

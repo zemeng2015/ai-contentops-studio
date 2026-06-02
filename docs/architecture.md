@@ -159,9 +159,14 @@ jobs:
 The worker supports dry-run validation for deployment checks and JSON output for automation logs:
 
 ```powershell
+contentops worker-jobs --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
 ```
+
+The worker job catalog scans `CONTENTOPS_PIPELINE_DIR` and exposes planned calendars through
+`GET /worker-jobs`, `contentops worker-jobs`, and the dashboard. Operators can review job count,
+publish intent, topics, tags, and invalid YAML before EventBridge or a manual run executes it.
 
 Every worker invocation writes a job execution receipt under `artifact_root/job-executions` by
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,

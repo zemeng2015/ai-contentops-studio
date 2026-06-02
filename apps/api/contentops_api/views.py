@@ -4,7 +4,7 @@ import json
 from html import escape
 from urllib.parse import urlencode
 
-from contentops_core.jobs import JobExecutionReport
+from contentops_core.jobs import JobExecutionReport, WorkerJobCatalogItem
 from contentops_core.models import (
     ApprovalRecord,
     AuditEvent,
@@ -377,12 +377,45 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
     """
 
 
+def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
+    if not items:
+        return "<p>No worker job files found.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.path)}</td>
+          <td>{escape(item.name)}</td>
+          <td>{str(item.valid).lower()}</td>
+          <td>{item.total}</td>
+          <td>{item.publish_count}</td>
+          <td>{item.review_count}</td>
+          <td>{escape(", ".join(item.tags) or "none")}</td>
+          <td>{escape("; ".join(item.topics[:3]) or "; ".join(item.errors) or "n/a")}</td>
+        </tr>
+        """
+        for item in items
+    )
+    return f"""
+      <p><a href="/worker-jobs">Worker job catalog JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th><th>Name</th><th>Valid</th><th>Jobs</th>
+            <th>Publish</th><th>Review</th><th>Tags</th><th>Topics</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
 def _operations_summary_html(summary: OperationsSummary) -> str:
     return f"""
       <p>
         <a href="/ops-summary">Operations summary JSON</a> |
         <a href="/deployment-manifest">Deployment manifest JSON</a> |
-        <a href="/release-readiness">Release readiness JSON</a>
+        <a href="/release-readiness">Release readiness JSON</a> |
+        <a href="/release-evidence">Release evidence JSON</a>
       </p>
       <div class="metrics">
         <div><strong>{summary.total_runs}</strong><span>Total runs</span></div>

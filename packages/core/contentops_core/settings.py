@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     artifact_s3_bucket: str | None = None
     artifact_s3_prefix: str = "contentops-artifacts"
     database_url: str = "sqlite:///contentops.db"
+    pipeline_dir: Path = Path("pipelines")
     site_output_dir: Path = Path("site")
     public_base_url: str = "http://localhost:8000/site"
     min_publish_score: float = 0.72

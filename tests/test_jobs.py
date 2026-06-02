@@ -10,6 +10,7 @@ from contentops_core.jobs import (
     get_job_execution_report,
     job_recovery_plan,
     list_job_execution_reports,
+    list_worker_job_catalog,
     load_job_file,
     write_job_execution_report,
 )
@@ -181,3 +182,38 @@ def test_missing_job_execution_history_is_empty(tmp_path: Path) -> None:
 
     assert report_list.total == 0
     assert report_list.items == []
+
+
+def test_worker_job_catalog_lists_valid_and_invalid_yaml(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "daily.yaml").write_text(
+        """
+name: daily-calendar
+jobs:
+  - name: production-llm
+    topic: Production LLM systems
+    publish: true
+    tags: [llm, portfolio]
+  - name: agent-watch
+    topic: Agent workflow reliability
+    tags: [agents]
+""",
+        encoding="utf-8",
+    )
+    (pipeline_dir / "broken.yaml").write_text("- not-a-mapping\n", encoding="utf-8")
+
+    catalog = list_worker_job_catalog(pipeline_dir)
+
+    assert catalog.total == 2
+    assert catalog.job_count == 2
+    assert catalog.publish_count == 1
+    assert catalog.review_count == 1
+    assert catalog.invalid_count == 1
+    daily = next(item for item in catalog.items if item.name == "daily-calendar")
+    assert daily.path == "daily.yaml"
+    assert daily.topics == ["Production LLM systems", "Agent workflow reliability"]
+    assert daily.tags == ["agents", "llm", "portfolio"]
+    broken = next(item for item in catalog.items if item.path == "broken.yaml")
+    assert broken.valid is False
+    assert broken.errors

@@ -12,6 +12,7 @@ contentops doctor --json
 contentops ops-summary --json
 contentops deployment-manifest
 contentops release-readiness --json
+contentops worker-jobs --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 ```
 
@@ -21,6 +22,7 @@ Expected result:
 - `ops-summary` shows no unexpected failed runs or action-required incidents.
 - `deployment-manifest` contains no secret values and shows expected runtime providers.
 - `release-readiness` is `pass` or expected `warn`; it must not be `fail`.
+- `worker-jobs` finds the expected calendars and reports `invalid_count=0`.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 
@@ -35,13 +37,15 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir art
 After the worker runs:
 
 ```powershell
+contentops worker-jobs --json
 contentops job-executions --json
 contentops job-execution <execution_id>
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 
-Review the execution receipt for per-job failures, run ids, artifact directories, publish URLs, and
-duration. In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
+Review the worker catalog before execution, then inspect the execution receipt for per-job failures,
+run ids, artifact directories, publish URLs, and duration. In AWS, mirror
+`artifacts/job-executions` to S3 with the rest of the artifact tree.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 When failures occur, inspect the recovery plan before rerunning it with

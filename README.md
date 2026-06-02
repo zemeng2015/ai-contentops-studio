@@ -187,6 +187,7 @@ contentops manifest <run_id>
 contentops audit-log <run_id>
 contentops audit-events --action publish --json
 contentops notifications <run_id>
+contentops worker-jobs --json
 contentops job-executions --json
 contentops job-execution <execution_id>
 contentops job-recovery-plan <execution_id> --output recovery.yaml
@@ -233,6 +234,7 @@ GET  /audit-events?action=publish&limit=20&offset=0
 GET  /runs/{run_id}/notifications
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
 GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
+GET  /worker-jobs
 GET  /job-executions?limit=20&offset=0
 GET  /job-executions/{execution_id}
 GET  /job-executions/{execution_id}/recovery-plan
@@ -314,10 +316,16 @@ than the configured retention window for archive or cleanup planning.
 The worker can validate or execute YAML-defined content calendars:
 
 ```powershell
+contentops worker-jobs --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
+
+`contentops worker-jobs`, `GET /worker-jobs`, and the dashboard catalog scan
+`CONTENTOPS_PIPELINE_DIR` for YAML calendars before they run. The catalog reports valid and invalid
+files, job counts, publish/review intent, tags, topics, and the exact job payloads operators will
+execute.
 
 Every worker execution writes a job receipt JSON file. Receipts include an execution id, dry-run
 flag, start/end timestamps, duration, per-job status, run ids, artifact directories, published URLs,

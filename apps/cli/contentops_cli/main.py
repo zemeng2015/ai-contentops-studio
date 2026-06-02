@@ -17,6 +17,7 @@ from contentops_core.jobs import (
     job_execution_dir,
     job_recovery_plan,
     list_job_execution_reports,
+    list_worker_job_catalog,
 )
 from contentops_core.models import RunRequest, RunStatus, SourceAuditReport
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
@@ -298,6 +299,35 @@ def job_executions(
         typer.echo(
             f"{report.execution_id}  {report.name:24}  "
             f"{report.succeeded}/{report.total} ok  failed={report.failed}"
+        )
+
+
+@app.command("worker-jobs")
+def worker_jobs(
+    pipeline_dir: Annotated[
+        Path | None,
+        typer.Option(help="Directory or YAML file containing worker job definitions."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    catalog = list_worker_job_catalog(pipeline_dir or settings.pipeline_dir)
+    if json_output:
+        typer.echo(catalog.model_dump_json(indent=2))
+        return
+    typer.echo(
+        f"Found {catalog.job_count} job(s) in {catalog.total} file(s); "
+        f"publish={catalog.publish_count} review={catalog.review_count} "
+        f"invalid={catalog.invalid_count}"
+    )
+    for item in catalog.items:
+        status = "valid" if item.valid else "invalid"
+        typer.echo(
+            f"{item.path}  {item.name:24}  {status:7}  "
+            f"jobs={item.total} publish={item.publish_count} review={item.review_count}"
         )
 
 
@@ -866,6 +896,7 @@ def init_config(
                 "# CONTENTOPS_ARTIFACT_S3_BUCKET=",
                 "CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts",
                 "CONTENTOPS_DATABASE_URL=sqlite:///contentops.db",
+                "CONTENTOPS_PIPELINE_DIR=pipelines",
                 "CONTENTOPS_SITE_OUTPUT_DIR=site",
                 "CONTENTOPS_PUBLIC_BASE_URL=http://localhost:8000/site",
                 "CONTENTOPS_MIN_PUBLISH_SCORE=0.72",

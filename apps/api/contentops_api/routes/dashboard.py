@@ -7,6 +7,7 @@ from typing import Annotated
 from contentops_core.jobs import (
     job_execution_dir,
     list_job_execution_reports,
+    list_worker_job_catalog,
 )
 from contentops_core.models import RunMetrics, RunRequest, RunStatus
 from contentops_core.pipeline import ContentOpsPipeline
@@ -46,6 +47,7 @@ from contentops_api.views import (
     _source_review_rows,
     _status_options,
     _timeline_rows,
+    _worker_jobs_html,
 )
 
 ReadAccessDependency = Callable[[Request], Awaitable[None]]
@@ -91,6 +93,7 @@ def build_dashboard_router(
             job_execution_dir(settings.artifact_root),
             limit=5,
         )
+        worker_jobs = list_worker_job_catalog(settings.pipeline_dir)
         published_content = review_service.published_content(limit=5)
         scorecards = review_service.scorecards(limit=5)
         cost_reports = review_service.cost_reports(limit=5)
@@ -196,6 +199,11 @@ def build_dashboard_router(
                   <h2>Audit Events</h2>
                   <p>Recent approve, publish, reject, and rollback events across all runs.</p>
                   {_audit_events_html(audit_events)}
+                </section>
+                <section class="hero compact">
+                  <h2>Worker Job Catalog</h2>
+                  <p>Planned YAML content calendars and publish/review intent before execution.</p>
+                  {_worker_jobs_html(worker_jobs.items)}
                 </section>
                 <section class="hero compact">
                   <h2>Worker Executions</h2>
