@@ -2,77 +2,83 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-AI ContentOps Studio is a production-shaped platform for technical research automation,
-source-grounded content generation, quality evaluation, artifact tracking, and publishing.
+[![CI](https://github.com/zemeng2015/ai-contentops-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/zemeng2015/ai-contentops-studio/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-It is designed to prove applied AI engineering skills beyond a prompt demo:
+AI ContentOps Studio is a production-shaped platform for AI-assisted technical research,
+source-grounded article generation, quality evaluation, release evidence, and publishing
+operations.
 
-- multi-step LLM workflow orchestration
-- source-grounded research packets
-- content planning before generation
-- deterministic quality evaluation
-- observable run history and artifacts
-- operational scorecards for quality, latency SLOs, and source-count checks
-- estimated token budget reports for cost-aware AI operations
-- artifact manifests with size, type, timestamp, and content hash metadata
-- queryable review queue with status/search filters and pagination
-- batch approve/reject workflow for review queues
-- explicit approval records before reviewed runs are published
-- append-only audit logs for review and publishing actions
-- global audit event queries across approve, reject, publish, and rollback actions
-- notification delivery logs for review and publishing events, with optional webhook delivery
-- source audit reports with scoring, risk reasons, and reviewer recommendations
-- artifact retention reports for storage hygiene and archive planning
-- S3 mirror receipts for bucket/key/status auditability in AWS deployments
-- generation receipts that audit model provider, retry attempts, fallback, and usage tokens
-- publish receipts that audit provider, URL, approval, file hashes, backups, and rollback hints
-- publish verification reports that prove target files still match their receipt hashes
-- incident reports that aggregate failed, degraded, drifted, and notification-failed runs
-- operations summary for queue depth, incident severity, pass rates, and budget posture
-- redacted deployment manifest for runtime config, security posture, and capability evidence
-- release readiness gate that combines health checks, incidents, quality, budget, and security
-- CI release evidence artifacts with doctor, deployment manifest, operations, and readiness JSON
-- optional operator API key protection for mutating API and dashboard actions
-- readiness checks and CLI diagnostics for production deployments
-- API, CLI, worker, and publisher boundaries
-- review dashboard with artifact, source, evaluation, and publish-plan inspection
-- run comparison for repeatable quality and source regression review
-- YAML-defined worker jobs for scheduled content calendars
-- worker recovery plans that rebuild failed scheduled jobs into rerunnable YAML
-- AWS-ready artifact storage and Terraform deployment skeleton
-- container release profile with optional startup migrations and health checks
-- local-first development with AWS-ready deployment primitives
+It is built as a portfolio-grade Applied AI Engineering project: not a prompt demo, but a
+small operating system for repeatable content workflows with API, CLI, dashboard, worker jobs,
+audit trails, quality gates, and AWS-ready deployment boundaries.
 
-## 3-minute demo
+## Why This Project
+
+Most content-generation demos stop at "send prompt, get article." This project shows the parts a
+real team needs after the first successful prompt:
+
+- research sources are captured and audited
+- generation is traceable and reviewable
+- quality, latency, cost, incidents, and release readiness are measured
+- publishing is gated by approval and creates receipts
+- scheduled jobs leave execution evidence and recovery plans
+- local development works without credentials, while provider boundaries are ready for OpenAI,
+  search APIs, S3, RDS, ECS, and EventBridge
+
+## Table of Contents
+
+- [Features](#features)
+- [Demo](#demo)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Review And Operations Workflow](#review-and-operations-workflow)
+- [API And CLI](#api-and-cli)
+- [Worker Jobs](#worker-jobs)
+- [Provider Configuration](#provider-configuration)
+- [Testing](#testing)
+- [Roadmap](#roadmap)
+- [Star History](#star-history)
+- [License](#license)
+
+## Features
+
+| Area | Capability |
+| --- | --- |
+| Research | Local, URL, feed, search, and discovery research providers with source normalization |
+| Generation | Template generator by default, optional OpenAI generator behind a provider interface |
+| Evaluation | Groundedness, source coverage, source quality, career relevance, and publish readiness |
+| Review | Review queue, status/search filters, batch approve/reject, run comparison, dashboard detail pages |
+| Governance | Approval records, audit logs, operator API key protection, read API key protection |
+| Publishing | Static site and homepage publishers, publish plans, receipts, verification, rollback |
+| Observability | Trace artifacts, scorecards, token budget reports, incident reports, operation summary |
+| Release Evidence | Deployment manifest, release readiness gate, CI-generated evidence artifacts |
+| Scheduling | YAML worker jobs, dry runs, execution receipts, job catalog, recovery plans |
+| Deployment | Docker profile, startup migrations, Alembic, S3 artifact mirroring, Terraform skeleton |
+
+## Demo
 
 ```powershell
 docker compose up --build -d api
 docker compose run --rm demo-seed
 ```
 
-Then open `http://localhost:8000/dashboard`. The demo seed creates published, approved, and
-needs-review runs so reviewers can inspect the dashboard, artifacts, receipts, scorecards,
-incidents, and static site output immediately.
+Open:
 
-See [Demo Walkthrough](docs/demo.md) for the full local and Docker flow.
+```text
+http://localhost:8000/dashboard
+```
 
-## What it does
+The seed command creates published, approved, and needs-review runs so you can inspect the
+dashboard, artifacts, receipts, scorecards, incidents, release evidence, and static site output
+immediately.
 
-Given a topic, URL, or repository, the system creates a content run:
+More details: [Demo Walkthrough](docs/demo.md)
 
-1. collect, normalize, and audit sources
-2. extract engineering signals and claims
-3. plan the article angle and outline
-4. generate markdown and HTML drafts
-5. evaluate groundedness, source coverage, career relevance, and publish readiness
-6. keep the run in review, approve or reject it, then publish approved content
-7. persist artifacts and run trace for inspection
-
-The first pipeline is intentionally local and deterministic so it can run in CI without API keys.
-Provider adapters are separated so OpenAI, search APIs, GitHub, or AWS services can be added
-without rewriting the domain layer.
-
-## Quick start
+## Quick Start
 
 ```powershell
 python -m venv .venv
@@ -90,7 +96,7 @@ Start the API:
 uvicorn contentops_api.main:app --reload --app-dir apps/api
 ```
 
-Then create a run:
+Create a run through HTTP:
 
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:8000/runs `
@@ -98,246 +104,139 @@ Invoke-RestMethod -Method Post http://127.0.0.1:8000/runs `
   -Body '{"topic":"AI evaluation for RAG systems","publish":true}'
 ```
 
-## Repository layout
+## Architecture
 
 ```text
 apps/
-  api/                     FastAPI service
+  api/                     FastAPI service and review dashboard
   cli/                     Typer command line interface
-  worker/                  Background worker entrypoint
+  worker/                  Scheduled YAML worker entrypoint
 packages/
-  core/                    Domain models, pipeline orchestration, artifact storage
-  providers/               Research, model, search, and external system adapters
-  evaluators/              Content quality and groundedness checks
-  publishing/              Static site and GitHub Pages publishers
+  core/                    Domain models, orchestration, storage, diagnostics
+  providers/               Research, model, search, and external-system adapters
+  evaluators/              Quality and groundedness checks
+  publishing/              Static site and homepage publishers
   observability/           Structured run tracing
-pipelines/                 YAML pipeline definitions
-docs/                      Architecture, deployment, and evaluation methodology
-infra/                     Docker and AWS deployment notes
+pipelines/                 YAML content calendars
+docs/                      Architecture, deployment, demo, runbook, integration docs
+infra/                     Terraform and deployment skeleton
 tests/                     Unit and integration tests
 ```
 
-Operational docs:
+Core design principles:
+
+- Every pipeline step writes inspectable artifacts.
+- Generated content is evaluated before publication.
+- Publishing is an explicit state transition with receipts and rollback hints.
+- External services sit behind provider interfaces.
+- Local defaults are deterministic; production paths are AWS-ready.
+
+Read more:
 
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
-- [Demo Walkthrough](docs/demo.md)
+- [Production Runbook](docs/runbook.md)
 - [Integration Smoke Tests](docs/integration-smoke.md)
-- [Production runbook](docs/runbook.md)
 
-## Architecture principles
+## Review And Operations Workflow
 
-- The pipeline is stateful and inspectable. Every step writes an artifact.
-- External services sit behind provider interfaces.
-- Generated content is evaluated before it is published.
-- Publishing is a state transition, not a side effect hidden inside generation.
-- Local filesystem and SQLite are the default, with S3/RDS/EventBridge-ready boundaries.
+AI ContentOps Studio treats each article as an auditable run:
 
-## Current MVP
+1. collect and normalize sources
+2. extract engineering signals and claims
+3. plan article angle and outline
+4. generate Markdown and HTML drafts
+5. evaluate quality, source coverage, and publish readiness
+6. hold the run for review
+7. approve, reject, publish, verify, or roll back
+8. export evidence for release review or incident handoff
 
-- Local research provider with deterministic source packets
-- URL research provider that fetches and normalizes operator-supplied sources
-- Feed research provider that discovers sources from RSS/Atom feeds
-- Search research provider for Brave-compatible web search APIs, with optional page enrichment
-- Discovery research provider that combines feed discovery, operator URLs, and local context
-- Source deduplication plus extraction status, quality, and content-length metadata
-- Optional OpenAI Responses API generator behind a provider boundary
-- Optional homepage publisher for Zack's GitHub Pages portfolio
-- Markdown and HTML article generation
-- Quality evaluation report
-- SQLite run metadata
-- Filesystem artifact store
-- Static site publisher
-- FastAPI `POST /runs` and `GET /runs`
-- FastAPI `GET /review-queue` with status/search filters and pagination metadata
-- FastAPI artifact review endpoints and `POST /runs/{run_id}/publish`
-- FastAPI metrics, scorecard, cost-report, generation-receipt, rerun, publish-plan, and
-  run-comparison endpoints
-- Worker entrypoint for single-job or batch YAML content calendars
-- CLI `contentops run`, `contentops runs`, `contentops show`, `contentops artifacts`, and
-  `contentops publish`, plus review commands for metrics, source-audit, rerun, publish-plan,
-  and compare
-- pytest coverage for pipeline behavior
-
-## Review workflow
-
-Generate first, inspect artifacts, then publish:
+Useful commands:
 
 ```powershell
-contentops run --topic "AI quality gates for RAG systems"
 contentops demo-seed
+contentops queue --status needs_review --json
 contentops artifacts <run_id>
 contentops show <run_id> --artifact eval-report.json
-contentops export-run <run_id> --output run-evidence.zip
-contentops publish-plan <run_id>
-contentops metrics <run_id>
 contentops scorecard <run_id>
-contentops scorecards --status needs_review --json
 contentops cost-report <run_id>
-contentops cost-reports --status needs_review --json
-contentops generation-receipt <run_id>
 contentops source-audit <run_id>
+contentops publish-plan <run_id>
+contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
+contentops publish <run_id>
+contentops publish-receipt <run_id>
+contentops verify-publish <run_id>
+contentops rollback-publish <run_id> --actor "Zack"
+contentops export-run <run_id> --output run-evidence.zip
+```
+
+Operations and release checks:
+
+```powershell
+contentops doctor --json
 contentops ops-summary --json
 contentops deployment-manifest
 contentops release-readiness --json
 contentops release-evidence --output-dir release-evidence
-contentops compare <base_run_id> <candidate_run_id>
-contentops queue --status needs_review --query "rag" --json
-contentops manifest <run_id>
-contentops audit-log <run_id>
-contentops audit-events --action publish --json
-contentops notifications <run_id>
-contentops worker-jobs --json
-contentops job-executions --json
-contentops job-execution <execution_id>
-contentops job-recovery-plan <execution_id> --output recovery.yaml
-contentops retention-report --days 90 --json
-contentops content --json
-contentops approve-many <run_id> <run_id> --reviewer "Zack" --json
-contentops approve <run_id> --reviewer "Zack" --notes "Ready to publish"
-contentops rerun <run_id>
-contentops publish <run_id>
-contentops publish-receipt <run_id>
-contentops verify-publish <run_id>
-contentops incident-report <run_id>
-contentops incident-reports --status published --json
-contentops rollback-publish <run_id> --actor "Zack"
 ```
 
-CI also writes release evidence JSON artifacts for each push. The artifact contains
-`doctor.json`, `deployment_manifest.json`, `operations_summary.json`,
-`release_readiness.json`, and `summary.json`, generated by:
+## API And CLI
 
-```powershell
-python scripts/generate_release_evidence.py --output-dir release-evidence
-```
-
-The API exposes the same lifecycle:
+Representative API endpoints:
 
 ```text
+POST /runs
+GET  /runs
+GET  /review-queue?status=needs_review&q=rag
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/artifact-manifest
 GET  /runs/{run_id}/bundle
-GET  /runs/{run_id}/artifacts/{artifact_name}
-GET  /runs/{run_id}/publish-plan
-GET  /runs/{run_id}/metrics
 GET  /runs/{run_id}/scorecard
 GET  /runs/{run_id}/cost-report
-GET  /runs/{run_id}/generation-receipt
 GET  /runs/{run_id}/source-audit
-GET  /runs/{run_id}/approval
+GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/incident-report
 GET  /runs/{run_id}/audit-log
-GET  /audit-events?action=publish&limit=20&offset=0
-GET  /runs/{run_id}/notifications
 GET  /runs/{base_run_id}/compare/{candidate_run_id}
-GET  /review-queue?status=needs_review&q=rag&limit=20&offset=0
+GET  /content
+GET  /scorecards
+GET  /cost-reports
+GET  /incident-reports
+GET  /audit-events
+GET  /retention-report
 GET  /worker-jobs
-GET  /job-executions?limit=20&offset=0
-GET  /job-executions/{execution_id}
+GET  /job-executions
 GET  /job-executions/{execution_id}/recovery-plan
-GET  /retention-report?days=90&limit=100
-GET  /content?limit=20&offset=0
-GET  /scorecards?status=needs_review&q=rag&limit=20&offset=0
-GET  /cost-reports?status=needs_review&q=rag&limit=20&offset=0
-GET  /incident-reports?status=published&q=rag&limit=20&offset=0
-GET  /ops-summary?window_size=100
+GET  /ops-summary
 GET  /deployment-manifest
-GET  /release-readiness?window_size=100
-GET  /release-evidence?window_size=100
+GET  /release-readiness
+GET  /release-evidence
 GET  /ready
-POST /review-queue/batch-approve
-POST /review-queue/batch-reject
-POST /runs/{run_id}/approve
-POST /runs/{run_id}/reject
-POST /runs/{run_id}/rerun
-POST /runs/{run_id}/publish
-POST /runs/{run_id}/rollback-publish
 ```
 
-The API also serves a lightweight dashboard at:
+Dashboard:
 
 ```text
 GET /dashboard
 ```
 
-Run details include a Source Review table so reviewers can inspect source status and extraction
-quality before publishing.
-Run details also include a Publish Plan that lists file-level changes before the publish action.
-Run details include a timeline derived from `trace.json`, including step durations and fields.
-Run details link to a downloadable evidence bundle with the run metadata, artifact manifest, and
-all run artifacts for interview review or incident handoff.
-The dashboard create form accepts optional source URLs, one per line.
-The dashboard list supports database-backed status/topic filters, queue counts, and pagination.
-The dashboard also surfaces recent worker executions from job receipts so scheduled content runs
-can be reviewed from the same operational surface.
-It also includes a Published Content catalog with shipped URLs, providers, timestamps, and
-evaluation scores for portfolio and operations review.
-It also includes Quality Scorecards that combine evaluation readiness, run duration SLOs, and
-source-count thresholds for production-style operational review.
-Token Budget reports estimate input/output tokens from persisted run artifacts and flag runs that
-exceed the configured per-run budget.
-Generation receipts record the model provider, model, retry attempts, fallback state, and token
-usage when the provider returns it.
-Run detail pages can compare two runs to spot evaluation deltas, source-count changes, and source
-overlap before publishing.
-Reviewed runs must be approved before publishing unless an operator explicitly uses `force=true`.
-Each decision is persisted as `approval.json` beside the other run artifacts.
-Approval is blocked when the run scorecard fails or the estimated token budget is exceeded, giving
-reviewers a governance gate instead of a passive report.
-Each successful publish writes `publish-receipt.json`, which records the provider, target URL,
-publish plan items, approval record, force flag, timestamp, before/after file hashes, and rollback
-hints. Existing publish targets are copied into `publish-backups/` under the run artifact
-directory before they are overwritten. Operators can run `contentops rollback-publish` or call
-`POST /runs/{run_id}/rollback-publish` to restore backed-up files or delete files created by the
-publish.
-Operators can run `contentops verify-publish` or call `GET /runs/{run_id}/publish-verification`
-to confirm current publish target files still match the receipt hashes.
-Incident reports combine run failures, scorecard warnings, budget warnings, publish verification
-drift, and notification delivery failures into one action-oriented health summary per run.
-The operations summary rolls queue depth, status counts, incident severity, pass rates, average
-duration, and estimated token usage into one dashboard/API/CLI surface for daily operations.
-The deployment manifest exposes redacted runtime, security, operations, and capability evidence so
-reviewers can inspect production readiness without seeing secrets.
-The release readiness gate combines readiness checks, deployment capabilities, incident posture,
-quality pass rates, budget pass rates, and operator security into a `can_release` decision.
-Review and publishing actions are appended to `audit-log.json` for operational traceability.
-The global audit event view scans recent run audit logs and exposes filterable approve, reject,
-publish, and rollback history for release review.
-They also write `notification-log.json`; if `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured,
-the same events are delivered to an external webhook without blocking the review workflow.
-Artifact retention reports estimate artifact count and bytes per recent run and identify runs older
-than the configured retention window for archive or cleanup planning.
+The dashboard includes review queues, run detail pages, source review, publish plans, scorecards,
+token budgets, incident reports, audit events, retention reports, worker job catalogs, and worker
+execution receipts.
 
-## Scheduled worker jobs
+## Worker Jobs
 
-The worker can validate or execute YAML-defined content calendars:
+The worker validates and executes YAML-defined content calendars:
 
 ```powershell
 contentops worker-jobs --json
-contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
-contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
 
-`contentops worker-jobs`, `GET /worker-jobs`, and the dashboard catalog scan
-`CONTENTOPS_PIPELINE_DIR` for YAML calendars before they run. The catalog reports valid and invalid
-files, job counts, publish/review intent, tags, topics, and the exact job payloads operators will
-execute.
-
-Every worker execution writes a job receipt JSON file. Receipts include an execution id, dry-run
-flag, start/end timestamps, duration, per-job status, run ids, artifact directories, published URLs,
-tags, metadata, and errors. By default receipts are written under
-`CONTENTOPS_ARTIFACT_ROOT/job-executions`, which is suitable for ECS/EventBridge logs and S3
-artifact mirroring.
-Receipts are queryable through `contentops job-executions`, `contentops job-execution`, and the
-`/job-executions` API endpoints, giving scheduled workers a durable execution history.
-Failed worker receipts can also produce a recovery plan, rebuilding failed jobs into a rerunnable
-YAML calendar with the original topic, source URLs, publish flag, tags, and metadata.
-
-Job files support a legacy single-job shape or a production-style batch:
+Example calendar:
 
 ```yaml
 name: daily-ai-roundup
@@ -346,53 +245,42 @@ jobs:
     topic: "AI engineering signals for production LLM systems"
     publish: true
     source_urls: []
+    tags:
+      - ai-engineering
+      - portfolio
 ```
 
-## Provider configuration
+Worker executions write receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions`. Failed receipts
+can be converted into rerunnable recovery calendars:
 
-The default stack runs without external credentials. `hybrid` is fully local unless URLs are
-provided; `discovery` also fetches configured RSS/Atom feeds for scheduled research jobs:
+```powershell
+contentops job-executions --json
+contentops job-execution <execution_id>
+contentops job-recovery-plan <execution_id> --output recovery.yaml
+```
+
+## Provider Configuration
+
+The default stack runs locally without external credentials:
 
 ```text
-CONTENTOPS_RESEARCH_PROVIDER=discovery
-CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending
-CONTENTOPS_RESEARCH_MAX_SOURCES=6
-CONTENTOPS_RESEARCH_RETRY_ATTEMPTS=2
-CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS=0.1
-CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search
-# CONTENTOPS_RESEARCH_SEARCH_API_KEY=
-CONTENTOPS_RESEARCH_SEARCH_ENRICH=true
+CONTENTOPS_RESEARCH_PROVIDER=hybrid
 CONTENTOPS_GENERATOR_PROVIDER=template
 CONTENTOPS_PUBLISHER_PROVIDER=static
-CONTENTOPS_OPENAI_MODEL=gpt-5-mini
-CONTENTOPS_OPENAI_TIMEOUT_SECONDS=60
-CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2
-CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
-CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
-# CONTENTOPS_OPERATOR_API_KEY=
-# CONTENTOPS_READ_API_KEY=
-CONTENTOPS_REQUIRE_READ_API_KEY=false
-CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5
-# CONTENTOPS_NOTIFICATION_WEBHOOK_URL=
-CONTENTOPS_LATENCY_SLO_MS=120000
-CONTENTOPS_MIN_SOURCE_COUNT=1
-CONTENTOPS_TOKEN_BUDGET_PER_RUN=12000
+CONTENTOPS_DATABASE_URL=sqlite:///contentops.db
+CONTENTOPS_ARTIFACT_ROOT=artifacts
 ```
 
-Research provider modes:
+Optional OpenAI generation:
 
-- `local`: deterministic CI-safe portfolio context
-- `url`: fetch and normalize operator-supplied URLs
-- `hybrid`: URL sources plus deterministic local context
-- `feed`: discover sources from RSS/Atom feeds or Atom search endpoints
-- `search`: discover sources from a Brave-compatible web search API and enrich result URLs
-- `discovery`: feed discovery plus operator URLs plus local portfolio context
+```text
+CONTENTOPS_GENERATOR_PROVIDER=openai
+CONTENTOPS_OPENAI_API_KEY=...
+CONTENTOPS_OPENAI_MODEL=gpt-5-mini
+CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
+```
 
-Network-backed research providers retry transient timeouts, connection errors, `429`, and `5xx`
-responses according to `CONTENTOPS_RESEARCH_RETRY_ATTEMPTS` and
-`CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS`.
-
-Mirror artifacts to S3 in AWS deployments:
+Optional S3 artifact mirroring:
 
 ```text
 CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3
@@ -400,92 +288,53 @@ CONTENTOPS_ARTIFACT_S3_BUCKET=your-artifact-bucket
 CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```
 
-Install the optional AWS dependency before enabling S3 mirroring:
-It also installs the Postgres driver used by RDS deployments.
+Optional Postgres/RDS:
+
+```text
+CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
+alembic upgrade head
+```
+
+Install AWS extras before enabling S3 or Postgres:
 
 ```powershell
 pip install -e ".[aws]"
 ```
 
-When S3 mirroring is enabled, each mirrored artifact writes a local `s3-mirror-log.json`
-receipt in the run artifact directory. The receipt records artifact name, bucket, object key,
-content type, mirror status, error details, and timestamp, so operators can audit what reached
-S3 without relying only on CloudWatch logs.
+See [config/production.env.example](config/production.env.example) for the production environment
+profile.
 
-Use Postgres/RDS for run metadata:
-
-```text
-CONTENTOPS_DATABASE_URL=postgresql+psycopg://contentops:password@host:5432/contentops
-```
-
-Apply database migrations before starting shared API or worker deployments:
+## Testing
 
 ```powershell
-alembic upgrade head
+python -m ruff check .
+python -m mypy apps packages tests
+python -m pytest
 ```
 
-The Alembic environment reads the same `CONTENTOPS_DATABASE_URL` setting as the application, so
-local SQLite, Docker, and RDS/Postgres deployments use one schema path. The repository still creates
-tables automatically for zero-config local development, but production deployments should treat
-migrations as the controlled database change mechanism.
-
-Container deployments can set `CONTENTOPS_RUN_MIGRATIONS=true` to run `alembic upgrade head`
-before the API process starts. The Docker image includes the migration files and a `/ready`
-healthcheck; use [config/production.env.example](config/production.env.example) as the production
-environment profile.
-
-Protect write operations in shared environments:
-
-```text
-CONTENTOPS_OPERATOR_API_KEY=replace-with-a-long-random-secret
-```
-
-When configured, mutating API and dashboard actions require `CONTENTOPS_OPERATOR_API_KEY` through
-`X-ContentOps-Api-Key` or an `api_key` query parameter. Read-only endpoints remain available for
-dashboards and integrations.
-Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` to protect dashboard pages, artifact downloads, source
-audits, evidence bundles, job receipts, and the published-content catalog. Read routes accept
-`CONTENTOPS_READ_API_KEY` or the operator key; write routes accept only the operator key.
-`/health` and `/ready` remain open for load balancers and deployment probes.
-Every API response includes `X-ContentOps-Request-Id`; clients can provide that header to correlate
-dashboard/API errors with logs and exported evidence bundles.
-
-Use real source URLs:
-
-```powershell
-contentops run --topic "Agent observability" --source-url "https://example.com/article"
-```
-
-Use OpenAI generation:
-
-```text
-CONTENTOPS_GENERATOR_PROVIDER=openai
-CONTENTOPS_OPENAI_API_KEY=...
-CONTENTOPS_OPENAI_MODEL=gpt-5-mini
-CONTENTOPS_OPENAI_TIMEOUT_SECONDS=60
-CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2
-CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5
-CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
-```
-
-The OpenAI provider retries transient timeouts, connection errors, `429`, and `5xx` responses.
-When `CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true`, exhausted provider failures fall back to the
-deterministic template generator so scheduled runs can still produce reviewable artifacts.
-
-Optional live provider smoke tests can verify OpenAI, Brave-compatible search, public feeds, and
-the configured homepage publisher path when credentials are available:
+Optional live provider smoke tests:
 
 ```powershell
 $env:CONTENTOPS_RUN_INTEGRATION="1"
 pytest -m integration tests/test_integration_smoke.py
 ```
 
-See [Integration Smoke Tests](docs/integration-smoke.md) for the required provider variables.
+The CI workflow also validates Docker image builds, Terraform formatting/validation, database
+migrations, worker dry runs, release evidence generation, linting, type checking, and tests.
 
-Publish into the portfolio homepage repository:
+## Roadmap
 
-```text
-CONTENTOPS_PUBLISHER_PROVIDER=homepage
-CONTENTOPS_HOMEPAGE_REPO_PATH=C:\Users\wangz\Documents\Codex\2026-05-22\files-mentioned-by-the-user-zackwang\zack-ai-homepage
-CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
-```
+- CloudWatch dashboard and alarms for scheduled workers
+- GitHub repository research provider
+- richer dashboard filtering and saved views
+- multi-tenant workspace configuration
+- queue-backed worker execution
+- deployable ECS/EventBridge reference environment
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=zemeng2015/ai-contentops-studio&type=Date)](https://www.star-history.com/#zemeng2015/ai-contentops-studio&Date)
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

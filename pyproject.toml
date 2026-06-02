@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "AI research, evaluation, and publishing automation platform for technical content operations."
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
 authors = [{ name = "Zack Wang" }]
 dependencies = [
   "fastapi>=0.115.0",
