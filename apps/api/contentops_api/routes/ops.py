@@ -23,12 +23,14 @@ from contentops_core.models import (
     IncidentReportListResponse,
     OperationsSummary,
     PublishedContentListResponse,
+    ReleaseEvidenceBundle,
     ReleaseReadinessReport,
     RetentionReport,
     RunStatus,
     ScorecardListResponse,
     SystemStatus,
 )
+from contentops_core.release_evidence import build_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -77,6 +79,21 @@ def build_ops_router(
     ) -> ReleaseReadinessReport:
         operations = review_service.operations_summary(window_size=window_size)
         return release_readiness(settings, repository, operations)
+
+    @router.get(
+        "/release-evidence",
+        response_model=ReleaseEvidenceBundle,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_release_evidence(
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> ReleaseEvidenceBundle:
+        return build_release_evidence(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            window_size=window_size,
+        )
 
     @router.get(
         "/job-executions",

@@ -177,6 +177,11 @@ def test_cli_queue_and_manifest_commands(
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
     release_readiness_result = runner.invoke(app, ["release-readiness", "--json"])
+    release_evidence_dir = tmp_path / "release-evidence"
+    release_evidence_result = runner.invoke(
+        app,
+        ["release-evidence", "--output-dir", str(release_evidence_dir)],
+    )
     retention_result = runner.invoke(app, ["retention-report", "--days", "3650", "--json"])
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
@@ -219,6 +224,12 @@ def test_cli_queue_and_manifest_commands(
     assert release_readiness_result.exit_code == 0
     release_readiness_payload = json.loads(release_readiness_result.output)
     assert release_readiness_payload["operations"]["total_runs"] == 1
+    assert release_evidence_result.exit_code == 0
+    release_evidence_payload = json.loads(release_evidence_result.output)
+    assert release_evidence_payload["summary"]["can_release"] is True
+    assert release_evidence_payload["operations_summary"]["total_runs"] == 1
+    assert (release_evidence_dir / "summary.json").exists()
+    assert (release_evidence_dir / "release_readiness.json").exists()
     assert retention_result.exit_code == 0
     retention_payload = json.loads(retention_result.output)
     assert retention_payload["total_runs_scanned"] == 1

@@ -180,6 +180,7 @@ contentops source-audit <run_id>
 contentops ops-summary --json
 contentops deployment-manifest
 contentops release-readiness --json
+contentops release-evidence --output-dir release-evidence
 contentops compare <base_run_id> <candidate_run_id>
 contentops queue --status needs_review --query "rag" --json
 contentops manifest <run_id>
@@ -243,6 +244,7 @@ GET  /incident-reports?status=published&q=rag&limit=20&offset=0
 GET  /ops-summary?window_size=100
 GET  /deployment-manifest
 GET  /release-readiness?window_size=100
+GET  /release-evidence?window_size=100
 GET  /ready
 POST /review-queue/batch-approve
 POST /review-queue/batch-reject

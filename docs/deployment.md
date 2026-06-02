@@ -130,6 +130,12 @@ The evidence bundle includes system status, a redacted deployment manifest, oper
 release readiness gates, and a summary file with the commit SHA. The command exits non-zero only
 when release readiness is `fail`; local-development `warn` states remain inspectable without
 blocking ordinary CI.
+The same bundle is also available through the product surface:
+
+```powershell
+contentops release-evidence --output-dir release-evidence
+Invoke-RestMethod http://127.0.0.1:8000/release-evidence
+```
 
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:

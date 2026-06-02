@@ -19,7 +19,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
     monkeypatch.setenv("CONTENTOPS_GIT_SHA", "test-sha")
     output_dir = tmp_path / "release-evidence"
 
-    summary = generate_release_evidence(output_dir)
+    bundle = generate_release_evidence(output_dir)
 
     expected_files = {
         "doctor.json",
@@ -29,8 +29,8 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "summary.json",
     }
     assert {path.name for path in output_dir.glob("*.json")} == expected_files
-    assert summary["git_sha"] == "test-sha"
-    assert summary["release_status"] in {"pass", "warn", "fail"}
+    assert bundle.summary.git_sha == "test-sha"
+    assert bundle.summary.release_status in {"pass", "warn", "fail"}
     readiness = json.loads((output_dir / "release_readiness.json").read_text(encoding="utf-8"))
     manifest = json.loads((output_dir / "deployment_manifest.json").read_text(encoding="utf-8"))
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"

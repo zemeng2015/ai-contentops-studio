@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import Any
+
+from contentops_core.diagnostics import deployment_manifest, release_readiness, system_status
+from contentops_core.models import ReleaseEvidenceBundle, ReleaseEvidenceSummary
+from contentops_core.repository import RunRepository
+from contentops_core.review import ReviewService
+from contentops_core.settings import Settings
+
+
+def build_release_evidence(
+    *,
+    settings: Settings,
+    repository: RunRepository,
+    review_service: ReviewService,
+    window_size: int = 100,
+    git_sha: str | None = None,
+) -> ReleaseEvidenceBundle:
+    doctor = system_status(settings, repository)
+    manifest = deployment_manifest(settings, repository)
+    operations = review_service.operations_summary(window_size=window_size)
+    readiness = release_readiness(settings, repository, operations)
+    summary = ReleaseEvidenceSummary(
+        git_sha=git_sha or os.getenv("GITHUB_SHA") or os.getenv("CONTENTOPS_GIT_SHA"),
+        doctor_status=doctor.status,
+        release_status=readiness.status,
+        can_release=readiness.can_release,
+        artifact_files=[
+            "doctor.json",
+            "deployment_manifest.json",
+            "operations_summary.json",
+            "release_readiness.json",
+            "summary.json",
+        ],
+    )
+    return ReleaseEvidenceBundle(
+        summary=summary,
+        doctor=doctor,
+        deployment_manifest=manifest,
+        operations_summary=operations,
+        release_readiness=readiness,
+    )
+
+
+def write_release_evidence(bundle: ReleaseEvidenceBundle, output_dir: Path) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    payloads: dict[str, Any] = {
+        "doctor": bundle.doctor.model_dump(mode="json"),
+        "deployment_manifest": bundle.deployment_manifest.model_dump(mode="json"),
+        "operations_summary": bundle.operations_summary.model_dump(mode="json"),
+        "release_readiness": bundle.release_readiness.model_dump(mode="json"),
+        "summary": bundle.summary.model_dump(mode="json"),
+    }
+    for name, payload in payloads.items():
+        (output_dir / f"{name}.json").write_text(
+            json.dumps(payload, indent=2) + "\n",
+            encoding="utf-8",
+        )

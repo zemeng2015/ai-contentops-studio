@@ -453,6 +453,23 @@ class ReleaseReadinessReport(BaseModel):
     deployment: DeploymentManifest
 
 
+class ReleaseEvidenceSummary(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    git_sha: str | None = None
+    doctor_status: str
+    release_status: str
+    can_release: bool
+    artifact_files: list[str] = Field(default_factory=list)
+
+
+class ReleaseEvidenceBundle(BaseModel):
+    summary: ReleaseEvidenceSummary
+    doctor: SystemStatus
+    deployment_manifest: DeploymentManifest
+    operations_summary: OperationsSummary
+    release_readiness: ReleaseReadinessReport
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

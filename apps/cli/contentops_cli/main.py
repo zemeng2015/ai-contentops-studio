@@ -19,6 +19,7 @@ from contentops_core.jobs import (
     list_job_execution_reports,
 )
 from contentops_core.models import RunRequest, RunStatus, SourceAuditReport
+from contentops_core.release_evidence import build_release_evidence, write_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -178,6 +179,32 @@ def show_release_readiness(
     for check in report.checks:
         typer.echo(f"- {check.name}: {check.status} - {check.message}")
     raise typer.Exit(0 if report.can_release else 1)
+
+
+@app.command("release-evidence")
+def show_release_evidence(
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to include in release gates."),
+    ] = 100,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(help="Optional directory where release evidence JSON files are written."),
+    ] = None,
+) -> None:
+    settings = Settings()
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    bundle = build_release_evidence(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        window_size=window_size,
+    )
+    if output_dir is not None:
+        write_release_evidence(bundle, output_dir)
+    typer.echo(bundle.model_dump_json(indent=2))
+    raise typer.Exit(0 if bundle.release_readiness.can_release else 1)
 
 
 @app.command("ops-summary")
