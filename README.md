@@ -12,6 +12,10 @@ AI ContentOps Studio is a production-shaped platform for AI-assisted technical r
 source-grounded article generation, quality evaluation, release evidence, and publishing
 operations.
 
+In plain English: this is a tool that helps a person or team turn AI/tech topics into reviewed,
+source-backed articles. It finds or accepts sources, drafts the article, checks quality, keeps a
+review queue, publishes approved work, and records evidence so people can trust what happened.
+
 It is built as a portfolio-grade Applied AI Engineering project: not a prompt demo, but a
 small operating system for repeatable content workflows with API, CLI, dashboard, worker jobs,
 audit trails, quality gates, and AWS-ready deployment boundaries.
@@ -33,11 +37,14 @@ real team needs after the first successful prompt:
 
 - [Features](#features)
 - [Demo](#demo)
+- [What The GUI Shows](#what-the-gui-shows)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Review And Operations Workflow](#review-and-operations-workflow)
 - [API And CLI](#api-and-cli)
 - [Worker Jobs](#worker-jobs)
+- [How To Run It Automatically](#how-to-run-it-automatically)
+- [How To Promote This Project](#how-to-promote-this-project)
 - [Provider Configuration](#provider-configuration)
 - [Testing](#testing)
 - [Roadmap](#roadmap)
@@ -45,6 +52,14 @@ real team needs after the first successful prompt:
 - [License](#license)
 
 ## Features
+
+For non-technical readers, the product does five practical jobs:
+
+1. turns a topic into a draft article
+2. keeps links, sources, and generated files together
+3. tells the reviewer whether the article looks safe to publish
+4. publishes only approved content
+5. records logs, receipts, and release evidence for later review
 
 | Area | Capability |
 | --- | --- |
@@ -77,6 +92,14 @@ dashboard, artifacts, receipts, scorecards, incidents, release evidence, and sta
 immediately.
 
 More details: [Demo Walkthrough](docs/demo.md)
+
+## What The GUI Shows
+
+The main dashboard is the operator workspace. A reviewer can create new content runs, filter the
+review queue, approve or reject articles, inspect quality signals, check worker jobs, and review
+published content from one place.
+
+![AI ContentOps Studio dashboard](docs/assets/dashboard-screenshot.png)
 
 ## Quick Start
 
@@ -258,6 +281,75 @@ contentops job-executions --json
 contentops job-execution <execution_id>
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
+
+## How To Run It Automatically
+
+To make the project run on a real schedule, you need to connect four pieces:
+
+1. **Choose the schedule**  
+   Edit `pipelines/daily_ai_roundup.yaml` with the topics you want to publish or review every day.
+
+2. **Choose the AI and research providers**  
+   Keep the default local/template mode for demos, or set OpenAI/search API keys for real generated
+   articles:
+
+   ```text
+   CONTENTOPS_GENERATOR_PROVIDER=openai
+   CONTENTOPS_OPENAI_API_KEY=...
+   CONTENTOPS_RESEARCH_PROVIDER=discovery
+   ```
+
+3. **Run the worker on a schedule**  
+   Local option:
+
+   ```powershell
+   contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
+   ```
+
+   Production option: deploy the Terraform stack and enable EventBridge Scheduler:
+
+   ```bash
+   terraform apply \
+     -var='worker_schedule_enabled=true' \
+     -var='worker_schedule_expression=cron(0 13 * * ? *)'
+   ```
+
+4. **Connect publishing and notifications**  
+   Configure the static/homepage publisher, protect the dashboard with API keys, and optionally set
+   `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` so approvals, publishes, and failures can notify you.
+
+Recommended first automation path:
+
+- run the worker once per day
+- keep `publish: false` until you trust the outputs
+- review articles in `/dashboard`
+- approve and publish manually
+- later turn on selected `publish: true` jobs
+
+## How To Promote This Project
+
+This project is strongest when presented as a real AI operations system, not just a content tool.
+
+Good promotion angles:
+
+- **LinkedIn post:** "I built an AI ContentOps platform that turns technical topics into reviewed,
+  source-backed articles with approval gates, audit logs, worker jobs, and AWS observability."
+- **Resume bullet:** "Built a production-style AI ContentOps platform with FastAPI, Typer,
+  SQLAlchemy, Docker, Terraform, CloudWatch, scheduled workers, quality evaluation, and release
+  evidence."
+- **Portfolio page:** show the dashboard screenshot, explain the workflow in five steps, and link
+  to the GitHub repo.
+- **Demo video:** record a 2-3 minute walkthrough: create run, inspect sources, approve, publish,
+  view receipt, show CloudWatch/Terraform evidence.
+- **GitHub topics:** add `ai-engineering`, `llmops`, `fastapi`, `content-automation`,
+  `terraform`, `aws`, `observability`, `portfolio-project`.
+
+Suggested next polish items for promotion:
+
+- add a short animated GIF of the dashboard workflow
+- add 2-3 example generated articles
+- add a one-page architecture diagram
+- publish a blog post explaining how the system was designed
 
 ## Provider Configuration
 
