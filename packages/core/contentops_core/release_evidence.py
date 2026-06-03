@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from contentops_core.diagnostics import deployment_manifest, release_readiness, system_status
-from contentops_core.models import ReleaseEvidenceBundle, ReleaseEvidenceSummary
+from contentops_core.models import (
+    ArtifactManifest,
+    ArtifactMetadata,
+    ReleaseEvidenceBundle,
+    ReleaseEvidenceSummary,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -32,6 +39,7 @@ def build_release_evidence(
         artifact_files=[
             "doctor.json",
             "deployment_manifest.json",
+            "evidence_manifest.json",
             "operations_summary.json",
             "release_readiness.json",
             "summary.json",
@@ -60,3 +68,38 @@ def write_release_evidence(bundle: ReleaseEvidenceBundle, output_dir: Path) -> N
             json.dumps(payload, indent=2) + "\n",
             encoding="utf-8",
         )
+    evidence_manifest = _evidence_manifest(
+        output_dir,
+        [f"{name}.json" for name in payloads],
+    )
+    (output_dir / "evidence_manifest.json").write_text(
+        evidence_manifest.model_dump_json(indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _evidence_manifest(output_dir: Path, artifact_files: list[str]) -> ArtifactManifest:
+    artifacts = {
+        file_name: _artifact_metadata(output_dir / file_name)
+        for file_name in sorted(artifact_files)
+    }
+    return ArtifactManifest(
+        run_id="release-evidence",
+        artifacts=artifacts,
+        metadata={
+            "bundle_type": "release_evidence",
+            "manifest_file": "evidence_manifest.json",
+            "hash_algorithm": "sha256",
+        },
+    )
+
+
+def _artifact_metadata(path: Path) -> ArtifactMetadata:
+    stat = path.stat()
+    return ArtifactMetadata(
+        name=path.name,
+        size_bytes=stat.st_size,
+        media_type="application/json",
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
+    )

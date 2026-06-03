@@ -229,7 +229,12 @@ def test_cli_queue_and_manifest_commands(
     assert release_evidence_payload["summary"]["can_release"] is True
     assert release_evidence_payload["operations_summary"]["total_runs"] == 1
     assert (release_evidence_dir / "summary.json").exists()
+    assert (release_evidence_dir / "evidence_manifest.json").exists()
     assert (release_evidence_dir / "release_readiness.json").exists()
+    evidence_manifest = json.loads(
+        (release_evidence_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    assert evidence_manifest["artifacts"]["summary.json"]["media_type"] == "application/json"
     assert retention_result.exit_code == 0
     retention_payload = json.loads(retention_result.output)
     assert retention_payload["total_runs_scanned"] == 1

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -24,6 +25,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
     expected_files = {
         "doctor.json",
         "deployment_manifest.json",
+        "evidence_manifest.json",
         "operations_summary.json",
         "release_readiness.json",
         "summary.json",
@@ -33,6 +35,14 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.summary.release_status in {"pass", "warn", "fail"}
     readiness = json.loads((output_dir / "release_readiness.json").read_text(encoding="utf-8"))
     manifest = json.loads((output_dir / "deployment_manifest.json").read_text(encoding="utf-8"))
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
     assert "checks" in manifest
     assert "operator_api_key" not in json.dumps(manifest).casefold()
+    assert set(bundle.summary.artifact_files) == expected_files
+    assert evidence_manifest["metadata"]["bundle_type"] == "release_evidence"
+    assert set(evidence_manifest["artifacts"]) == expected_files - {"evidence_manifest.json"}
+    summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
+    assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha

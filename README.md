@@ -110,7 +110,7 @@ Each run writes inspectable artifacts such as:
 | Publishing | Static site and homepage publishers, receipts, verification, rollback |
 | Observability | Trace artifacts, scorecards, token budgets, incidents, operations summary |
 | Scheduling | YAML worker jobs, dry runs, receipts, recovery plans |
-| Release Evidence | Deployment manifest, release readiness gate, CI evidence artifacts |
+| Release Evidence | Deployment manifest, release readiness gate, hashed CI evidence manifest |
 | Deployment | Docker image, Alembic migrations, S3 mirroring, RDS, EventBridge, CloudWatch |
 
 ## CLI Examples
@@ -126,6 +126,9 @@ contentops publish <run_id>
 contentops publish-receipt <run_id>
 contentops release-evidence --output-dir release-evidence
 ```
+
+`release-evidence` writes `evidence_manifest.json` with SHA-256 hashes and file metadata for every
+evidence artifact, so CI output can be archived and compared during deployment reviews.
 
 ## API Surface
 
