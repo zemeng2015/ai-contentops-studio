@@ -136,6 +136,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
     failures: list[str] = []
     warnings: list[str] = []
     research_readiness = _research_provider_readiness(settings)
+    publishing_readiness = _publishing_readiness(settings)
     if settings.research_provider not in RESEARCH_PROVIDERS:
         failures.append(f"unknown research provider: {settings.research_provider}")
     if settings.generator_provider not in GENERATOR_PROVIDERS:
@@ -170,6 +171,9 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("token budget per run must be at least 1")
     if settings.publisher_provider == "homepage" and settings.homepage_repo_path is None:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
+    publishing_warnings = publishing_readiness.get("warnings", [])
+    if isinstance(publishing_warnings, list):
+        warnings.extend(str(warning) for warning in publishing_warnings)
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
         warnings.append("feed/discovery research has no configured feeds")
     research_warnings = research_readiness.get("warnings", [])
@@ -184,6 +188,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
                 "failures": failures,
                 "warnings": warnings,
                 "research_readiness": research_readiness,
+                "publishing_readiness": publishing_readiness,
             },
         )
     status = "degraded" if warnings else "ok"
@@ -195,6 +200,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         fields={
             "research_provider": settings.research_provider,
             "research_readiness": research_readiness,
+            "publishing_readiness": publishing_readiness,
             "research_retry_attempts": settings.research_retry_attempts,
             "research_retry_backoff_seconds": settings.research_retry_backoff_seconds,
             "research_search_enrich": settings.research_search_enrich,
@@ -307,6 +313,79 @@ def _research_provider_mode(provider: str) -> str:
     return "unknown"
 
 
+def _publishing_readiness(settings: Settings) -> dict[str, object]:
+    provider = settings.publisher_provider
+    warnings: list[str] = []
+    ready = provider in PUBLISHER_PROVIDERS
+    fields: dict[str, object] = {
+        "provider": provider,
+        "ready": ready,
+        "mode": _publisher_mode(provider),
+        "target_url": settings.homepage_public_base_url
+        if provider == "homepage"
+        else settings.public_base_url,
+        "warnings": warnings,
+    }
+    if provider == "static":
+        fields["output_dir"] = str(settings.site_output_dir)
+        if not _path_is_writable(settings.site_output_dir):
+            ready = False
+            warnings.append(
+                f"Static site output directory is not writable: {settings.site_output_dir}"
+            )
+    elif provider == "homepage":
+        fields["homepage_repo_path"] = str(settings.homepage_repo_path or "")
+        if settings.homepage_repo_path is None:
+            ready = False
+            warnings.append("Homepage publisher requires CONTENTOPS_HOMEPAGE_REPO_PATH.")
+        elif not settings.homepage_repo_path.exists():
+            ready = False
+            warnings.append(
+                f"Homepage repository path does not exist: {settings.homepage_repo_path}"
+            )
+        else:
+            index_path = settings.homepage_repo_path / "index.html"
+            fields["homepage_index_exists"] = index_path.exists()
+            if not index_path.exists():
+                ready = False
+                warnings.append(f"Homepage index not found: {index_path}")
+            else:
+                html = index_path.read_text(encoding="utf-8")
+                has_post_grid = '<div class="post-grid">' in html
+                fields["homepage_post_grid_marker"] = has_post_grid
+                if not has_post_grid:
+                    ready = False
+                    warnings.append(
+                        "Homepage index.html does not contain the expected post-grid marker."
+                    )
+            posts_dir = settings.homepage_repo_path / "posts"
+            fields["posts_dir"] = str(posts_dir)
+            if not _path_is_writable(posts_dir):
+                ready = False
+                warnings.append(f"Homepage posts directory is not writable: {posts_dir}")
+    fields["ready"] = ready
+    return fields
+
+
+def _publisher_mode(provider: str) -> str:
+    if provider == "static":
+        return "filesystem_static_site"
+    if provider == "homepage":
+        return "homepage_repository"
+    return "unknown"
+
+
+def _path_is_writable(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".contentops-write-check"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+    except OSError:
+        return False
+    return True
+
+
 def _overall_status(checks: list[ComponentCheck]) -> str:
     statuses = {check.status for check in checks}
     if "fail" in statuses:
@@ -325,6 +404,7 @@ def _runtime_fields(settings: Settings) -> dict[str, object]:
         "research_readiness": _research_provider_readiness(settings),
         "generator_provider": settings.generator_provider,
         "publisher_provider": settings.publisher_provider,
+        "publishing_readiness": _publishing_readiness(settings),
         "public_base_url": settings.public_base_url,
         "homepage_public_base_url": settings.homepage_public_base_url,
     }
@@ -365,6 +445,8 @@ def _capabilities(
         cloud_status = "fail"
     research_readiness = _research_provider_readiness(settings)
     research_status = "ok" if research_readiness["scheduled_ready"] else "degraded"
+    publishing_readiness = _publishing_readiness(settings)
+    publishing_status = "ok" if publishing_readiness["ready"] else "fail"
     if status.status == "fail":
         research_status = "fail"
     return [
@@ -385,8 +467,10 @@ def _capabilities(
         ),
         DeploymentCapability(
             name="publishing_recovery",
-            status="ok",
+            status=publishing_status,
             evidence=[
+                f"publisher_provider={settings.publisher_provider}",
+                f"mode={publishing_readiness['mode']}",
                 "publish-receipt.json",
                 "publish-verification.json",
                 "publish-rollback.json",

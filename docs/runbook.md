@@ -24,6 +24,7 @@ Expected result:
 - `deployment-manifest` contains no secret values and shows expected runtime providers.
 - `release-readiness` is `pass` or expected `warn`; it must not be `fail`.
 - `scheduled_research_ready` is `ok` for production worker calendars that depend on live sources.
+- `publishing_recovery` is `ok`, proving the configured publishing target can be planned safely.
 - `worker-jobs` finds the expected calendars and reports `invalid_count=0`.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.

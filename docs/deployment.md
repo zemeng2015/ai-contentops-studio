@@ -176,6 +176,8 @@ when the scheduled calendar depends on search or GitHub repository sources.
 `contentops deployment-manifest` and `contentops release-evidence` also report
 `scheduled_research_ready`, including the selected research provider, provider mode, credential
 state, and whether the provider can discover or retrieve sources for scheduled automation.
+They also report publishing readiness, including static output writability or homepage repository
+markers, so a scheduled worker does not reach approval with an unusable publishing target.
 
 The Terraform stack creates a CloudWatch dashboard and three default alarms:
 

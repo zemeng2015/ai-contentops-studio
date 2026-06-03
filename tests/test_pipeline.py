@@ -609,6 +609,54 @@ def test_deployment_manifest_reports_scheduled_research_capability(tmp_path: Pat
     assert manifest.runtime["research_readiness"]["mode"] == "repository_intelligence"
 
 
+def test_system_status_reports_static_publishing_readiness(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        publisher_provider="static",
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    readiness = provider_check.fields["publishing_readiness"]
+    assert readiness["provider"] == "static"
+    assert readiness["mode"] == "filesystem_static_site"
+    assert readiness["ready"] is True
+    capability = next(
+        item for item in deployment_manifest(settings, repo).capabilities
+        if item.name == "publishing_recovery"
+    )
+    assert capability.status == "ok"
+    assert "publisher_provider=static" in capability.evidence
+
+
+def test_system_status_reports_homepage_publishing_marker(tmp_path: Path) -> None:
+    homepage = tmp_path / "homepage"
+    homepage.mkdir()
+    (homepage / "index.html").write_text("<html><body>No grid yet</body></html>", encoding="utf-8")
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        publisher_provider="homepage",
+        homepage_repo_path=homepage,
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    readiness = provider_check.fields["publishing_readiness"]
+    assert status.status == "degraded"
+    assert readiness["provider"] == "homepage"
+    assert readiness["ready"] is False
+    assert readiness["homepage_index_exists"] is True
+    assert readiness["homepage_post_grid_marker"] is False
+    assert any("post-grid marker" in warning for warning in readiness["warnings"])
+
+
 def test_system_status_validates_research_retry_policy(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",
