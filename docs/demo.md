@@ -65,6 +65,8 @@ http://127.0.0.1:8000/dashboard
 ## What to Inspect
 
 - Dashboard queue depth, operations summary, scorecards, incidents, and published content.
+- Content calendar page at `/dashboard/worker-jobs` with review-first GitHub project update jobs.
+- Worker execution detail pages that connect automation receipts back to generated runs.
 - Run detail pages with source audit, evaluation report, timeline, publish plan, and artifacts.
 - `publish-receipt.json`, `publish-verification.json`, `audit-log.json`, and `generation-receipt.json`.
 - Static site output under the configured site directory.

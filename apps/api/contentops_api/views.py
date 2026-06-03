@@ -122,6 +122,21 @@ def _page(title: str, body: str) -> str:
           .grid > div {{ padding: 22px; min-width: 0; }}
           .grid table {{ border-radius: 0; box-shadow: none; }}
           pre {{ overflow: auto; padding: 16px; background: #101816; color: #e6f0ec; }}
+          .pill {{
+            display: inline-block;
+            border-radius: 999px;
+            padding: 3px 8px;
+            margin: 2px 4px 2px 0;
+            background: #e8f2ef;
+            color: #12594b;
+            font-size: 12px;
+            font-weight: 900;
+          }}
+          .pill.review {{ background: #fff4de; color: #8a4c00; }}
+          .pill.publish {{ background: #e8f2ef; color: #12594b; }}
+          .muted {{ color: #5f6965; }}
+          .url-list {{ margin: 0; padding-left: 18px; }}
+          .url-list li {{ margin: 2px 0; }}
           @media (max-width: 800px) {{
             .grid, .metrics {{ grid-template-columns: 1fr; }}
           }}
@@ -348,7 +363,7 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
         f"""
         <tr>
           <td>
-            <a href="/job-executions/{escape(report.execution_id)}">
+            <a href="/dashboard/job-executions/{escape(report.execution_id)}">
               {escape(report.execution_id)}
             </a>
           </td>
@@ -377,10 +392,57 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
     """
 
 
+def _job_execution_detail_html(report: JobExecutionReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(result.job_name)}</td>
+          <td>{_job_intent_label(result.publish)}</td>
+          <td>{escape(str(result.status))}</td>
+          <td>{_run_link(result.run_id)}</td>
+          <td>{escape(result.topic)}</td>
+          <td>{_source_urls_html(result.source_urls)}</td>
+          <td>{escape(", ".join(result.tags) or "none")}</td>
+          <td>{escape(_metadata_label(result.metadata))}</td>
+          <td>{escape(result.error or "")}</td>
+        </tr>
+        """
+        for result in report.results
+    )
+    return f"""
+      <h2>{escape(report.name)}</h2>
+      <p>
+        <a href="/job-executions/{escape(report.execution_id)}">Execution JSON</a> |
+        <a href="/job-executions/{escape(report.execution_id)}/recovery-plan">Recovery plan JSON</a>
+      </p>
+      <div class="metrics">
+        <div><strong>{report.total}</strong><span>Total jobs</span></div>
+        <div><strong>{report.succeeded}</strong><span>Succeeded</span></div>
+        <div><strong>{report.failed}</strong><span>Failed</span></div>
+        <div><strong>{str(report.dry_run).lower()}</strong><span>Dry run</span></div>
+        <div><strong>{_duration_label(report.duration_ms)}</strong><span>Duration</span></div>
+        <div><strong>{escape(report.started_at.isoformat())}</strong><span>Started</span></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Job</th><th>Intent</th><th>Status</th><th>Run</th><th>Topic</th>
+            <th>Sources</th><th>Tags</th><th>Metadata</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
 def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
     if not items:
         return "<p>No worker job files found.</p>"
-    rows = "".join(
+    publish_count = sum(item.publish_count for item in items)
+    review_count = sum(item.review_count for item in items)
+    invalid_count = sum(1 for item in items if not item.valid)
+    job_count = sum(item.total for item in items)
+    file_rows = "".join(
         f"""
         <tr>
           <td>{escape(item.path)}</td>
@@ -395,8 +457,27 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
         """
         for item in items
     )
+    job_rows = "".join(_worker_job_rows(item) for item in items)
     return f"""
       <p><a href="/worker-jobs">Worker job catalog JSON</a></p>
+      <div class="metrics">
+        <div><strong>{len(items)}</strong><span>Job files</span></div>
+        <div><strong>{job_count}</strong><span>Planned jobs</span></div>
+        <div><strong>{review_count}</strong><span>Review first</span></div>
+        <div><strong>{publish_count}</strong><span>Auto publish</span></div>
+        <div><strong>{invalid_count}</strong><span>Invalid files</span></div>
+      </div>
+      <h3>Planned Jobs</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>File</th><th>Job</th><th>Intent</th><th>Topic</th>
+            <th>Sources</th><th>Tags</th><th>Metadata</th>
+          </tr>
+        </thead>
+        <tbody>{job_rows}</tbody>
+      </table>
+      <h3>Job Files</h3>
       <table>
         <thead>
           <tr>
@@ -404,9 +485,72 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
             <th>Publish</th><th>Review</th><th>Tags</th><th>Topics</th>
           </tr>
         </thead>
-        <tbody>{rows}</tbody>
+        <tbody>{file_rows}</tbody>
       </table>
     """
+
+
+def _worker_job_rows(item: WorkerJobCatalogItem) -> str:
+    if not item.valid:
+        errors = "; ".join(item.errors) or "Invalid job file."
+        return f"""
+          <tr>
+            <td>{escape(item.path)}</td>
+            <td>{escape(item.name)}</td>
+            <td><span class="pill review">invalid</span></td>
+            <td>{escape(errors)}</td>
+            <td>n/a</td>
+            <td>n/a</td>
+            <td>n/a</td>
+          </tr>
+        """
+    return "".join(
+        f"""
+        <tr>
+          <td>{escape(item.path)}</td>
+          <td>{escape(job.name)}</td>
+          <td>{_job_intent_label(job.publish)}</td>
+          <td>{escape(job.topic)}</td>
+          <td>{_source_urls_html(job.source_urls)}</td>
+          <td>{escape(", ".join(job.tags) or "none")}</td>
+          <td>{escape(_metadata_label(job.metadata))}</td>
+        </tr>
+        """
+        for job in item.jobs
+    )
+
+
+def _job_intent_label(publish: bool) -> str:
+    css_class = "publish" if publish else "review"
+    label = "publish if ready" if publish else "review first"
+    return f'<span class="pill {css_class}">{label}</span>'
+
+
+def _source_urls_html(source_urls: list[str]) -> str:
+    if not source_urls:
+        return '<span class="muted">none</span>'
+    items = "".join(
+        f'<li><a href="{escape(url)}">{escape(_short_url(url))}</a></li>'
+        for url in source_urls
+    )
+    return f'<ul class="url-list">{items}</ul>'
+
+
+def _short_url(url: str) -> str:
+    return url.removeprefix("https://").removeprefix("http://").removesuffix("/")
+
+
+def _metadata_label(metadata: dict[str, str]) -> str:
+    if not metadata:
+        return "none"
+    return "; ".join(f"{key}={value}" for key, value in sorted(metadata.items()))
+
+
+def _run_link(run_id: str | None) -> str:
+    if not run_id:
+        return '<span class="muted">n/a</span>'
+    escaped_run_id = escape(run_id)
+    return f'<a href="/dashboard/runs/{escaped_run_id}">{escaped_run_id}</a>'
 
 
 def _operations_summary_html(summary: OperationsSummary) -> str:

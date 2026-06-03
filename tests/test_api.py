@@ -356,6 +356,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     detail_response = client.get(f"/job-executions/{report.execution_id}")
     recovery_response = client.get(f"/job-executions/{report.execution_id}/recovery-plan")
     dashboard_response = client.get("/dashboard")
+    dashboard_detail_response = client.get(
+        f"/dashboard/job-executions/{report.execution_id}"
+    )
 
     assert list_response.status_code == 200
     assert any(
@@ -370,6 +373,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert "Worker Job Catalog" in dashboard_response.text
     assert "Worker Executions" in dashboard_response.text
     assert report.execution_id in dashboard_response.text
+    assert dashboard_detail_response.status_code == 200
+    assert "Execution JSON" in dashboard_detail_response.text
+    assert "API job history" in dashboard_detail_response.text
 
 
 def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:
@@ -401,6 +407,44 @@ jobs:
     assert payload["publish_count"] == 1
     assert payload["items"][0]["path"] == "calendar.yaml"
     assert payload["items"][0]["jobs"][0]["topic"] == "AI engineering roundup"
+
+
+def test_dashboard_worker_jobs_shows_content_calendar(tmp_path: Path) -> None:
+    client = TestClient(app)
+    original_pipeline_dir = settings.pipeline_dir
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "project_updates.yaml").write_text(
+        """
+name: project-updates
+jobs:
+  - name: github-project-update
+    topic: GitHub project update for portfolio readers
+    publish: false
+    source_urls:
+      - https://github.com/zemeng2015/ai-contentops-studio
+    tags: [github, portfolio]
+    metadata:
+      research_provider: github
+      content_type: project update
+""",
+        encoding="utf-8",
+    )
+    settings.pipeline_dir = pipeline_dir
+    try:
+        dashboard_response = client.get("/dashboard")
+        calendar_response = client.get("/dashboard/worker-jobs")
+    finally:
+        settings.pipeline_dir = original_pipeline_dir
+
+    assert dashboard_response.status_code == 200
+    assert calendar_response.status_code == 200
+    assert "Open content calendar" in dashboard_response.text
+    assert "Content Calendar" in calendar_response.text
+    assert "github-project-update" in calendar_response.text
+    assert "review first" in calendar_response.text
+    assert "github.com/zemeng2015/ai-contentops-studio" in calendar_response.text
+    assert "research_provider=github" in calendar_response.text
 
 
 def test_review_queue_batch_approve_returns_per_run_results() -> None:

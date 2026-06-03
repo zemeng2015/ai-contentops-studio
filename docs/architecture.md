@@ -174,8 +174,10 @@ default. Receipts include execution id, dry-run flag, timestamps, duration, job 
 artifact directories, publish URLs, and per-job errors, giving EventBridge/ECS-triggered runs an
 auditable artifact even when stdout logs are rotated.
 The same receipt history is exposed through `GET /job-executions`, `GET /job-executions/{id}`,
-`contentops job-executions`, `contentops job-execution`, and a dashboard panel so operator review
-does not depend on cloud log retention.
+`contentops job-executions`, `contentops job-execution`, and dashboard pages so operator review
+does not depend on cloud log retention. The dashboard includes a content calendar view for
+planned jobs plus a job execution detail view that links completed jobs back to generated runs,
+source URLs, metadata, and recovery-plan JSON.
 Failed executions also expose a recovery plan through
 `GET /job-executions/{id}/recovery-plan` and `contentops job-recovery-plan`. The plan rebuilds the
 failed jobs as a YAML-compatible content calendar while preserving topic, source URLs, publish

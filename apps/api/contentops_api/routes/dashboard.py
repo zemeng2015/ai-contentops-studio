@@ -5,6 +5,7 @@ from html import escape
 from typing import Annotated
 
 from contentops_core.jobs import (
+    get_job_execution_report,
     job_execution_dir,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -31,6 +32,7 @@ from contentops_api.views import (
     _generation_receipt_html,
     _incident_report_html,
     _incident_reports_html,
+    _job_execution_detail_html,
     _job_executions_html,
     _notification_log_html,
     _operations_summary_html,
@@ -203,6 +205,7 @@ def build_dashboard_router(
                 <section class="hero compact">
                   <h2>Worker Job Catalog</h2>
                   <p>Planned YAML content calendars and publish/review intent before execution.</p>
+                  <p><a href="/dashboard/worker-jobs">Open content calendar</a></p>
                   {_worker_jobs_html(worker_jobs.items)}
                 </section>
                 <section class="hero compact">
@@ -235,6 +238,61 @@ def build_dashboard_router(
         )
     
     
+    @router.get(
+        "/dashboard/worker-jobs",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_worker_jobs(api_key: str = Query(default="")) -> HTMLResponse:
+        worker_jobs = list_worker_job_catalog(settings.pipeline_dir)
+        return HTMLResponse(
+            _page(
+                "Content Calendar",
+                f"""
+                <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                <section class="hero">
+                  <h2>Worker Job Catalog</h2>
+                  <p>
+                    Review scheduled content jobs before automation runs them. GitHub project
+                    update jobs should stay in review mode until a human approves the generated
+                    article.
+                  </p>
+                  {_worker_jobs_html(worker_jobs.items)}
+                </section>
+                """,
+            )
+        )
+
+
+    @router.get(
+        "/dashboard/job-executions/{execution_id}",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_job_execution_detail(
+        execution_id: str,
+        api_key: str = Query(default=""),
+    ) -> HTMLResponse:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return HTMLResponse(
+            _page(
+                f"Job Execution {report.execution_id}",
+                f"""
+                <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                <section class="hero">
+                  {_job_execution_detail_html(report)}
+                </section>
+                """,
+            )
+        )
+
+
     @router.post("/dashboard/runs", dependencies=[Depends(require_operator)])
     async def dashboard_create_run(
         topic: Annotated[str, Form()],
