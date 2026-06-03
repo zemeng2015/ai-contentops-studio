@@ -246,6 +246,8 @@ See [Deployment](docs/deployment.md) and [Production Runbook](docs/runbook.md).
 - [Production Runbook](docs/runbook.md)
 - [Evaluation Methodology](docs/eval-methodology.md)
 - [Integration Smoke Tests](docs/integration-smoke.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
 
 ## Star History
 

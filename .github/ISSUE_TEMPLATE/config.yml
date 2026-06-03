@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security report
+    url: https://github.com/zemeng2015/ai-contentops-studio/security
+    about: Please avoid public issues for sensitive security reports.

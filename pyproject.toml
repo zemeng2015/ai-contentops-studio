@@ -10,6 +10,26 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Zack Wang" }]
+keywords = [
+  "ai",
+  "llmops",
+  "content-automation",
+  "fastapi",
+  "observability",
+  "terraform",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Topic :: Text Processing :: Markup :: Markdown",
+]
 dependencies = [
   "fastapi>=0.115.0",
   "httpx>=0.27.0",
@@ -41,6 +61,12 @@ aws = [
 [project.scripts]
 contentops = "contentops_cli.main:app"
 contentops-worker = "contentops_worker.main:app"
+
+[project.urls]
+Homepage = "https://github.com/zemeng2015/ai-contentops-studio"
+Repository = "https://github.com/zemeng2015/ai-contentops-studio"
+Issues = "https://github.com/zemeng2015/ai-contentops-studio/issues"
+Documentation = "https://github.com/zemeng2015/ai-contentops-studio/tree/main/docs"
 
 [tool.setuptools.packages.find]
 where = [
