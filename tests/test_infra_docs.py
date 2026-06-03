@@ -23,6 +23,10 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "CONTENTOPS_OPERATOR_API_KEY" in main
     assert "CONTENTOPS_READ_API_KEY" in main
     assert "CONTENTOPS_OPENAI_API_KEY" in main
+    assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in main
+    assert "CONTENTOPS_RESEARCH_GITHUB_TOKEN" in main
+    assert "var.worker_pipeline_path" in main
+    assert "var.research_provider" in main
     assert "CONTENTOPS_RUN_MIGRATIONS" in main
     assert "CONTENTOPS_REQUIRE_READ_API_KEY" in main
     assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in main
@@ -36,6 +40,7 @@ def test_ci_validates_terraform() -> None:
     assert "hashicorp/setup-terraform" in workflow
     assert "terraform fmt -check" in workflow
     assert "terraform validate" in workflow
+    assert "pipelines/project_repository_updates.yaml" in workflow
     assert "scripts/generate_release_evidence.py" in workflow
     assert "actions/upload-artifact" in workflow
 

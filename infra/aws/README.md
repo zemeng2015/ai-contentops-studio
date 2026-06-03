@@ -22,7 +22,9 @@ before Terraform or CDK resources are added.
 - Secrets Manager storage for `CONTENTOPS_DATABASE_URL`
 - optional Secrets Manager injection for `CONTENTOPS_OPERATOR_API_KEY`,
   `CONTENTOPS_READ_API_KEY`,
-  `CONTENTOPS_OPENAI_API_KEY`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL`
+  `CONTENTOPS_OPENAI_API_KEY`,
+  `CONTENTOPS_RESEARCH_SEARCH_API_KEY`,
+  `CONTENTOPS_RESEARCH_GITHUB_TOKEN`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL`
 - ECS Fargate task definitions for API and worker
 - task execution and artifact access IAM roles
 - CloudWatch log groups
@@ -48,6 +50,12 @@ terraform plan \
 
 The recurring worker schedule is disabled by default. Set `worker_schedule_enabled=true` after the
 image, networking, RDS metadata store, and publishing target are ready.
+Set `worker_pipeline_path` to choose the scheduled content calendar. For example, use
+`pipelines/daily_ai_roundup.yaml` for AI trend monitoring or
+`pipelines/project_repository_updates.yaml` for GitHub project update drafts.
+Set `research_provider=github` with `research_github_token_secret_arn` for repository intelligence
+jobs, or `research_provider=search` with `research_search_api_key_secret_arn` for open-web
+discovery jobs.
 Set `operator_api_key_secret_arn` to require an operator key for write actions in shared
 deployments.
 Set `read_api_key_secret_arn` and `require_read_api_key=true` to protect dashboard and artifact

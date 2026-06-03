@@ -29,7 +29,9 @@ jobs:
           export CONTENTOPS_DATABASE_URL=sqlite:///migration-check.db
           alembic upgrade head
       - name: Worker dry run
-        run: contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
+        run: |
+          contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
+          contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run
       - name: Release evidence
         run: |
           export CONTENTOPS_DATABASE_URL=sqlite:///release-evidence.db

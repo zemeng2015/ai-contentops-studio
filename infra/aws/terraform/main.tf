@@ -247,6 +247,8 @@ resource "aws_iam_role_policy" "task_execution_secrets" {
       Resource = compact([
         aws_secretsmanager_secret.database_url.arn,
         var.openai_api_key_secret_arn,
+        var.research_search_api_key_secret_arn,
+        var.research_github_token_secret_arn,
         var.operator_api_key_secret_arn,
         var.read_api_key_secret_arn,
         var.notification_webhook_url_secret_arn
@@ -314,7 +316,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
         { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
         { name = "CONTENTOPS_GENERATOR_PROVIDER", value = "template" },
-        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" },
+        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = var.research_provider },
         { name = "CONTENTOPS_RUN_MIGRATIONS", value = "true" },
         { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) },
         { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) },
@@ -334,6 +336,18 @@ resource "aws_ecs_task_definition" "api" {
           {
             name      = "CONTENTOPS_OPENAI_API_KEY"
             valueFrom = var.openai_api_key_secret_arn
+          }
+        ] : [],
+        var.research_search_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_RESEARCH_SEARCH_API_KEY"
+            valueFrom = var.research_search_api_key_secret_arn
+          }
+        ] : [],
+        var.research_github_token_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_RESEARCH_GITHUB_TOKEN"
+            valueFrom = var.research_github_token_secret_arn
           }
         ] : [],
         var.operator_api_key_secret_arn != "" ? [
@@ -382,13 +396,13 @@ resource "aws_ecs_task_definition" "worker" {
       name      = "worker"
       image     = var.container_image
       essential = true
-      command   = ["contentops-worker", "run-pipeline", "pipelines/daily_ai_roundup.yaml"]
+      command   = ["contentops-worker", "run-pipeline", var.worker_pipeline_path]
       environment = [
         { name = "CONTENTOPS_ARTIFACT_STORE_PROVIDER", value = "s3" },
         { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
         { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
         { name = "CONTENTOPS_GENERATOR_PROVIDER", value = "template" },
-        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = "discovery" },
+        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = var.research_provider },
         { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) },
         { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) },
         { name = "CONTENTOPS_LATENCY_SLO_MS", value = tostring(var.latency_slo_ms) },
@@ -406,6 +420,18 @@ resource "aws_ecs_task_definition" "worker" {
           {
             name      = "CONTENTOPS_OPENAI_API_KEY"
             valueFrom = var.openai_api_key_secret_arn
+          }
+        ] : [],
+        var.research_search_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_RESEARCH_SEARCH_API_KEY"
+            valueFrom = var.research_search_api_key_secret_arn
+          }
+        ] : [],
+        var.research_github_token_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_RESEARCH_GITHUB_TOKEN"
+            valueFrom = var.research_github_token_secret_arn
           }
         ] : [],
         var.operator_api_key_secret_arn != "" ? [

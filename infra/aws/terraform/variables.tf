@@ -73,6 +73,24 @@ variable "openai_api_key_secret_arn" {
   default     = ""
 }
 
+variable "research_provider" {
+  description = "Research provider used by API and scheduled workers."
+  type        = string
+  default     = "discovery"
+}
+
+variable "research_search_api_key_secret_arn" {
+  description = "Secrets Manager ARN containing the optional search provider API key."
+  type        = string
+  default     = ""
+}
+
+variable "research_github_token_secret_arn" {
+  description = "Secrets Manager ARN containing the optional GitHub token for repository research."
+  type        = string
+  default     = ""
+}
+
 variable "operator_api_key_secret_arn" {
   description = "Secrets Manager ARN containing the optional operator API key."
   type        = string
@@ -143,6 +161,12 @@ variable "worker_schedule_enabled" {
   description = "Whether the recurring worker schedule is enabled."
   type        = bool
   default     = false
+}
+
+variable "worker_pipeline_path" {
+  description = "Pipeline YAML path executed by the scheduled worker task."
+  type        = string
+  default     = "pipelines/daily_ai_roundup.yaml"
 }
 
 variable "alarm_actions" {
