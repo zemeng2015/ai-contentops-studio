@@ -18,6 +18,7 @@ RESEARCH_PROVIDERS = {"local", "url", "hybrid", "feed", "discovery", "search", "
 GENERATOR_PROVIDERS = {"template", "openai"}
 PUBLISHER_PROVIDERS = {"static", "homepage"}
 ARTIFACT_STORE_PROVIDERS = {"local", "s3"}
+SCHEDULED_RESEARCH_PROVIDERS = {"feed", "discovery", "search", "github"}
 
 
 def system_status(settings: Settings, repository: RunRepository) -> SystemStatus:
@@ -134,6 +135,7 @@ def _local_artifact_store_check(root: Path) -> ComponentCheck:
 def _provider_config_check(settings: Settings) -> ComponentCheck:
     failures: list[str] = []
     warnings: list[str] = []
+    research_readiness = _research_provider_readiness(settings)
     if settings.research_provider not in RESEARCH_PROVIDERS:
         failures.append(f"unknown research provider: {settings.research_provider}")
     if settings.generator_provider not in GENERATOR_PROVIDERS:
@@ -170,12 +172,19 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("homepage publishing requires CONTENTOPS_HOMEPAGE_REPO_PATH")
     if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
         warnings.append("feed/discovery research has no configured feeds")
+    research_warnings = research_readiness.get("warnings", [])
+    if isinstance(research_warnings, list):
+        warnings.extend(str(warning) for warning in research_warnings)
     if failures:
         return ComponentCheck(
             name="provider_config",
             status="fail",
             message="Provider configuration is invalid.",
-            fields={"failures": failures, "warnings": warnings},
+            fields={
+                "failures": failures,
+                "warnings": warnings,
+                "research_readiness": research_readiness,
+            },
         )
     status = "degraded" if warnings else "ok"
     message = "Provider configuration has warnings." if warnings else "Providers are configured."
@@ -185,6 +194,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         message=message,
         fields={
             "research_provider": settings.research_provider,
+            "research_readiness": research_readiness,
             "research_retry_attempts": settings.research_retry_attempts,
             "research_retry_backoff_seconds": settings.research_retry_backoff_seconds,
             "research_search_enrich": settings.research_search_enrich,
@@ -244,6 +254,59 @@ def _research_feeds(settings: Settings) -> list[str]:
     return [feed.strip() for feed in settings.research_feeds.split(",") if feed.strip()]
 
 
+def _research_provider_readiness(settings: Settings) -> dict[str, object]:
+    provider = settings.research_provider
+    warnings: list[str] = []
+    credential_required = provider in {"search"}
+    credential_configured = _research_provider_credential_configured(settings)
+    scheduled_ready = provider in SCHEDULED_RESEARCH_PROVIDERS
+    if provider == "search" and not settings.research_search_api_key:
+        scheduled_ready = False
+    if provider in {"feed", "discovery"} and not _research_feeds(settings):
+        scheduled_ready = False
+    if provider == "github" and not settings.research_github_token:
+        warnings.append(
+            "GitHub research can use public unauthenticated API calls, but a token is recommended "
+            "for scheduled workers and private repositories."
+        )
+    if provider in {"local", "hybrid", "url"}:
+        warnings.append(
+            "Research provider is useful for local/manual runs but does not discover new sources "
+            "for scheduled automation."
+        )
+    return {
+        "provider": provider,
+        "mode": _research_provider_mode(provider),
+        "scheduled_ready": scheduled_ready,
+        "credential_required": credential_required,
+        "credential_configured": credential_configured,
+        "feeds_configured": bool(_research_feeds(settings)),
+        "search_endpoint_configured": bool(settings.research_search_endpoint),
+        "github_token_recommended": provider == "github",
+        "warnings": warnings,
+    }
+
+
+def _research_provider_credential_configured(settings: Settings) -> bool:
+    if settings.research_provider == "search":
+        return settings.research_search_api_key is not None
+    if settings.research_provider == "github":
+        return settings.research_github_token is not None
+    return True
+
+
+def _research_provider_mode(provider: str) -> str:
+    if provider in {"local", "hybrid", "url"}:
+        return "manual"
+    if provider in {"feed", "discovery"}:
+        return "curated_discovery"
+    if provider == "search":
+        return "credentialed_open_web"
+    if provider == "github":
+        return "repository_intelligence"
+    return "unknown"
+
+
 def _overall_status(checks: list[ComponentCheck]) -> str:
     statuses = {check.status for check in checks}
     if "fail" in statuses:
@@ -259,6 +322,7 @@ def _runtime_fields(settings: Settings) -> dict[str, object]:
         "artifact_store_provider": settings.artifact_store_provider,
         "artifact_s3_bucket_configured": settings.artifact_s3_bucket is not None,
         "research_provider": settings.research_provider,
+        "research_readiness": _research_provider_readiness(settings),
         "generator_provider": settings.generator_provider,
         "publisher_provider": settings.publisher_provider,
         "public_base_url": settings.public_base_url,
@@ -299,6 +363,10 @@ def _capabilities(
         cloud_status = "degraded"
     if status.status == "fail":
         cloud_status = "fail"
+    research_readiness = _research_provider_readiness(settings)
+    research_status = "ok" if research_readiness["scheduled_ready"] else "degraded"
+    if status.status == "fail":
+        research_status = "fail"
     return [
         DeploymentCapability(
             name="run_orchestration",
@@ -328,6 +396,15 @@ def _capabilities(
             name="incident_operations",
             status="ok",
             evidence=["/incident-reports", "/ops-summary", "contentops incident-report"],
+        ),
+        DeploymentCapability(
+            name="scheduled_research_ready",
+            status=research_status,
+            evidence=[
+                f"research_provider={settings.research_provider}",
+                f"mode={research_readiness['mode']}",
+                f"scheduled_ready={str(research_readiness['scheduled_ready']).lower()}",
+            ],
         ),
         DeploymentCapability(
             name="aws_deployment_ready",

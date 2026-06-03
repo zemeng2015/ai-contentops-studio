@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from contentops_core.artifacts import S3MirroringArtifactStore
-from contentops_core.diagnostics import system_status
+from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import RunRecord, RunRequest, RunStatus
 from contentops_core.repository import RunRepository
@@ -568,6 +568,45 @@ def test_system_status_reports_missing_search_credentials(tmp_path: Path) -> Non
     assert status.status == "fail"
     provider_check = next(check for check in status.checks if check.name == "provider_config")
     assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in provider_check.fields["failures"][0]
+    assert provider_check.fields["research_readiness"]["scheduled_ready"] is False
+    assert provider_check.fields["research_readiness"]["credential_required"] is True
+
+
+def test_system_status_reports_github_research_readiness(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        research_provider="github",
+        research_github_token="github-token",
+    )
+    repo = RunRepository(settings.database_url)
+
+    status = system_status(settings, repo)
+
+    provider_check = next(check for check in status.checks if check.name == "provider_config")
+    readiness = provider_check.fields["research_readiness"]
+    assert readiness["provider"] == "github"
+    assert readiness["mode"] == "repository_intelligence"
+    assert readiness["scheduled_ready"] is True
+    assert readiness["credential_configured"] is True
+
+
+def test_deployment_manifest_reports_scheduled_research_capability(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        research_provider="github",
+    )
+    repo = RunRepository(settings.database_url)
+
+    manifest = deployment_manifest(settings, repo)
+
+    capability = next(
+        item for item in manifest.capabilities if item.name == "scheduled_research_ready"
+    )
+    assert capability.status == "ok"
+    assert "research_provider=github" in capability.evidence
+    assert manifest.runtime["research_readiness"]["mode"] == "repository_intelligence"
 
 
 def test_system_status_validates_research_retry_policy(tmp_path: Path) -> None:

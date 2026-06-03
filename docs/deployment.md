@@ -169,6 +169,9 @@ these receipts are copied to S3 with the rest of the run artifacts.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.
+`contentops deployment-manifest` and `contentops release-evidence` also report
+`scheduled_research_ready`, including the selected research provider, provider mode, credential
+state, and whether the provider can discover or retrieve sources for scheduled automation.
 
 The Terraform stack creates a CloudWatch dashboard and three default alarms:
 
