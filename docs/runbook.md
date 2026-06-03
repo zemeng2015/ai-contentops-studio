@@ -78,9 +78,10 @@ worker windows:
 - Recent API and worker failure log tables should be empty or explainable.
 
 If `alarm_actions` is configured, API error, worker failure, and RDS connection alarms page the
-configured SNS or incident-management targets. When an alarm fires, first inspect `/ops-summary`,
-`/release-evidence`, `/job-executions`, and the relevant CloudWatch log table before rerunning or
-rolling back content.
+configured SNS or incident-management targets. When an alarm fires, first inspect
+`/dashboard/release-evidence`, `/ops-summary`, `/job-executions`, and the relevant CloudWatch log
+table before rerunning or rolling back content. Use `/release-evidence` when an automation or
+deployment script needs the same evidence in JSON form.
 
 ## 4. Review Queue
 

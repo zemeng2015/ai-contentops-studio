@@ -139,6 +139,7 @@ Representative endpoints:
 POST /runs
 GET  /runs
 GET  /dashboard
+GET  /dashboard/release-evidence
 GET  /review-queue
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/scorecard

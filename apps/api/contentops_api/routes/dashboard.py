@@ -15,6 +15,7 @@ from contentops_core.jobs import (
 )
 from contentops_core.models import ArtifactMirrorRecord, RunMetrics, RunRequest, RunStatus
 from contentops_core.pipeline import ContentOpsPipeline
+from contentops_core.release_evidence import build_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -45,6 +46,7 @@ from contentops_api.views import (
     _publish_receipt_html,
     _publish_verification_html,
     _published_content_html,
+    _release_evidence_html,
     _retention_report_html,
     _s3_mirror_log_html,
     _scorecard_html,
@@ -263,6 +265,36 @@ def build_dashboard_router(
                     article.
                   </p>
                   {_worker_jobs_html(worker_jobs.items)}
+                </section>
+                """,
+            )
+        )
+
+    @router.get(
+        "/dashboard/release-evidence",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_release_evidence(
+        api_key: str = Query(default=""),
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> HTMLResponse:
+        bundle = build_release_evidence(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            window_size=window_size,
+        )
+        return HTMLResponse(
+            _page(
+                "Release Evidence",
+                f"""
+                <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                <section class="hero">
+                  <p>
+                    Human-readable release evidence for deployment review and audit handoff.
+                  </p>
+                  {_release_evidence_html(bundle)}
                 </section>
                 """,
             )

@@ -556,9 +556,23 @@ def test_dashboard_renders() -> None:
     assert "Token Budgets" in response.text
     assert "Incident Reports" in response.text
     assert "Operations Summary" in response.text
+    assert "Release evidence dashboard" in response.text
     assert "Audit Events" in response.text
     assert "Artifact Retention" in response.text
     assert "Worker Job Catalog" in response.text
+
+
+def test_dashboard_release_evidence_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/release-evidence")
+
+    assert response.status_code == 200
+    assert "Release Evidence" in response.text
+    assert "Release Gate Checks" in response.text
+    assert "Deployment Capabilities" in response.text
+    assert "Evidence Files" in response.text
+    assert "evidence_manifest.json" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

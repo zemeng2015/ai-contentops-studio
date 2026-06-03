@@ -19,6 +19,7 @@ from contentops_core.models import (
     PublishPlan,
     PublishReceipt,
     PublishVerificationReport,
+    ReleaseEvidenceBundle,
     RetentionReport,
     RunComparison,
     RunCostReport,
@@ -641,6 +642,7 @@ def _run_link(run_id: str | None) -> str:
 def _operations_summary_html(summary: OperationsSummary) -> str:
     return f"""
       <p>
+        <a href="/dashboard/release-evidence">Release evidence dashboard</a> |
         <a href="/ops-summary">Operations summary JSON</a> |
         <a href="/deployment-manifest">Deployment manifest JSON</a> |
         <a href="/release-readiness">Release readiness JSON</a> |
@@ -661,6 +663,73 @@ def _operations_summary_html(summary: OperationsSummary) -> str:
         <div><strong>{_duration_label(summary.avg_duration_ms)}</strong><span>Avg run</span></div>
         <div><strong>{summary.estimated_total_tokens}</strong><span>Window tokens</span></div>
       </div>
+    """
+
+
+def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
+    summary = bundle.summary
+    gate_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(check.name)}</td>
+          <td><span class="pill">{escape(check.status)}</span></td>
+          <td>{escape(check.message)}</td>
+          <td><pre>{escape(json.dumps(check.evidence, ensure_ascii=False, indent=2))}</pre></td>
+        </tr>
+        """
+        for check in bundle.release_readiness.checks
+    )
+    capability_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(capability.name)}</td>
+          <td><span class="pill">{escape(capability.status)}</span></td>
+          <td>{escape(", ".join(capability.evidence) or "none")}</td>
+        </tr>
+        """
+        for capability in bundle.deployment_manifest.capabilities
+    )
+    artifact_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(name)}</td>
+        </tr>
+        """
+        for name in summary.artifact_files
+    )
+    if not artifact_rows:
+        artifact_rows = '<tr><td><span class="muted">No files recorded.</span></td></tr>'
+    return f"""
+      <p>
+        <a href="/release-evidence">Release evidence JSON</a> |
+        <a href="/deployment-manifest">Deployment manifest JSON</a> |
+        <a href="/release-readiness">Release readiness JSON</a>
+      </p>
+      <div class="metrics">
+        <div><strong>{escape(summary.release_status)}</strong><span>Release status</span></div>
+        <div><strong>{str(summary.can_release).lower()}</strong><span>Can release</span></div>
+        <div><strong>{escape(summary.doctor_status)}</strong><span>Doctor status</span></div>
+        <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
+        <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
+        <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
+      </div>
+      <h2>Release Gate Checks</h2>
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
+        </thead>
+        <tbody>{gate_rows}</tbody>
+      </table>
+      <h2>Deployment Capabilities</h2>
+      <table>
+        <thead><tr><th>Capability</th><th>Status</th><th>Evidence</th></tr></thead>
+        <tbody>{capability_rows}</tbody>
+      </table>
+      <h2>Evidence Files</h2>
+      <table>
+        <thead><tr><th>File</th></tr></thead>
+        <tbody>{artifact_rows}</tbody>
+      </table>
     """
 
 
