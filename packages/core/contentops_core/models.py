@@ -496,6 +496,7 @@ class RunRequest(BaseModel):
     topic: str
     source_urls: list[str] = Field(default_factory=list)
     publish: bool = False
+    metadata: dict[str, str] = Field(default_factory=dict)
 
 
 class RunRecord(BaseModel):

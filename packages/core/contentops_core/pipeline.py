@@ -45,8 +45,27 @@ class ContentOpsPipeline:
         trace = RunTrace()
         self.artifact_store.prepare(record)
         self.artifact_store.write_json(record, "request.json", request)
+        if request.metadata:
+            self.artifact_store.write_json(
+                record,
+                "workflow-context.json",
+                {
+                    "topic": request.topic,
+                    "source_urls": request.source_urls,
+                    "publish": request.publish,
+                    "metadata": request.metadata,
+                },
+            )
         self.repository.save(record)
         try:
+            if request.metadata:
+                trace.add(
+                    "workflow_context",
+                    "recorded",
+                    metadata_keys=sorted(request.metadata),
+                    workflow=request.metadata.get("contentops_workflow_name"),
+                    job=request.metadata.get("contentops_job_name"),
+                )
             record.touch(RunStatus.RESEARCHING)
             self.repository.save(record)
             trace.add("research", "started")

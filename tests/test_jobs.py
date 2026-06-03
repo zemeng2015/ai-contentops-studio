@@ -92,6 +92,42 @@ jobs:
     assert all(result.run_id for result in report.results)
 
 
+def test_job_runner_persists_workflow_context(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    path = tmp_path / "jobs.yaml"
+    path.write_text(
+        """
+name: project-updates
+jobs:
+  - name: repo-update
+    topic: GitHub repository launch update
+    source_urls:
+      - https://github.com/zemeng2015/ai-contentops-studio
+    tags: [github, portfolio]
+    metadata:
+      research_provider: github
+      content_type: project update
+""",
+        encoding="utf-8",
+    )
+
+    report = JobRunner(build_pipeline(settings)).run(load_job_file(path))
+    run_id = report.results[0].run_id
+    assert run_id is not None
+    artifact_dir = Path(str(report.results[0].artifact_dir))
+    context = (artifact_dir / "workflow-context.json").read_text(encoding="utf-8")
+    request = (artifact_dir / "request.json").read_text(encoding="utf-8")
+
+    assert '"contentops_workflow_name": "project-updates"' in context
+    assert '"contentops_job_name": "repo-update"' in context
+    assert '"contentops_job_tags": "github,portfolio"' in context
+    assert '"research_provider": "github"' in request
+
+
 def test_job_runner_builds_dry_run_receipt(tmp_path: Path) -> None:
     path = tmp_path / "jobs.yaml"
     path.write_text(

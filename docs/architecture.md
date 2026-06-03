@@ -173,6 +173,10 @@ Every worker invocation writes a job execution receipt under `artifact_root/job-
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,
 artifact directories, publish URLs, and per-job errors, giving EventBridge/ECS-triggered runs an
 auditable artifact even when stdout logs are rotated.
+When a worker job creates a run, its workflow name, job name, tags, publish intent, and custom
+metadata are copied into `request.json` and `workflow-context.json` inside the run artifact
+directory. This lets reviewers open a run and understand which scheduled workflow produced it
+without cross-referencing external logs.
 The same receipt history is exposed through `GET /job-executions`, `GET /job-executions/{id}`,
 `contentops job-executions`, `contentops job-execution`, and dashboard pages so operator review
 does not depend on cloud log retention. The dashboard includes a content calendar view for

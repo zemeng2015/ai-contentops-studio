@@ -435,6 +435,51 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
     """
 
 
+def _workflow_context_html(request_json: str) -> str:
+    data = json.loads(request_json)
+    metadata = data.get("metadata", {})
+    if not isinstance(metadata, dict) or not metadata:
+        return "<p>No workflow metadata recorded for this run.</p>"
+    normalized = {
+        str(key): str(value)
+        for key, value in metadata.items()
+        if isinstance(key, str)
+    }
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(key)}</td>
+          <td>{escape(value)}</td>
+        </tr>
+        """
+        for key, value in sorted(normalized.items())
+    )
+    return f"""
+      <div class="metrics">
+        <div>
+          <strong>{escape(normalized.get("contentops_workflow_name", "manual"))}</strong>
+          <span>Workflow</span>
+        </div>
+        <div>
+          <strong>{escape(normalized.get("contentops_job_name", "manual"))}</strong>
+          <span>Job</span>
+        </div>
+        <div>
+          <strong>{escape(normalized.get("contentops_publish_intent", "review"))}</strong>
+          <span>Intent</span>
+        </div>
+        <div>
+          <strong>{escape(normalized.get("research_provider", "default"))}</strong>
+          <span>Research provider</span>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Metadata</th><th>Value</th></tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
 def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
     if not items:
         return "<p>No worker job files found.</p>"

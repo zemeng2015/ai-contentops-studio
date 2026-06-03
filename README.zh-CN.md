@@ -87,6 +87,8 @@ Topic or URLs
 每次运行都会写入可检查的 artifacts，例如：
 
 - `research.json`
+- `request.json`
+- `workflow-context.json`
 - `draft.md`
 - `eval-report.json`
 - `scorecard.json`

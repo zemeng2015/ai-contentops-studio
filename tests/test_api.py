@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from contentops_api.main import app, settings
+from contentops_core.factory import build_pipeline
 from contentops_core.jobs import (
     JobRunner,
     job_execution_dir,
@@ -445,6 +446,36 @@ jobs:
     assert "review first" in calendar_response.text
     assert "github.com/zemeng2015/ai-contentops-studio" in calendar_response.text
     assert "research_provider=github" in calendar_response.text
+
+
+def test_dashboard_run_detail_shows_workflow_context(tmp_path: Path) -> None:
+    client = TestClient(app)
+    path = tmp_path / "workflow.yaml"
+    path.write_text(
+        """
+name: dashboard-project-updates
+jobs:
+  - name: dashboard-repo-update
+    topic: Dashboard workflow context run
+    tags: [github, dashboard]
+    metadata:
+      research_provider: github
+      content_type: project update
+""",
+        encoding="utf-8",
+    )
+    report = JobRunner(build_pipeline(settings)).run(load_job_file(path))
+    run_id = report.results[0].run_id
+    assert run_id is not None
+
+    response = client.get(f"/dashboard/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert "Workflow Context" in response.text
+    assert "dashboard-project-updates" in response.text
+    assert "dashboard-repo-update" in response.text
+    assert "content_type" in response.text
+    assert "project update" in response.text
 
 
 def test_review_queue_batch_approve_returns_per_run_results() -> None:

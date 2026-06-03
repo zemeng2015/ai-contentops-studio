@@ -50,6 +50,7 @@ from contentops_api.views import (
     _status_options,
     _timeline_rows,
     _worker_jobs_html,
+    _workflow_context_html,
 )
 
 ReadAccessDependency = Callable[[Request], Awaitable[None]]
@@ -341,6 +342,15 @@ def build_dashboard_router(
         generation_receipt = review_service.generation_receipt(run_id)
         incident_report = review_service.incident_report(run_id)
         timeline_rows = _timeline_rows(metrics)
+        workflow_context_html = ""
+        if "workflow-context.json" in artifacts:
+            workflow_context_html = _workflow_context_html(
+                review_service.read_artifact(run_id, "workflow-context.json")
+            )
+        elif "request.json" in artifacts:
+            workflow_context_html = _workflow_context_html(
+                review_service.read_artifact(run_id, "request.json")
+            )
         plan_html = ""
         try:
             plan_html = _publish_plan_html(review_service.publish_plan(run_id))
@@ -397,6 +407,8 @@ def build_dashboard_router(
                   </div>
                   <h3>Publish Plan</h3>
                   {plan_html}
+                  <h3>Workflow Context</h3>
+                  {workflow_context_html}
                   <h3>Quality Scorecard</h3>
                   {_scorecard_html(scorecard)}
                   <h3>Token Budget</h3>

@@ -89,6 +89,8 @@ Topic or URLs
 Each run writes inspectable artifacts such as:
 
 - `research.json`
+- `request.json`
+- `workflow-context.json`
 - `draft.md`
 - `eval-report.json`
 - `scorecard.json`

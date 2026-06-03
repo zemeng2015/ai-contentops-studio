@@ -20,11 +20,19 @@ class ContentJob(BaseModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
 
-    def to_request(self) -> RunRequest:
+    def to_request(self, workflow_name: str | None = None) -> RunRequest:
+        metadata = dict(self.metadata)
+        metadata["contentops_job_name"] = self.name
+        metadata["contentops_publish_intent"] = "publish" if self.publish else "review"
+        if self.tags:
+            metadata["contentops_job_tags"] = ",".join(self.tags)
+        if workflow_name:
+            metadata["contentops_workflow_name"] = workflow_name
         return RunRequest(
             topic=self.topic,
             source_urls=self.source_urls,
             publish=self.publish,
+            metadata=metadata,
         )
 
 
@@ -121,7 +129,7 @@ class JobRunner:
         for job in job_file.jobs:
             job_started = datetime.now(UTC)
             try:
-                run_result = self.pipeline.run(job.to_request())
+                run_result = self.pipeline.run(job.to_request(workflow_name=job_file.name))
                 results.append(
                     JobRunResult(
                         job_name=job.name,
