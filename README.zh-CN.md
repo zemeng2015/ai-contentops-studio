@@ -84,6 +84,8 @@ http://localhost:8000/dashboard
 
 更多说明见：[Demo Walkthrough](docs/demo.md)
 
+![AI ContentOps Studio demo walkthrough](docs/assets/demo-walkthrough.gif)
+
 ## GUI 展示
 
 主 Dashboard 是运营人员的工作台。你可以创建内容任务、过滤 review queue、approve/reject 文章、查看质量指标、检查 worker jobs，并查看已经发布的内容。
@@ -95,6 +97,7 @@ http://localhost:8000/dashboard
 如果给招聘方、面试官或非技术读者看，建议先打开 [Showcase Package](docs/showcase.md)。里面包含：
 
 - 干净的 Dashboard 截图
+- 短 demo walkthrough GIF
 - 一页架构图
 - 三篇示例文章输出
 - 两分钟 demo 讲解脚本

@@ -94,6 +94,8 @@ immediately.
 
 More details: [Demo Walkthrough](docs/demo.md)
 
+![AI ContentOps Studio demo walkthrough](docs/assets/demo-walkthrough.gif)
+
 ## What The GUI Shows
 
 The main dashboard is the operator workspace. A reviewer can create new content runs, filter the
@@ -108,6 +110,7 @@ For a fast portfolio review, start with the curated [Showcase Package](docs/show
 includes:
 
 - a clean dashboard screenshot
+- a short demo walkthrough GIF
 - a one-page architecture diagram
 - three sample article outputs
 - a two-minute demo script

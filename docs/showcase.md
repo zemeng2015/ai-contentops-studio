@@ -10,6 +10,8 @@ checks, approval gates, publishing receipts, scheduled workers, and AWS-ready ob
 
 ## Main Screenshot
 
+![AI ContentOps Studio demo walkthrough](assets/demo-walkthrough.gif)
+
 ![AI ContentOps Studio dashboard](assets/dashboard-screenshot.png)
 
 ## Architecture Snapshot
