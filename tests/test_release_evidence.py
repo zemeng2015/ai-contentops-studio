@@ -84,7 +84,7 @@ def test_generate_release_evidence_mirrors_to_s3_when_configured(
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_STORE_PROVIDER", "s3")
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_S3_BUCKET", "evidence-bucket")
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_S3_PREFIX", "contentops-prod")
-    monkeypatch.setenv("CONTENTOPS_GIT_SHA", "release-sha")
+    monkeypatch.setenv("GITHUB_SHA", "release-sha")
     output_dir = tmp_path / "release-evidence"
 
     generate_release_evidence(output_dir)

@@ -101,7 +101,7 @@ def test_worker_dry_run_mirrors_receipt_to_s3(
     )
 
     assert result.exit_code == 0
-    receipt = next(receipt_dir.glob("*.json"))
+    receipt = next(path for path in receipt_dir.glob("*.json") if path.name != "s3-mirror-log.json")
     mirror_log = json.loads((receipt_dir / "s3-mirror-log.json").read_text(encoding="utf-8"))
     assert uploads[0]["bucket"] == "receipt-bucket"
     assert uploads[0]["key"] == f"contentops-prod/job-executions/{receipt.stem}/{receipt.name}"
