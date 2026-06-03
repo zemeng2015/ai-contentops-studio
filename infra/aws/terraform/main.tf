@@ -4,7 +4,7 @@ locals {
     Project = var.project_name
     System  = "ai-contentops-studio"
   }
-  database_url = "postgresql+psycopg://${var.db_username}:${random_password.db.result}@${aws_db_instance.metadata.address}:${aws_db_instance.metadata.port}/${var.db_name}"
+  database_url         = "postgresql+psycopg://${var.db_username}:${random_password.db.result}@${aws_db_instance.metadata.address}:${aws_db_instance.metadata.port}/${var.db_name}"
   cloudwatch_namespace = "ContentOps/${local.name}"
   worker_security_group_ids = length(var.worker_security_group_ids) > 0 ? var.worker_security_group_ids : [
     aws_security_group.worker.id
@@ -612,10 +612,10 @@ resource "aws_cloudwatch_dashboard" "operations" {
         width  = 12
         height = 6
         properties = {
-          title   = "Recent API errors"
-          region  = var.aws_region
-          query   = "SOURCE '${aws_cloudwatch_log_group.api.name}' | fields @timestamp, @message | filter @message like /ERROR|Error|Traceback|exception|failed/ | sort @timestamp desc | limit 20"
-          view    = "table"
+          title  = "Recent API errors"
+          region = var.aws_region
+          query  = "SOURCE '${aws_cloudwatch_log_group.api.name}' | fields @timestamp, @message | filter @message like /ERROR|Error|Traceback|exception|failed/ | sort @timestamp desc | limit 20"
+          view   = "table"
         }
       },
       {
@@ -625,10 +625,10 @@ resource "aws_cloudwatch_dashboard" "operations" {
         width  = 12
         height = 6
         properties = {
-          title   = "Recent worker failures"
-          region  = var.aws_region
-          query   = "SOURCE '${aws_cloudwatch_log_group.worker.name}' | fields @timestamp, @message | filter @message like /ERROR|Error|Traceback|exception|failed/ | sort @timestamp desc | limit 20"
-          view    = "table"
+          title  = "Recent worker failures"
+          region = var.aws_region
+          query  = "SOURCE '${aws_cloudwatch_log_group.worker.name}' | fields @timestamp, @message | filter @message like /ERROR|Error|Traceback|exception|failed/ | sort @timestamp desc | limit 20"
+          view   = "table"
         }
       }
     ]
