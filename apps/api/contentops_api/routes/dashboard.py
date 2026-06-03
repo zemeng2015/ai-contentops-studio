@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from html import escape
+from pathlib import Path
 from typing import Annotated
 
 from contentops_core.jobs import (
+    JobExecutionReport,
     get_job_execution_report,
     job_execution_dir,
     list_job_execution_reports,
     list_worker_job_catalog,
 )
-from contentops_core.models import RunMetrics, RunRequest, RunStatus
+from contentops_core.models import ArtifactMirrorRecord, RunMetrics, RunRequest, RunStatus
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
@@ -43,6 +46,7 @@ from contentops_api.views import (
     _publish_verification_html,
     _published_content_html,
     _retention_report_html,
+    _s3_mirror_log_html,
     _scorecard_html,
     _scorecards_html,
     _source_audit_html,
@@ -288,6 +292,8 @@ def build_dashboard_router(
                 <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
                 <section class="hero">
                   {_job_execution_detail_html(report)}
+                  <h3>S3 Mirror Log</h3>
+                  {_s3_mirror_log_html(_job_execution_s3_mirror_log(report))}
                 </section>
                 """,
             )
@@ -377,6 +383,10 @@ def build_dashboard_router(
                 verification_html = "<p>Publish verification unavailable.</p>"
         audit_html = _audit_log_html(review_service.audit_log(run_id))
         notification_html = _notification_log_html(review_service.notification_log(run_id))
+        mirror_log_html = _s3_mirror_log_html(
+            review_service.s3_mirror_log(run_id),
+            f"/runs/{escape(run_id)}/s3-mirror-log",
+        )
         approve_action = f"/dashboard/runs/{escape(run_id)}/approve{_api_key_query(api_key)}"
         reject_action = f"/dashboard/runs/{escape(run_id)}/reject{_api_key_query(api_key)}"
         rerun_action = f"/dashboard/runs/{escape(run_id)}/rerun{_api_key_query(api_key)}"
@@ -415,6 +425,8 @@ def build_dashboard_router(
                   {_cost_report_html(cost_report)}
                   <h3>Generation Receipt</h3>
                   {_generation_receipt_html(run_id, generation_receipt)}
+                  <h3>S3 Mirror Log</h3>
+                  {mirror_log_html}
                   <h3>Incident Report</h3>
                   {_incident_report_html(incident_report)}
                   <h3>Approval</h3>
@@ -610,3 +622,20 @@ def build_dashboard_router(
 
 
     return router
+
+
+def _job_execution_s3_mirror_log(report: JobExecutionReport) -> list[ArtifactMirrorRecord]:
+    if not report.receipt_path:
+        return []
+    path = Path(report.receipt_path)
+    mirror_log_path = path.parent / "s3-mirror-log.json"
+    if not mirror_log_path.exists():
+        return []
+    data = json.loads(mirror_log_path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        return []
+    return [
+        ArtifactMirrorRecord.model_validate(item)
+        for item in data
+        if isinstance(item, dict) and item.get("artifact_name") == path.name
+    ]

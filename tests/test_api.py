@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from contentops_api.main import app, settings
@@ -182,6 +183,24 @@ def test_run_artifact_and_publish_endpoints() -> None:
     run = create_response.json()
     artifacts_response = client.get(f"/runs/{run['id']}/artifacts")
     manifest_response = client.get(f"/runs/{run['id']}/artifact-manifest")
+    mirror_log_path = Path(run["artifact_dir"]) / "s3-mirror-log.json"
+    mirror_log_path.write_text(
+        json.dumps(
+            [
+                {
+                    "run_id": run["id"],
+                    "artifact_name": "eval-report.json",
+                    "provider": "s3",
+                    "bucket": "api-bucket",
+                    "key": f"contentops/{run['id']}/eval-report.json",
+                    "content_type": "application/json",
+                    "status": "mirrored",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    mirror_log_response = client.get(f"/runs/{run['id']}/s3-mirror-log")
     bundle_response = client.get(f"/runs/{run['id']}/bundle")
     artifact_response = client.get(f"/runs/{run['id']}/artifacts/eval-report.json")
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
@@ -215,6 +234,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "eval-report.json" in artifacts_response.json()
     assert manifest_response.status_code == 200
     assert manifest_response.json()["artifacts"]["eval-report.json"]["size_bytes"] > 0
+    assert mirror_log_response.status_code == 200
+    assert mirror_log_response.json()[0]["bucket"] == "api-bucket"
+    assert mirror_log_response.json()[0]["status"] == "mirrored"
     assert bundle_response.status_code == 200
     assert bundle_response.content.startswith(b"PK")
     assert artifact_response.status_code == 200
@@ -352,6 +374,24 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     path.write_text("name: api-job-history\ntopic: API job history\n", encoding="utf-8")
     report = JobRunner.dry_run_report(load_job_file(path))
     write_job_execution_report(report, job_execution_dir(settings.artifact_root))
+    assert report.receipt_path is not None
+    receipt_path = Path(report.receipt_path)
+    (receipt_path.parent / "s3-mirror-log.json").write_text(
+        json.dumps(
+            [
+                {
+                    "run_id": f"job-executions/{receipt_path.stem}",
+                    "artifact_name": receipt_path.name,
+                    "provider": "s3",
+                    "bucket": "job-bucket",
+                    "key": f"contentops/job-executions/{receipt_path.stem}/{receipt_path.name}",
+                    "content_type": "application/json",
+                    "status": "mirrored",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     list_response = client.get("/job-executions?limit=5")
     detail_response = client.get(f"/job-executions/{report.execution_id}")
@@ -377,6 +417,8 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert dashboard_detail_response.status_code == 200
     assert "Execution JSON" in dashboard_detail_response.text
     assert "API job history" in dashboard_detail_response.text
+    assert "S3 Mirror Log" in dashboard_detail_response.text
+    assert "job-bucket" in dashboard_detail_response.text
 
 
 def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:
@@ -549,6 +591,7 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Quality Scorecard" in detail_response.text
     assert "Token Budget" in detail_response.text
     assert "Generation Receipt" in detail_response.text
+    assert "S3 Mirror Log" in detail_response.text
     assert "Incident Report" in detail_response.text
     assert "Manifest JSON" in detail_response.text
     assert "Download evidence bundle" in detail_response.text

@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
+    ArtifactMirrorRecord,
     AuditEvent,
     GenerationReceipt,
     NotificationDelivery,
@@ -138,6 +139,18 @@ def build_runs_router(
     def get_artifact_manifest(run_id: str) -> ArtifactManifest:
         try:
             return review_service.artifact_manifest(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+    @router.get(
+        "/runs/{run_id}/s3-mirror-log",
+        response_model=list[ArtifactMirrorRecord],
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_s3_mirror_log(run_id: str) -> list[ArtifactMirrorRecord]:
+        try:
+            return review_service.s3_mirror_log(run_id)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
 

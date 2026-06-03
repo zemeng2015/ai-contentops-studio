@@ -124,6 +124,7 @@ contentops publish-plan <run_id>
 contentops approve <run_id> --reviewer "operator"
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 ```
 
@@ -142,6 +143,7 @@ GET  /review-queue
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/scorecard
 GET  /runs/{run_id}/source-audit
+GET  /runs/{run_id}/s3-mirror-log
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification

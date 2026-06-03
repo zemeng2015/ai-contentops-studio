@@ -62,6 +62,8 @@ whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when
 `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3`, so scheduled execution receipts and deployment evidence
 can be traced to exact S3 keys.
+Use `contentops s3-mirror-log <run_id>`, `GET /runs/{id}/s3-mirror-log`, or the dashboard run
+detail page to inspect run-level mirror records without opening the artifact directory manually.
 When failures occur, inspect the recovery plan before rerunning it with
 `contentops-worker run-pipeline recovery.yaml`.
 

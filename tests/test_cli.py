@@ -162,6 +162,23 @@ def test_cli_queue_and_manifest_commands(
         for line in run_result.output.splitlines()
         if line.startswith("Run:")
     )
+    run_artifact_dir = next((tmp_path / "artifacts").glob(f"*-{run_id}"))
+    (run_artifact_dir / "s3-mirror-log.json").write_text(
+        json.dumps(
+            [
+                {
+                    "run_id": run_id,
+                    "artifact_name": "eval-report.json",
+                    "provider": "s3",
+                    "bucket": "cli-bucket",
+                    "key": f"contentops/{run_id}/eval-report.json",
+                    "content_type": "application/json",
+                    "status": "mirrored",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
     queue_result = runner.invoke(
         app,
         ["queue", "--query", "searchable", "--status", "needs_review", "--json"],
@@ -185,6 +202,7 @@ def test_cli_queue_and_manifest_commands(
     retention_result = runner.invoke(app, ["retention-report", "--days", "3650", "--json"])
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
+    mirror_log_result = runner.invoke(app, ["s3-mirror-log", run_id])
     source_audit_result = runner.invoke(app, ["source-audit", run_id, "--json"])
     bundle_path = tmp_path / "bundle.zip"
     export_result = runner.invoke(app, ["export-run", run_id, "--output", str(bundle_path)])
@@ -247,6 +265,9 @@ def test_cli_queue_and_manifest_commands(
     manifest_payload = json.loads(manifest_result.output)
     assert manifest_payload["run_id"] == run_id
     assert manifest_payload["artifacts"]["eval-report.json"]["size_bytes"] > 0
+    assert mirror_log_result.exit_code == 0
+    mirror_log_payload = json.loads(mirror_log_result.output)
+    assert mirror_log_payload[0]["bucket"] == "cli-bucket"
     assert source_audit_result.exit_code == 0
     source_audit_payload = json.loads(source_audit_result.output)
     assert source_audit_payload["source_count"] >= 1

@@ -18,6 +18,7 @@ from contentops_core.models import (
     ApprovalRecord,
     ArtifactManifest,
     ArtifactMetadata,
+    ArtifactMirrorRecord,
     AuditEvent,
     AuditEventListResponse,
     CostReportListResponse,
@@ -112,6 +113,16 @@ class ReviewService:
         run = self._get_run(run_id)
         artifact_path = self._safe_artifact_path(run.artifact_dir, artifact_name)
         return artifact_path.read_text(encoding="utf-8")
+
+    def s3_mirror_log(self, run_id: str) -> list[ArtifactMirrorRecord]:
+        run = self._get_run(run_id)
+        path = run.artifact_dir / "s3-mirror-log.json"
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        return [ArtifactMirrorRecord.model_validate(item) for item in data]
 
     def create_bundle(self, run_id: str, output_path: Path | None = None) -> Path:
         run = self._get_run(run_id)

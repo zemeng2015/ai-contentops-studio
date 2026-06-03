@@ -650,6 +650,16 @@ def manifest(run_id: str) -> None:
     typer.echo(artifact_manifest.model_dump_json(indent=2))
 
 
+@app.command("s3-mirror-log")
+def s3_mirror_log(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        records = service.s3_mirror_log(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(json.dumps([record.model_dump(mode="json") for record in records], indent=2))
+
+
 @app.command()
 def publish(
     run_id: str,

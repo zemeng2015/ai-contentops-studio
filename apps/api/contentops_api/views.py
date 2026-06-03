@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from contentops_core.jobs import JobExecutionReport, WorkerJobCatalogItem
 from contentops_core.models import (
     ApprovalRecord,
+    ArtifactMirrorRecord,
     AuditEvent,
     AuditEventListResponse,
     CostReportListResponse,
@@ -428,6 +429,45 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
           <tr>
             <th>Job</th><th>Intent</th><th>Status</th><th>Run</th><th>Topic</th>
             <th>Sources</th><th>Tags</th><th>Metadata</th><th>Error</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _s3_mirror_log_html(records: list[ArtifactMirrorRecord], json_href: str | None = None) -> str:
+    if not records:
+        return "<p>No S3 mirror records found.</p>"
+    mirrored = sum(1 for record in records if record.status == "mirrored")
+    failed = len(records) - mirrored
+    json_link = f'<p><a href="{escape(json_href)}">S3 mirror log JSON</a></p>' if json_href else ""
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(record.artifact_name)}</td>
+          <td>{escape(record.status)}</td>
+          <td>{escape(record.bucket)}</td>
+          <td><code>{escape(record.key)}</code></td>
+          <td>{escape(record.content_type)}</td>
+          <td>{escape(record.error or "")}</td>
+          <td>{escape(record.mirrored_at.isoformat())}</td>
+        </tr>
+        """
+        for record in records
+    )
+    return f"""
+      {json_link}
+      <div class="metrics">
+        <div><strong>{len(records)}</strong><span>Mirror attempts</span></div>
+        <div><strong>{mirrored}</strong><span>Mirrored</span></div>
+        <div><strong>{failed}</strong><span>Failed</span></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Artifact</th><th>Status</th><th>Bucket</th><th>Key</th>
+            <th>Type</th><th>Error</th><th>At</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>

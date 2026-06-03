@@ -342,7 +342,7 @@ def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:
     if not receipt_dir.exists():
         return []
     return sorted(
-        receipt_dir.glob("*.json"),
+        (path for path in receipt_dir.glob("*.json") if path.name != "s3-mirror-log.json"),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
