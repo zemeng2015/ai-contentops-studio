@@ -86,6 +86,10 @@ write is mirrored to S3 under:
 s3://$CONTENTOPS_ARTIFACT_S3_BUCKET/$CONTENTOPS_ARTIFACT_S3_PREFIX/<run_id>/<artifact>
 ```
 
+Release evidence and worker execution receipts use the same bucket and prefix. Their local output
+directories include `s3-mirror-log.json`, which records the bucket, key, content type, status, and
+error message for every standalone artifact mirror attempt.
+
 For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy can use the
 `postgresql+psycopg://` URL:
 
@@ -166,7 +170,7 @@ configuration.
 
 Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions` unless
 `--receipt-dir` is provided. In ECS/EventBridge deployments, keep artifact mirroring enabled so
-these receipts are copied to S3 with the rest of the run artifacts.
+these receipts are copied to S3 with the rest of the run artifacts and release evidence.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.

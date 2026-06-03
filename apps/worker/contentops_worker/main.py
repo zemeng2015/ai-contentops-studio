@@ -4,8 +4,14 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from contentops_core.artifacts import (
+    failed_s3_mirror_records,
+    mirror_files_to_s3,
+    write_s3_mirror_log,
+)
 from contentops_core.factory import build_pipeline
 from contentops_core.jobs import JobRunner, load_job_file, write_job_execution_report
+from contentops_core.models import ArtifactMirrorRecord
 from contentops_core.settings import Settings
 
 app = typer.Typer(help="Run scheduled or YAML-defined ContentOps jobs.")
@@ -34,6 +40,7 @@ def run_pipeline(
     if dry_run:
         report = JobRunner.dry_run_report(job_file)
         write_job_execution_report(report, resolved_receipt_dir)
+        _mirror_receipt_if_configured(settings, report.receipt_path)
         if json_output:
             typer.echo(report.model_dump_json(indent=2))
             return
@@ -45,6 +52,7 @@ def run_pipeline(
         return
 
     report = JobRunner(build_pipeline(settings)).run(job_file, receipt_dir=resolved_receipt_dir)
+    _mirror_receipt_if_configured(settings, report.receipt_path)
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
         return
@@ -53,3 +61,32 @@ def run_pipeline(
     for result in report.results:
         run_label = result.run_id or "no-run"
         typer.echo(f"- {result.job_name}: {run_label} {result.status}")
+
+
+def _mirror_receipt_if_configured(settings: Settings, receipt_path: str | None) -> None:
+    if settings.artifact_store_provider != "s3":
+        return
+    if not settings.artifact_s3_bucket:
+        raise typer.BadParameter(
+            "CONTENTOPS_ARTIFACT_S3_BUCKET is required for S3 receipt mirroring."
+        )
+    if receipt_path is None:
+        raise typer.BadParameter("Job execution receipt path is missing.")
+    path = Path(receipt_path)
+    records = mirror_files_to_s3(
+        [path],
+        bucket=settings.artifact_s3_bucket,
+        prefix=settings.artifact_s3_prefix,
+        collection_id=f"job-executions/{path.stem}",
+    )
+    write_s3_mirror_log(records, path.parent / "s3-mirror-log.json")
+    failures = failed_s3_mirror_records(records)
+    if failures:
+        raise typer.BadParameter(_mirror_failure_message(failures))
+
+
+def _mirror_failure_message(failures: list[ArtifactMirrorRecord]) -> str:
+    details = "; ".join(
+        f"{record.artifact_name}: {record.error or 'mirror failed'}" for record in failures
+    )
+    return f"Failed to mirror job execution receipt to S3: {details}"

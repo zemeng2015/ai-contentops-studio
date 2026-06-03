@@ -44,7 +44,7 @@ def generate_release_evidence(output_dir: Path, window_size: int = 100) -> Relea
         review_service=review_service,
         window_size=window_size,
     )
-    write_release_evidence(bundle, output_dir)
+    write_release_evidence(bundle, output_dir, settings=settings)
     return bundle
 
 

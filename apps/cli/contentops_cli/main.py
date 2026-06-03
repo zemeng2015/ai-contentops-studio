@@ -203,7 +203,7 @@ def show_release_evidence(
         window_size=window_size,
     )
     if output_dir is not None:
-        write_release_evidence(bundle, output_dir)
+        write_release_evidence(bundle, output_dir, settings=settings)
     typer.echo(bundle.model_dump_json(indent=2))
     raise typer.Exit(0 if bundle.release_readiness.can_release else 1)
 

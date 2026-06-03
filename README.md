@@ -233,6 +233,10 @@ CONTENTOPS_ARTIFACT_S3_BUCKET=your-artifact-bucket
 CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```
 
+With S3 mirroring enabled, run artifacts, release evidence output, and worker execution receipts
+write local `s3-mirror-log.json` records that include the bucket, key, content type, and mirror
+status for each object.
+
 Use Postgres/RDS:
 
 ```text
