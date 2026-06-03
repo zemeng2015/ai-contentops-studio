@@ -170,6 +170,15 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
 
+从 GitHub 项目仓库生成待审核的项目更新文章：
+
+```powershell
+$env:CONTENTOPS_RESEARCH_PROVIDER="github"
+$env:CONTENTOPS_RESEARCH_GITHUB_TOKEN="..."
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --receipt-dir artifacts/job-executions
+```
+
 失败的 worker 执行可以生成 recovery YAML：
 
 ```powershell

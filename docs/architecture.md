@@ -144,8 +144,8 @@ needs_review -> rejected
 ## Worker jobs
 
 The worker accepts YAML job files in either a single-job shape or a batch `jobs:` shape. Batch job
-files are the production path for content calendars, scheduled digests, and daily AI research
-roundups.
+files are the production path for content calendars, scheduled digests, daily AI research
+roundups, and GitHub repository project updates.
 
 ```yaml
 name: daily-ai-roundup
@@ -162,6 +162,7 @@ The worker supports dry-run validation for deployment checks and JSON output for
 contentops worker-jobs --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --json
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
 ```
 
 The worker job catalog scans `CONTENTOPS_PIPELINE_DIR` and exposes planned calendars through

@@ -172,6 +172,15 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
 
+Generate review-ready posts from GitHub project repositories:
+
+```powershell
+$env:CONTENTOPS_RESEARCH_PROVIDER="github"
+$env:CONTENTOPS_RESEARCH_GITHUB_TOKEN="..."
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --receipt-dir artifacts/job-executions
+```
+
 Failed worker executions can produce recovery YAML:
 
 ```powershell

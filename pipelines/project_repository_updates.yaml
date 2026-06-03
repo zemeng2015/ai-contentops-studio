@@ -1,0 +1,62 @@
+name: project-repository-updates
+jobs:
+  - name: ai-contentops-studio-product-update
+    topic: "AI ContentOps Studio as a production-grade AI content operations platform"
+    publish: false
+    source_urls:
+      - https://github.com/zemeng2015/ai-contentops-studio
+    tags:
+      - github
+      - product-update
+      - ai-contentops
+      - portfolio
+    metadata:
+      audience: "technical recruiters, hiring managers, and applied AI engineers"
+      research_provider: "github"
+      content_type: "project update"
+      review_required: "true"
+  - name: llm-eval-observability-project-update
+    topic: "LLM evaluation and observability patterns for production AI systems"
+    publish: false
+    source_urls:
+      - https://github.com/zemeng2015/llm-eval-observability
+    tags:
+      - github
+      - evaluation
+      - observability
+      - portfolio
+    metadata:
+      audience: "AI platform teams and backend engineering hiring managers"
+      research_provider: "github"
+      content_type: "project update"
+      review_required: "true"
+  - name: mortgage-intelligence-copilot-project-update
+    topic: "Mortgage intelligence copilot for document-heavy financial workflows"
+    publish: false
+    source_urls:
+      - https://github.com/zemeng2015/mortgage-intelligence-copilot
+    tags:
+      - github
+      - rag
+      - financial-workflows
+      - portfolio
+    metadata:
+      audience: "fintech teams, data platform teams, and applied AI reviewers"
+      research_provider: "github"
+      content_type: "project update"
+      review_required: "true"
+  - name: nl-to-athena-analyst-project-update
+    topic: "Natural language to Athena analyst for AWS data exploration"
+    publish: false
+    source_urls:
+      - https://github.com/zemeng2015/nl-to-athena-analyst
+    tags:
+      - github
+      - aws
+      - athena
+      - portfolio
+    metadata:
+      audience: "AWS data teams and applied AI engineering hiring managers"
+      research_provider: "github"
+      content_type: "project update"
+      review_required: "true"

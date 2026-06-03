@@ -217,3 +217,19 @@ jobs:
     broken = next(item for item in catalog.items if item.path == "broken.yaml")
     assert broken.valid is False
     assert broken.errors
+
+
+def test_project_repository_updates_pipeline_targets_github_repos() -> None:
+    job_file = load_job_file(Path("pipelines/project_repository_updates.yaml"))
+
+    assert job_file.name == "project-repository-updates"
+    assert len(job_file.jobs) >= 4
+    assert all(job.publish is False for job in job_file.jobs)
+    assert all("github" in job.tags for job in job_file.jobs)
+    assert all(job.metadata["research_provider"] == "github" for job in job_file.jobs)
+    assert all(job.source_urls for job in job_file.jobs)
+    assert all(
+        source_url.startswith("https://github.com/zemeng2015/")
+        for job in job_file.jobs
+        for source_url in job.source_urls
+    )

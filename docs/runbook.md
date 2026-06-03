@@ -14,6 +14,7 @@ contentops deployment-manifest
 contentops release-readiness --json
 contentops worker-jobs --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
 ```
 
 Expected result:
@@ -32,6 +33,14 @@ Use the worker for recurring content discovery:
 
 ```powershell
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
+```
+
+Use the GitHub repository workflow for review-ready project update drafts:
+
+```powershell
+$env:CONTENTOPS_RESEARCH_PROVIDER="github"
+$env:CONTENTOPS_RESEARCH_GITHUB_TOKEN="..."
+contentops-worker run-pipeline pipelines/project_repository_updates.yaml --receipt-dir artifacts/job-executions
 ```
 
 After the worker runs:
