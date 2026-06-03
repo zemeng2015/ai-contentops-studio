@@ -32,3 +32,18 @@ output "daily_worker_schedule_arn" {
   description = "EventBridge Scheduler ARN for the recurring worker."
   value       = aws_scheduler_schedule.daily_worker.arn
 }
+
+output "operations_dashboard_name" {
+  description = "CloudWatch dashboard for ContentOps operations."
+  value       = aws_cloudwatch_dashboard.operations.dashboard_name
+}
+
+output "api_error_alarm_name" {
+  description = "CloudWatch alarm for API log-derived errors."
+  value       = aws_cloudwatch_metric_alarm.api_errors.alarm_name
+}
+
+output "worker_failure_alarm_name" {
+  description = "CloudWatch alarm for scheduled worker failures."
+  value       = aws_cloudwatch_metric_alarm.worker_failures.alarm_name
+}

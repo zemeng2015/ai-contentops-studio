@@ -12,6 +12,9 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "aws_secretsmanager_secret" in main
     assert "aws_ecs_task_definition" in main
     assert "aws_cloudwatch_log_group" in main
+    assert "aws_cloudwatch_log_metric_filter" in main
+    assert "aws_cloudwatch_metric_alarm" in main
+    assert "aws_cloudwatch_dashboard" in main
     assert "aws_scheduler_schedule_group" in main
     assert "aws_scheduler_schedule" in main
     assert "ecs:RunTask" in main
@@ -23,6 +26,8 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "CONTENTOPS_RUN_MIGRATIONS" in main
     assert "CONTENTOPS_REQUIRE_READ_API_KEY" in main
     assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in main
+    assert "WorkerFailureCount" in main
+    assert "ApiErrorCount" in main
 
 
 def test_ci_validates_terraform() -> None:

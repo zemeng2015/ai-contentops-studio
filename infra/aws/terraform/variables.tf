@@ -144,3 +144,39 @@ variable "worker_schedule_enabled" {
   type        = bool
   default     = false
 }
+
+variable "alarm_actions" {
+  description = "SNS topic ARNs or other CloudWatch alarm actions for alarm and OK transitions."
+  type        = list(string)
+  default     = []
+}
+
+variable "alarm_period_seconds" {
+  description = "CloudWatch alarm period in seconds."
+  type        = number
+  default     = 300
+}
+
+variable "alarm_evaluation_periods" {
+  description = "Number of periods evaluated before an alarm changes state."
+  type        = number
+  default     = 1
+}
+
+variable "api_error_alarm_threshold" {
+  description = "API log-derived error count that triggers an alarm within the alarm period."
+  type        = number
+  default     = 1
+}
+
+variable "worker_failure_alarm_threshold" {
+  description = "Worker log-derived failure count that triggers an alarm within the alarm period."
+  type        = number
+  default     = 1
+}
+
+variable "db_connection_alarm_threshold" {
+  description = "Average RDS connection count that triggers an alarm within the alarm period."
+  type        = number
+  default     = 40
+}

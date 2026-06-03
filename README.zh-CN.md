@@ -311,7 +311,6 @@ CI 会验证 Docker image build、Terraform fmt/validate、数据库迁移、wor
 
 ## Roadmap
 
-- CloudWatch dashboard 和 worker alarms
 - GitHub repository research provider
 - 更强的 Dashboard filtering 和 saved views
 - 多 workspace 配置

@@ -26,6 +26,9 @@ before Terraform or CDK resources are added.
 - ECS Fargate task definitions for API and worker
 - task execution and artifact access IAM roles
 - CloudWatch log groups
+- CloudWatch log metric filters for API errors and worker failures
+- CloudWatch alarms for API errors, worker failures, and high RDS connections
+- CloudWatch operations dashboard for errors, ECS resources, RDS health, and recent failure logs
 - EventBridge Scheduler recurring worker run
 
 It intentionally stops short of creating public networking and an ALB until the runtime deployment
@@ -55,3 +58,6 @@ webhook while retaining local `notification-log.json` receipts.
 Tune `latency_slo_ms` and `min_source_count` to make the dashboard and `/scorecards` API reflect
 the production quality bar for recurring content runs.
 Tune `token_budget_per_run` to make `/cost-reports` useful as a recurring-run budget guardrail.
+Set `alarm_actions` to SNS topic ARNs or incident-management integrations if CloudWatch alarms
+should notify operators. Leave it empty to create inspectable alarms without paging during early
+portfolio demos.

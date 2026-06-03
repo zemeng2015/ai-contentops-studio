@@ -51,7 +51,22 @@ whether any artifact mirror attempt failed before the worker completed.
 When failures occur, inspect the recovery plan before rerunning it with
 `contentops-worker run-pipeline recovery.yaml`.
 
-## 3. Review Queue
+## 3. CloudWatch Operations
+
+For AWS deployments, inspect the Terraform-created CloudWatch dashboard before and after scheduled
+worker windows:
+
+- API and worker log-derived error metrics should remain at zero.
+- RDS metadata database connections should stay below the configured threshold.
+- ECS CPU and memory should leave enough headroom for retries and source enrichment.
+- Recent API and worker failure log tables should be empty or explainable.
+
+If `alarm_actions` is configured, API error, worker failure, and RDS connection alarms page the
+configured SNS or incident-management targets. When an alarm fires, first inspect `/ops-summary`,
+`/release-evidence`, `/job-executions`, and the relevant CloudWatch log table before rerunning or
+rolling back content.
+
+## 4. Review Queue
 
 List content awaiting operator review:
 
@@ -86,7 +101,7 @@ Reject weak runs with an explicit reason:
 contentops reject <run_id> --reviewer "Zack" --notes "Needs stronger source coverage."
 ```
 
-## 4. Publish
+## 5. Publish
 
 Preview the publish changes:
 
@@ -108,7 +123,7 @@ artifacts, and rollback hints. Confirm that `notification-log.json` recorded loc
 deliveries or webhook delivery status for approve/publish events. Confirm that publish
 verification passes so current target files still match the receipt hashes.
 
-## 5. Published Content Inventory
+## 6. Published Content Inventory
 
 Track shipped content as an operational catalog:
 
@@ -145,7 +160,7 @@ Cost reports prefer provider usage tokens from `generation-receipt.json`. When u
 they fall back to artifact-based estimates; use those estimates as a budget guardrail and
 correlate with provider billing dashboards for financial reporting.
 
-## 6. Evidence Export
+## 7. Evidence Export
 
 Export a run for portfolio review, incident handoff, or offline audit:
 
@@ -156,7 +171,7 @@ contentops export-run <run_id> --output run-evidence.zip
 The zip contains `bundle-manifest.json` and every run artifact, including request, research,
 source audit, draft, evaluation, trace, approval, audit log, and publish receipt when present.
 
-## 7. Rollback
+## 8. Rollback
 
 If a publish needs to be undone:
 
@@ -170,7 +185,7 @@ Rollback restores backed-up files or deletes newly created files according to th
 It then writes `publish-rollback.json`, appends a `rollback_publish` audit event, clears the
 published URL, and returns the run to an approved or reviewable state.
 
-## 8. Incident Checks
+## 9. Incident Checks
 
 When a scheduled job fails:
 
@@ -191,7 +206,7 @@ contentops-worker run-pipeline recovery.yaml
 contentops rerun <run_id>
 ```
 
-## 9. Production Environment Notes
+## 10. Production Environment Notes
 
 Recommended AWS-backed setup:
 

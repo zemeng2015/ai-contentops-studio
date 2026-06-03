@@ -44,8 +44,8 @@ S3/Postgres without changing the pipeline contract.
 
 The AWS Terraform skeleton lives in `infra/aws/terraform`. It defines the artifact bucket, RDS
 Postgres metadata database, database URL secret, ECS task definitions, scheduled worker IAM role,
-EventBridge Scheduler rule, log groups, and scheduler group needed for the first production
-deployment shape.
+EventBridge Scheduler rule, log groups, log-derived metrics, CloudWatch alarms, an operations
+dashboard, and scheduler group needed for the first production deployment shape.
 
 ## Provider environment variables
 
@@ -167,3 +167,12 @@ these receipts are copied to S3 with the rest of the run artifacts.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.
+
+The Terraform stack creates a CloudWatch dashboard and three default alarms:
+
+- API log-derived errors
+- Worker log-derived failures
+- high RDS metadata database connections
+
+Set `alarm_actions` to SNS topic ARNs or incident integrations to page operators. Keep it empty
+when you want dashboard evidence and alarm state without live notifications.

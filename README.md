@@ -324,7 +324,6 @@ migrations, worker dry runs, release evidence generation, linting, type checking
 
 ## Roadmap
 
-- CloudWatch dashboard and alarms for scheduled workers
 - GitHub repository research provider
 - richer dashboard filtering and saved views
 - multi-tenant workspace configuration

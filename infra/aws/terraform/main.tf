@@ -5,6 +5,7 @@ locals {
     System  = "ai-contentops-studio"
   }
   database_url = "postgresql+psycopg://${var.db_username}:${random_password.db.result}@${aws_db_instance.metadata.address}:${aws_db_instance.metadata.port}/${var.db_name}"
+  cloudwatch_namespace = "ContentOps/${local.name}"
   worker_security_group_ids = length(var.worker_security_group_ids) > 0 ? var.worker_security_group_ids : [
     aws_security_group.worker.id
   ]
@@ -43,6 +44,83 @@ resource "aws_cloudwatch_log_group" "worker" {
   name              = "/ecs/${local.name}/worker"
   retention_in_days = 30
   tags              = local.tags
+}
+
+resource "aws_cloudwatch_log_metric_filter" "api_errors" {
+  name           = "${local.name}-api-errors"
+  log_group_name = aws_cloudwatch_log_group.api.name
+  pattern        = "?ERROR ?Error ?Traceback ?exception ?failed"
+
+  metric_transformation {
+    name      = "ApiErrorCount"
+    namespace = local.cloudwatch_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_log_metric_filter" "worker_failures" {
+  name           = "${local.name}-worker-failures"
+  log_group_name = aws_cloudwatch_log_group.worker.name
+  pattern        = "?ERROR ?Error ?Traceback ?exception ?failed"
+
+  metric_transformation {
+    name      = "WorkerFailureCount"
+    namespace = local.cloudwatch_namespace
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "api_errors" {
+  alarm_name          = "${local.name}-api-errors"
+  alarm_description   = "API task logs contain errors that should be investigated."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = var.alarm_evaluation_periods
+  threshold           = var.api_error_alarm_threshold
+  period              = var.alarm_period_seconds
+  statistic           = "Sum"
+  namespace           = local.cloudwatch_namespace
+  metric_name         = "ApiErrorCount"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "worker_failures" {
+  alarm_name          = "${local.name}-worker-failures"
+  alarm_description   = "Scheduled worker logs contain failures or tracebacks."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = var.alarm_evaluation_periods
+  threshold           = var.worker_failure_alarm_threshold
+  period              = var.alarm_period_seconds
+  statistic           = "Sum"
+  namespace           = local.cloudwatch_namespace
+  metric_name         = "WorkerFailureCount"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+  tags                = local.tags
+}
+
+resource "aws_cloudwatch_metric_alarm" "database_connections" {
+  alarm_name          = "${local.name}-db-connections-high"
+  alarm_description   = "RDS connection count is above the configured operational threshold."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = var.alarm_evaluation_periods
+  threshold           = var.db_connection_alarm_threshold
+  period              = var.alarm_period_seconds
+  statistic           = "Average"
+  namespace           = "AWS/RDS"
+  metric_name         = "DatabaseConnections"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+
+  dimensions = {
+    DBInstanceIdentifier = aws_db_instance.metadata.identifier
+  }
+
+  tags = local.tags
 }
 
 resource "random_password" "db" {
@@ -436,4 +514,123 @@ resource "aws_scheduler_schedule" "daily_worker" {
       }
     }
   }
+}
+
+resource "aws_cloudwatch_dashboard" "operations" {
+  dashboard_name = "${local.name}-operations"
+
+  dashboard_body = jsonencode({
+    widgets = [
+      {
+        type   = "text"
+        x      = 0
+        y      = 0
+        width  = 24
+        height = 2
+        properties = {
+          markdown = "# AI ContentOps Studio Operations\nRelease evidence: `/release-evidence`; worker receipts: `/job-executions`; job catalog: `/worker-jobs`."
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 2
+        width  = 12
+        height = 6
+        properties = {
+          title   = "API and worker log-derived errors"
+          region  = var.aws_region
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            [local.cloudwatch_namespace, "ApiErrorCount"],
+            [".", "WorkerFailureCount"]
+          ]
+          stat   = "Sum"
+          period = var.alarm_period_seconds
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 2
+        width  = 12
+        height = 6
+        properties = {
+          title   = "RDS metadata database"
+          region  = var.aws_region
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/RDS", "DatabaseConnections", "DBInstanceIdentifier", aws_db_instance.metadata.identifier],
+            [".", "CPUUtilization", ".", "."],
+            [".", "FreeStorageSpace", ".", "."]
+          ]
+          period = 300
+        }
+      },
+      {
+        type   = "metric"
+        x      = 0
+        y      = 8
+        width  = 12
+        height = 6
+        properties = {
+          title   = "ECS API task resources"
+          region  = var.aws_region
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "TaskDefinitionFamily", aws_ecs_task_definition.api.family],
+            [".", "MemoryUtilization", ".", ".", ".", "."]
+          ]
+          period = 300
+        }
+      },
+      {
+        type   = "metric"
+        x      = 12
+        y      = 8
+        width  = 12
+        height = 6
+        properties = {
+          title   = "ECS worker task resources"
+          region  = var.aws_region
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "TaskDefinitionFamily", aws_ecs_task_definition.worker.family],
+            [".", "MemoryUtilization", ".", ".", ".", "."]
+          ]
+          period = 300
+        }
+      },
+      {
+        type   = "log"
+        x      = 0
+        y      = 14
+        width  = 12
+        height = 6
+        properties = {
+          title   = "Recent API errors"
+          region  = var.aws_region
+          query   = "SOURCE '${aws_cloudwatch_log_group.api.name}' | fields @timestamp, @message | filter @message like /ERROR|Error|Traceback|exception|failed/ | sort @timestamp desc | limit 20"
+          view    = "table"
+        }
+      },
+      {
+        type   = "log"
+        x      = 12
+        y      = 14
+        width  = 12
+        height = 6
+        properties = {
+          title   = "Recent worker failures"
+          region  = var.aws_region
+          query   = "SOURCE '${aws_cloudwatch_log_group.worker.name}' | fields @timestamp, @message | filter @message like /ERROR|Error|Traceback|exception|failed/ | sort @timestamp desc | limit 20"
+          view    = "table"
+        }
+      }
+    ]
+  })
 }
