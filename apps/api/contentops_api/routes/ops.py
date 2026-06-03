@@ -32,11 +32,15 @@ from contentops_core.models import (
     ScorecardListResponse,
     SystemStatus,
 )
-from contentops_core.release_evidence import build_release_evidence
+from contentops_core.release_evidence import (
+    build_release_evidence,
+    create_release_evidence_archive,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse
 
 ReadAccessDependency = Callable[[Request], Awaitable[None]]
 StatusParser = Callable[[str], RunStatus | None]
@@ -95,6 +99,27 @@ def build_ops_router(
             repository=repository,
             review_service=review_service,
             window_size=window_size,
+        )
+
+    @router.get(
+        "/release-evidence/bundle",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_release_evidence_bundle(
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> FileResponse:
+        bundle = build_release_evidence(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            window_size=window_size,
+        )
+        archive_path = settings.artifact_root / "release-evidence" / "release-evidence.zip"
+        create_release_evidence_archive(bundle, archive_path)
+        return FileResponse(
+            archive_path,
+            media_type="application/zip",
+            filename=archive_path.name,
         )
 
     @router.get(

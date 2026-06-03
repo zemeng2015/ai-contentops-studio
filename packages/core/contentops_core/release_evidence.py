@@ -5,7 +5,9 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from contentops_core.artifacts import (
     failed_s3_mirror_records,
@@ -87,6 +89,20 @@ def write_release_evidence(
     )
     if settings is not None:
         mirror_release_evidence_to_s3(bundle, output_dir, settings)
+
+
+def create_release_evidence_archive(
+    bundle: ReleaseEvidenceBundle,
+    output_path: Path,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="contentops-release-evidence-") as directory:
+        evidence_dir = Path(directory)
+        write_release_evidence(bundle, evidence_dir)
+        with ZipFile(output_path, "w", compression=ZIP_DEFLATED) as archive:
+            for path in sorted(evidence_dir.glob("*.json")):
+                archive.write(path, path.name)
+    return output_path
 
 
 def mirror_release_evidence_to_s3(

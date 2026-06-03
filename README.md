@@ -152,6 +152,7 @@ GET  /ops-summary
 GET  /deployment-manifest
 GET  /release-readiness
 GET  /release-evidence
+GET  /release-evidence/bundle
 GET  /worker-jobs
 GET  /job-executions
 ```

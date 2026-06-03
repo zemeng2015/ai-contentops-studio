@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
+from contentops_core.release_evidence import create_release_evidence_archive
 
 from scripts.generate_release_evidence import generate_release_evidence
 
@@ -46,6 +48,26 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert set(evidence_manifest["artifacts"]) == expected_files - {"evidence_manifest.json"}
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
+
+
+def test_create_release_evidence_archive_writes_zip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    monkeypatch.setenv("CONTENTOPS_GIT_SHA", "archive-sha")
+    bundle = generate_release_evidence(tmp_path / "release-evidence")
+    archive_path = create_release_evidence_archive(bundle, tmp_path / "release-evidence.zip")
+
+    assert archive_path.exists()
+    with ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+        assert names == set(bundle.summary.artifact_files)
+        summary = json.loads(archive.read("summary.json"))
+        assert summary["git_sha"] == "archive-sha"
 
 
 def test_generate_release_evidence_mirrors_to_s3_when_configured(

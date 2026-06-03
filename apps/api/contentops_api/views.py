@@ -701,6 +701,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         artifact_rows = '<tr><td><span class="muted">No files recorded.</span></td></tr>'
     return f"""
       <p>
+        <a href="/release-evidence/bundle">Download evidence bundle</a> |
         <a href="/release-evidence">Release evidence JSON</a> |
         <a href="/deployment-manifest">Deployment manifest JSON</a> |
         <a href="/release-readiness">Release readiness JSON</a>

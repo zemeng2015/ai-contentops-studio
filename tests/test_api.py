@@ -22,6 +22,7 @@ def test_health_endpoint() -> None:
     ready_response = client.get("/ready")
     manifest_response = client.get("/deployment-manifest")
     release_response = client.get("/release-readiness")
+    release_bundle_response = client.get("/release-evidence/bundle")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -42,6 +43,8 @@ def test_health_endpoint() -> None:
     assert manifest_payload["runtime"]["database_engine"] in {"sqlite", "postgresql"}
     assert "openai_api_key" not in manifest_response.text
     assert release_response.status_code == 200
+    assert release_bundle_response.status_code == 200
+    assert release_bundle_response.content.startswith(b"PK")
     release_payload = release_response.json()
     assert release_payload["status"] in {"pass", "warn", "fail"}
     assert isinstance(release_payload["can_release"], bool)
@@ -572,6 +575,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Release Gate Checks" in response.text
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
+    assert "Download evidence bundle" in response.text
     assert "evidence_manifest.json" in response.text
 
 
