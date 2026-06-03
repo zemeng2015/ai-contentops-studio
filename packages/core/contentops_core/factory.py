@@ -5,6 +5,7 @@ from contentops_providers.openai_generator import OpenAIResponsesGenerator
 from contentops_providers.research import (
     DiscoveryResearchProvider,
     FeedResearchProvider,
+    GitHubResearchProvider,
     HybridResearchProvider,
     LocalResearchProvider,
     SearchResearchProvider,
@@ -47,6 +48,7 @@ def _build_research_provider(
     | FeedResearchProvider
     | DiscoveryResearchProvider
     | SearchResearchProvider
+    | GitHubResearchProvider
 ):
     if settings.research_provider == "local":
         return LocalResearchProvider()
@@ -70,6 +72,14 @@ def _build_research_provider(
             api_key=settings.research_search_api_key,
             max_sources=settings.research_max_sources,
             enrich_results=settings.research_search_enrich,
+            retry_attempts=settings.research_retry_attempts,
+            retry_backoff_seconds=settings.research_retry_backoff_seconds,
+        )
+    if settings.research_provider == "github":
+        return GitHubResearchProvider(
+            api_base_url=settings.research_github_api_base_url,
+            token=settings.research_github_token,
+            max_items=settings.research_max_sources,
             retry_attempts=settings.research_retry_attempts,
             retry_backoff_seconds=settings.research_retry_backoff_seconds,
         )

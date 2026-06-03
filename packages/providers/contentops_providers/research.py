@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -570,6 +571,253 @@ class SearchResearchProvider:
         )
 
 
+@dataclass(frozen=True)
+class GitHubRepositoryRef:
+    owner: str
+    repo: str
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.owner}/{self.repo}"
+
+
+class GitHubResearchProvider:
+    """Collect repository context from GitHub for source-backed content planning."""
+
+    def __init__(
+        self,
+        api_base_url: str = "https://api.github.com",
+        token: str | None = None,
+        max_items: int = 5,
+        timeout_seconds: float = 12.0,
+        retry_attempts: int = 2,
+        retry_backoff_seconds: float = 0.1,
+    ) -> None:
+        self.api_base_url = api_base_url.rstrip("/")
+        self.token = token
+        self.max_items = max(max_items, 1)
+        self.timeout_seconds = timeout_seconds
+        self.retry_attempts = retry_attempts
+        self.retry_backoff_seconds = retry_backoff_seconds
+
+    def collect(self, request: RunRequest) -> ResearchPacket:
+        refs = [
+            repo_ref
+            for source_url in request.source_urls
+            if (repo_ref := _github_repo_from_ref(source_url)) is not None
+        ]
+        if not refs:
+            sources = [
+                Source(
+                    title="No GitHub repositories provided",
+                    publisher="github",
+                    summary=(
+                        "GitHub research needs source_urls such as "
+                        "https://github.com/owner/repo or owner/repo."
+                    ),
+                    credibility=0.35,
+                    extraction_status="missing_input",
+                    extraction_quality=0.2,
+                )
+            ]
+        else:
+            sources = dedupe_sources(
+                [source for repo_ref in refs for source in self._collect_repo_sources(repo_ref)]
+            )
+        claims = [
+            Claim(
+                text=f"{source.title} provides repository evidence for {request.topic}.",
+                source_title=source.title,
+                confidence=source.credibility,
+            )
+            for source in sources
+        ]
+        return ResearchPacket(
+            topic=request.topic.strip(),
+            sources=sources,
+            claims=claims,
+            engineering_signals=[
+                "Repository metadata helps connect content strategy to shipped software.",
+                (
+                    "README and issue context expose product positioning, maturity, and "
+                    "roadmap signals."
+                ),
+                (
+                    "GitHub-backed research can turn open-source activity into reviewable "
+                    "content inputs."
+                ),
+            ],
+            risks=[
+                "Public repository metadata may omit private architecture and operational context.",
+                (
+                    "Open issues and pull requests can be noisy unless reviewers inspect the "
+                    "source links."
+                ),
+                "GitHub API rate limits should be managed with a token in scheduled deployments.",
+            ],
+            project_implications=[
+                "Use repository README, issue, and pull request signals to generate launch posts.",
+                (
+                    "Compare GitHub evidence with evaluation reports before publishing "
+                    "portfolio content."
+                ),
+                "Configure worker jobs with repository source_urls for repeatable product updates.",
+            ],
+        )
+
+    def _collect_repo_sources(self, repo_ref: GitHubRepositoryRef) -> list[Source]:
+        try:
+            with httpx.Client(
+                timeout=self.timeout_seconds,
+                follow_redirects=True,
+                headers=self._headers(),
+            ) as client:
+                repo = self._get_json(client, f"/repos/{repo_ref.full_name}")
+                readme = self._get_optional_json(client, f"/repos/{repo_ref.full_name}/readme")
+                issues = self._get_optional_json(
+                    client,
+                    f"/repos/{repo_ref.full_name}/issues",
+                    params={"state": "open", "per_page": self.max_items},
+                )
+                pulls = self._get_optional_json(
+                    client,
+                    f"/repos/{repo_ref.full_name}/pulls",
+                    params={"state": "open", "per_page": self.max_items},
+                )
+            sources = [self._repo_source(repo_ref, repo)]
+            if isinstance(readme, dict):
+                sources.append(self._readme_source(repo_ref, readme))
+            if isinstance(issues, list):
+                sources.append(self._activity_source(repo_ref, issues, "issues"))
+            if isinstance(pulls, list):
+                sources.append(self._activity_source(repo_ref, pulls, "pull requests"))
+            return sources
+        except Exception as exc:
+            return [
+                Source(
+                    title=f"Unavailable GitHub repository: {repo_ref.full_name}",
+                    url=f"https://github.com/{repo_ref.full_name}",
+                    canonical_url=f"https://github.com/{repo_ref.full_name}".lower(),
+                    publisher="github",
+                    summary=f"GitHub fetch failed: {exc}",
+                    credibility=0.28,
+                    extraction_status="failed",
+                    extraction_quality=0.15,
+                )
+            ]
+
+    def _headers(self) -> dict[str, str]:
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "ai-contentops-studio/0.1",
+        }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
+
+    def _get_json(
+        self,
+        client: httpx.Client,
+        path: str,
+        *,
+        params: QueryParams | None = None,
+    ) -> object:
+        response = _get_with_retries(
+            client,
+            f"{self.api_base_url}{path}",
+            params=params,
+            retry_attempts=self.retry_attempts,
+            retry_backoff_seconds=self.retry_backoff_seconds,
+        )
+        return response.json()
+
+    def _get_optional_json(
+        self,
+        client: httpx.Client,
+        path: str,
+        *,
+        params: QueryParams | None = None,
+    ) -> object | None:
+        try:
+            return self._get_json(client, path, params=params)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _repo_source(repo_ref: GitHubRepositoryRef, payload: object) -> Source:
+        repo = payload if isinstance(payload, dict) else {}
+        html_url = _string_value(repo, "html_url") or f"https://github.com/{repo_ref.full_name}"
+        description = _string_value(repo, "description") or "No repository description provided."
+        language = _string_value(repo, "language") or "unknown language"
+        stars = _number_value(repo, "stargazers_count")
+        forks = _number_value(repo, "forks_count")
+        open_issues = _number_value(repo, "open_issues_count")
+        summary = (
+            f"{description} Primary language: {language}. "
+            f"Stars: {stars}. Forks: {forks}. Open issues: {open_issues}."
+        )
+        return Source(
+            title=f"GitHub repository: {repo_ref.full_name}",
+            url=html_url,
+            canonical_url=_normalize_url(html_url),
+            publisher="github",
+            summary=summary[:500],
+            credibility=0.86,
+            extraction_status="github_repo",
+            extraction_quality=0.82,
+            content_length=len(summary),
+        )
+
+    @staticmethod
+    def _readme_source(repo_ref: GitHubRepositoryRef, payload: dict[str, object]) -> Source:
+        html_url = _string_value(payload, "html_url") or f"https://github.com/{repo_ref.full_name}"
+        text = _decode_github_content(_string_value(payload, "content") or "")
+        summary = _markdown_excerpt(text)
+        if not summary:
+            summary = "README exists but no readable text was extracted."
+        return Source(
+            title=f"README: {repo_ref.full_name}",
+            url=html_url,
+            canonical_url=_normalize_url(html_url),
+            publisher="github",
+            summary=summary[:700],
+            credibility=0.84,
+            extraction_status="github_readme",
+            extraction_quality=0.86 if len(summary) >= 160 else 0.62,
+            content_length=len(text),
+        )
+
+    @staticmethod
+    def _activity_source(
+        repo_ref: GitHubRepositoryRef,
+        payload: list[object],
+        label: str,
+    ) -> Source:
+        items = [item for item in payload if isinstance(item, dict)]
+        titles: list[str] = []
+        for item in items:
+            title = _string_value(item, "title")
+            if title is not None:
+                titles.append(title)
+        summary = (
+            f"Open {label}: "
+            + "; ".join(titles[:5])
+            if titles
+            else f"No open {label} returned by GitHub."
+        )
+        return Source(
+            title=f"GitHub {label}: {repo_ref.full_name}",
+            url=f"https://github.com/{repo_ref.full_name}",
+            canonical_url=f"https://github.com/{repo_ref.full_name}/{label.replace(' ', '-')}",
+            publisher="github",
+            summary=summary[:500],
+            credibility=0.7 if titles else 0.58,
+            extraction_status=f"github_{label.replace(' ', '_')}",
+            extraction_quality=0.72 if titles else 0.5,
+            content_length=len(summary),
+        )
+
+
 class DiscoveryResearchProvider:
     def __init__(
         self,
@@ -763,6 +1011,56 @@ def _first_string(item: dict[str, object], keys: list[str]) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _github_repo_from_ref(value: str) -> GitHubRepositoryRef | None:
+    text = value.strip().removesuffix(".git")
+    if not text:
+        return None
+    if re.fullmatch(r"[\w.-]+/[\w.-]+", text):
+        owner, repo = text.split("/", 1)
+        return GitHubRepositoryRef(owner=owner, repo=repo)
+    parsed = urlparse(text)
+    if parsed.netloc.lower().removeprefix("www.") != "github.com":
+        return None
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if len(parts) < 2:
+        return None
+    return GitHubRepositoryRef(owner=parts[0], repo=parts[1].removesuffix(".git"))
+
+
+def _decode_github_content(value: str) -> str:
+    compact = re.sub(r"\s+", "", value)
+    if not compact:
+        return ""
+    try:
+        return base64.b64decode(compact).decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _markdown_excerpt(markdown: str) -> str:
+    without_fences = re.sub(r"```.*?```", " ", markdown, flags=re.DOTALL)
+    without_links = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", without_fences)
+    without_markup = re.sub(r"[#*_>`~|]", " ", without_links)
+    without_urls = re.sub(r"https?://\S+", " ", without_markup)
+    return re.sub(r"\s+", " ", without_urls).strip()
+
+
+def _string_value(item: dict[str, object], key: str) -> str | None:
+    value = item.get(key)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _number_value(item: dict[str, object], key: str) -> int:
+    value = item.get(key)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    return 0
 
 
 def dedupe_sources(sources: list[Source]) -> list[Source]:

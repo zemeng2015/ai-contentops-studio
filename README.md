@@ -101,7 +101,7 @@ Each run writes inspectable artifacts such as:
 
 | Area | Capability |
 | --- | --- |
-| Research | Local, URL, feed, search, and discovery research providers |
+| Research | Local, URL, GitHub, feed, search, and discovery research providers |
 | Generation | Template generator by default, optional OpenAI provider |
 | Evaluation | Groundedness, source coverage, technical depth, publish readiness |
 | Review | Review queue, status filters, batch approve/reject, run comparison |
@@ -198,6 +198,18 @@ CONTENTOPS_OPENAI_API_KEY=...
 CONTENTOPS_OPENAI_MODEL=gpt-5-mini
 CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 ```
+
+Use GitHub repository research:
+
+```text
+CONTENTOPS_RESEARCH_PROVIDER=github
+CONTENTOPS_RESEARCH_GITHUB_API_BASE_URL=https://api.github.com
+CONTENTOPS_RESEARCH_GITHUB_TOKEN=...
+```
+
+Then pass repository URLs in `source_urls`, for example `https://github.com/owner/repo`.
+The provider collects repository metadata, README text, open issues, and open pull requests as
+reviewable research sources.
 
 Use S3 artifact mirroring:
 

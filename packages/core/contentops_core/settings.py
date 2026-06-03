@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     research_search_endpoint: str = "https://api.search.brave.com/res/v1/web/search"
     research_search_api_key: str | None = None
     research_search_enrich: bool = True
+    research_github_api_base_url: str = "https://api.github.com"
+    research_github_token: str | None = None
     generator_provider: str = "template"
     publisher_provider: str = "static"
     openai_api_key: str | None = None

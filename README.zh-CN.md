@@ -99,7 +99,7 @@ Topic or URLs
 
 | 模块 | 能力 |
 | --- | --- |
-| Research | Local、URL、Feed、Search、Discovery 多种研究 provider |
+| Research | Local、URL、GitHub、Feed、Search、Discovery 多种研究 provider |
 | Generation | 默认模板生成器，可选 OpenAI provider |
 | Evaluation | groundedness、source coverage、technical depth、publish readiness |
 | Review | review queue、状态过滤、批量 approve/reject、run comparison |
@@ -196,6 +196,17 @@ CONTENTOPS_OPENAI_API_KEY=...
 CONTENTOPS_OPENAI_MODEL=gpt-5-mini
 CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true
 ```
+
+使用 GitHub 仓库作为研究来源：
+
+```text
+CONTENTOPS_RESEARCH_PROVIDER=github
+CONTENTOPS_RESEARCH_GITHUB_API_BASE_URL=https://api.github.com
+CONTENTOPS_RESEARCH_GITHUB_TOKEN=...
+```
+
+然后在 `source_urls` 里传入仓库地址，例如 `https://github.com/owner/repo`。系统会把仓库
+metadata、README、open issues 和 open pull requests 转成可审核的 research sources。
 
 使用 S3 artifact mirror：
 

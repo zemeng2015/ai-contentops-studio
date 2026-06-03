@@ -14,7 +14,7 @@ from contentops_core.models import (
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
-RESEARCH_PROVIDERS = {"local", "url", "hybrid", "feed", "discovery", "search"}
+RESEARCH_PROVIDERS = {"local", "url", "hybrid", "feed", "discovery", "search", "github"}
 GENERATOR_PROVIDERS = {"template", "openai"}
 PUBLISHER_PROVIDERS = {"static", "homepage"}
 ARTIFACT_STORE_PROVIDERS = {"local", "s3"}
@@ -152,6 +152,8 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_API_KEY")
     if settings.research_provider == "search" and not settings.research_search_endpoint:
         failures.append("search research requires CONTENTOPS_RESEARCH_SEARCH_ENDPOINT")
+    if settings.research_provider == "github" and not settings.research_github_api_base_url:
+        failures.append("github research requires CONTENTOPS_RESEARCH_GITHUB_API_BASE_URL")
     if settings.research_retry_attempts < 1:
         failures.append("research retry attempts must be at least 1")
     if settings.research_retry_backoff_seconds < 0:
@@ -186,6 +188,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             "research_retry_attempts": settings.research_retry_attempts,
             "research_retry_backoff_seconds": settings.research_retry_backoff_seconds,
             "research_search_enrich": settings.research_search_enrich,
+            "research_github_token_configured": settings.research_github_token is not None,
             "generator_provider": settings.generator_provider,
             "openai_timeout_seconds": settings.openai_timeout_seconds,
             "openai_retry_attempts": settings.openai_retry_attempts,
@@ -270,6 +273,7 @@ def _security_fields(settings: Settings) -> dict[str, object]:
         "read_routes_protected": settings.require_read_api_key,
         "model_credentials_configured": settings.openai_api_key is not None,
         "search_credentials_configured": settings.research_search_api_key is not None,
+        "github_credentials_configured": settings.research_github_token is not None,
         "notification_webhook_configured": settings.notification_webhook_url is not None,
     }
 

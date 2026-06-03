@@ -20,6 +20,7 @@ from contentops_providers.openai_generator import OpenAIResponsesGenerator
 from contentops_providers.research import (
     DiscoveryResearchProvider,
     FeedResearchProvider,
+    GitHubResearchProvider,
     HybridResearchProvider,
     SearchResearchProvider,
     URLResearchProvider,
@@ -251,6 +252,18 @@ def test_search_research_provider_requires_api_key(tmp_path: Path) -> None:
         build_pipeline(settings)
 
 
+def test_github_research_provider_can_be_selected(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        research_provider="github",
+    )
+
+    pipeline = build_pipeline(settings)
+
+    assert isinstance(pipeline.research_provider, GitHubResearchProvider)
+
+
 def test_search_research_parses_brave_style_results(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -386,6 +399,109 @@ def test_search_research_falls_back_when_enrichment_fails(
     assert packet.sources[0].title == "Workflow reliability"
     assert packet.sources[0].extraction_status == "search"
     assert packet.sources[0].summary.startswith("Search snippet")
+
+
+def test_github_research_collects_repository_readme_and_activity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import base64
+
+    readme = base64.b64encode(
+        b"# AI ContentOps Studio\n\n"
+        b"A production-minded content operations platform for researching, "
+        b"generating, evaluating, and publishing AI engineering articles."
+    ).decode("ascii")
+
+    class FakeResponse:
+        def __init__(self, payload: object) -> None:
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> object:
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            headers = kwargs["headers"]
+            assert isinstance(headers, dict)
+            assert headers["Authorization"] == "Bearer github-token"
+            assert headers["Accept"] == "application/vnd.github+json"
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(
+            self,
+            url: str,
+            params: dict[str, object] | None = None,
+        ) -> FakeResponse:
+            if url.endswith("/repos/zemeng2015/ai-contentops-studio"):
+                return FakeResponse(
+                    {
+                        "html_url": "https://github.com/zemeng2015/ai-contentops-studio",
+                        "description": "AI content operations platform",
+                        "language": "Python",
+                        "stargazers_count": 7,
+                        "forks_count": 1,
+                        "open_issues_count": 3,
+                    }
+                )
+            if url.endswith("/repos/zemeng2015/ai-contentops-studio/readme"):
+                return FakeResponse(
+                    {
+                        "html_url": (
+                            "https://github.com/zemeng2015/ai-contentops-studio/blob/main/"
+                            "README.md"
+                        ),
+                        "content": readme,
+                    }
+                )
+            if url.endswith("/repos/zemeng2015/ai-contentops-studio/issues"):
+                assert params == {"state": "open", "per_page": 2}
+                return FakeResponse(
+                    [
+                        {"title": "Add provider replay tests"},
+                        {"title": "Improve dashboard source review"},
+                    ]
+                )
+            if url.endswith("/repos/zemeng2015/ai-contentops-studio/pulls"):
+                assert params == {"state": "open", "per_page": 2}
+                return FakeResponse([{"title": "Ship GitHub research provider"}])
+            raise AssertionError(f"unexpected URL: {url}")
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = GitHubResearchProvider(
+        token="github-token",
+        max_items=2,
+        retry_backoff_seconds=0,
+    ).collect(
+        RunRequest(
+            topic="AI content operations",
+            source_urls=["https://github.com/zemeng2015/ai-contentops-studio"],
+        )
+    )
+
+    titles = {source.title for source in packet.sources}
+    assert "GitHub repository: zemeng2015/ai-contentops-studio" in titles
+    assert "README: zemeng2015/ai-contentops-studio" in titles
+    assert "GitHub issues: zemeng2015/ai-contentops-studio" in titles
+    assert "GitHub pull requests: zemeng2015/ai-contentops-studio" in titles
+    readme_source = next(source for source in packet.sources if source.title.startswith("README"))
+    assert readme_source.extraction_status == "github_readme"
+    assert "production-minded content operations platform" in readme_source.summary
+
+
+def test_github_research_reports_missing_repository_urls() -> None:
+    packet = GitHubResearchProvider().collect(RunRequest(topic="Portfolio launch"))
+
+    assert packet.sources[0].extraction_status == "missing_input"
+    assert "source_urls" in packet.sources[0].summary
 
 
 def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -218,16 +218,18 @@ Research providers:
 - `local`: deterministic source packet for CI and offline demos
 - `url`: fetches operator-supplied URLs and normalizes title, publisher, and summary
 - `hybrid`: combines URL sources with local portfolio context
+- `github`: collects GitHub repository metadata, README text, open issues, and open pull requests
 - `feed`: discovers candidate sources from configured RSS/Atom feeds or Atom search endpoints
 - `search`: discovers candidate sources from a Brave-compatible web search API and enriches
   result URLs with fetched page metadata
 - `discovery`: combines feed discovery, operator URLs, and local portfolio context
 
-The search provider is the credentialed production path for open-web discovery. The discovery
-provider is the low-cost recurring path for curated feeds and operator URLs. Both let the worker
-start from a topic, retrieve current entries, rank them by topic relevance and AI engineering
-keywords, enrich reachable search results with page content, deduplicate canonical URLs, and
-persist the discovered sources into `research.json`.
+The search provider is the credentialed production path for open-web discovery. The GitHub
+provider is the repository evidence path for launch posts, project writeups, and open-source
+activity summaries. The discovery provider is the low-cost recurring path for curated feeds and
+operator URLs. These providers let the worker start from a topic, retrieve current entries or
+repository activity, rank or normalize the evidence, deduplicate canonical URLs, and persist the
+discovered sources into `research.json`.
 Network-backed research providers share a bounded retry policy for transient timeouts,
 connection errors, `429`, and `5xx` responses so scheduled workers degrade gracefully when an
 upstream source is briefly unavailable.
