@@ -30,6 +30,7 @@ AI ContentOps Studio 是一个面向生产形态设计的 AI 内容运营平台�
 - [功能亮点](#功能亮点)
 - [快速 Demo](#快速-demo)
 - [GUI 展示](#gui-展示)
+- [展示包](#展示包)
 - [快速开始](#快速开始)
 - [架构](#架构)
 - [Review 和运营流程](#review-和运营流程)
@@ -88,6 +89,18 @@ http://localhost:8000/dashboard
 主 Dashboard 是运营人员的工作台。你可以创建内容任务、过滤 review queue、approve/reject 文章、查看质量指标、检查 worker jobs，并查看已经发布的内容。
 
 ![AI ContentOps Studio dashboard](docs/assets/dashboard-screenshot.png)
+
+## 展示包
+
+如果给招聘方、面试官或非技术读者看，建议先打开 [Showcase Package](docs/showcase.md)。里面包含：
+
+- 干净的 Dashboard 截图
+- 一页架构图
+- 三篇示例文章输出
+- 两分钟 demo 讲解脚本
+- 面试讲解要点和推广 checklist
+
+![AI ContentOps Studio architecture overview](docs/assets/architecture-overview.svg)
 
 ## 快速开始
 

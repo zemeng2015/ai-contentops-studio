@@ -38,6 +38,7 @@ real team needs after the first successful prompt:
 - [Features](#features)
 - [Demo](#demo)
 - [What The GUI Shows](#what-the-gui-shows)
+- [Showcase Package](#showcase-package)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Review And Operations Workflow](#review-and-operations-workflow)
@@ -100,6 +101,19 @@ review queue, approve or reject articles, inspect quality signals, check worker 
 published content from one place.
 
 ![AI ContentOps Studio dashboard](docs/assets/dashboard-screenshot.png)
+
+## Showcase Package
+
+For a fast portfolio review, start with the curated [Showcase Package](docs/showcase.md). It
+includes:
+
+- a clean dashboard screenshot
+- a one-page architecture diagram
+- three sample article outputs
+- a two-minute demo script
+- interview talking points and promotion checklist
+
+![AI ContentOps Studio architecture overview](docs/assets/architecture-overview.svg)
 
 ## Quick Start
 

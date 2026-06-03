@@ -31,6 +31,9 @@ docker compose exec api contentops content --json
 docker compose exec api contentops release-readiness --json
 ```
 
+For a recruiter-friendly overview with screenshots, architecture, sample articles, and a two-minute
+demo script, see [Showcase Package](showcase.md).
+
 Stop the demo:
 
 ```powershell

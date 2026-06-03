@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">AI ContentOps Studio architecture overview</title>
+  <desc id="desc">A high-level workflow from topics and sources through research, generation, review, publishing, and AWS operations.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f8f6; }
+      .band { fill: #ffffff; stroke: #d8ddd7; stroke-width: 2; }
+      .box { fill: #ffffff; stroke: #b8c8c2; stroke-width: 2; rx: 10; }
+      .box-dark { fill: #12201d; stroke: #12201d; stroke-width: 2; rx: 10; }
+      .box-soft { fill: #ecf6f3; stroke: #1f7a68; stroke-width: 2; rx: 10; }
+      .text { fill: #18201e; font: 700 24px Inter, Arial, sans-serif; }
+      .small { fill: #4f5b57; font: 500 17px Inter, Arial, sans-serif; }
+      .small-bold { fill: #18201e; font: 700 17px Inter, Arial, sans-serif; }
+      .white { fill: #ffffff; font: 800 24px Inter, Arial, sans-serif; }
+      .white-small { fill: #dce7e3; font: 500 17px Inter, Arial, sans-serif; }
+      .arrow { stroke: #1f7a68; stroke-width: 4; fill: none; marker-end: url(#arrow); }
+      .muted-arrow { stroke: #9facaa; stroke-width: 3; fill: none; marker-end: url(#muted-arrow); }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#1f7a68" />
+    </marker>
+    <marker id="muted-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#9facaa" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1280" height="720" />
+  <text x="70" y="70" class="text" style="font-size:34px">AI ContentOps Studio</text>
+  <text x="70" y="104" class="small">Turns AI and technical topics into reviewed, source-backed, publishable content.</text>
+
+  <rect x="60" y="145" width="1160" height="260" class="band" rx="18" />
+  <text x="90" y="188" class="small-bold">Content workflow</text>
+
+  <rect x="90" y="225" width="150" height="105" class="box-soft" />
+  <text x="116" y="265" class="text">Topic</text>
+  <text x="116" y="294" class="small">idea or schedule</text>
+
+  <path d="M250 278 H315" class="arrow" />
+
+  <rect x="330" y="225" width="150" height="105" class="box" />
+  <text x="357" y="260" class="text">Research</text>
+  <text x="356" y="292" class="small">sources + claims</text>
+
+  <path d="M490 278 H555" class="arrow" />
+
+  <rect x="570" y="225" width="150" height="105" class="box" />
+  <text x="602" y="260" class="text">Draft</text>
+  <text x="596" y="292" class="small">markdown + html</text>
+
+  <path d="M730 278 H795" class="arrow" />
+
+  <rect x="810" y="225" width="150" height="105" class="box" />
+  <text x="842" y="260" class="text">Review</text>
+  <text x="836" y="292" class="small">quality gates</text>
+
+  <path d="M970 278 H1035" class="arrow" />
+
+  <rect x="1050" y="225" width="135" height="105" class="box-dark" />
+  <text x="1082" y="264" class="white">Publish</text>
+  <text x="1074" y="294" class="white-small">receipt + URL</text>
+
+  <rect x="60" y="455" width="540" height="165" class="band" rx="18" />
+  <text x="90" y="498" class="small-bold">Operator surfaces</text>
+  <rect x="90" y="530" width="130" height="55" class="box" />
+  <text x="119" y="565" class="small-bold">Dashboard</text>
+  <rect x="245" y="530" width="115" height="55" class="box" />
+  <text x="283" y="565" class="small-bold">CLI</text>
+  <rect x="385" y="530" width="165" height="55" class="box" />
+  <text x="414" y="565" class="small-bold">REST API</text>
+
+  <rect x="680" y="455" width="540" height="165" class="band" rx="18" />
+  <text x="710" y="498" class="small-bold">Production operations</text>
+  <rect x="710" y="530" width="110" height="55" class="box" />
+  <text x="742" y="565" class="small-bold">S3</text>
+  <rect x="845" y="530" width="120" height="55" class="box" />
+  <text x="878" y="565" class="small-bold">RDS</text>
+  <rect x="990" y="530" width="180" height="55" class="box" />
+  <text x="1014" y="565" class="small-bold">CloudWatch</text>
+
+  <path d="M405 330 C405 388 300 420 300 530" class="muted-arrow" />
+  <path d="M885 330 C885 390 985 420 985 530" class="muted-arrow" />
+  <path d="M1118 330 C1118 390 1060 420 1060 530" class="muted-arrow" />
+</svg>
