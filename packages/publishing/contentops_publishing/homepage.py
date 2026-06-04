@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from shutil import copyfile
+from subprocess import run
 
 from contentops_core.models import Draft, EvaluationReport, PublishPlan, PublishPlanItem, RunRecord
 
@@ -28,6 +29,26 @@ class HomepagePublisher:
         post_path = posts_dir / f"{draft.slug}.html"
         eval_path = posts_dir / f"{draft.slug}.eval.json"
         index_path = self.homepage_repo_path / "index.html"
+        items = [
+            PublishPlanItem(
+                path=str(post_path),
+                action="create" if not post_path.exists() else "overwrite",
+                exists=post_path.exists(),
+                description="Write generated article into homepage posts directory.",
+            ),
+            PublishPlanItem(
+                path=str(eval_path),
+                action="create" if not eval_path.exists() else "overwrite",
+                exists=eval_path.exists(),
+                description="Copy eval report into homepage posts directory.",
+            ),
+            PublishPlanItem(
+                path=str(index_path),
+                action="update",
+                exists=index_path.exists(),
+                description="Insert article card into homepage Writing grid.",
+            ),
+        ]
         warnings: list[str] = []
         if not report.publish_ready:
             warnings.append("Evaluation report is not publish-ready.")
@@ -39,31 +60,17 @@ class HomepagePublisher:
                 warnings.append(
                     "Homepage index.html does not contain the expected post-grid marker."
                 )
+        metadata = self._plan_metadata(items, draft)
+        git_metadata = metadata.get("git")
+        if isinstance(git_metadata, dict) and not git_metadata.get("is_repository"):
+            warnings.append("Homepage target must be a git repository.")
         return PublishPlan(
             provider="homepage",
             target_url=f"{self.public_base_url}/posts/{draft.slug}.html",
             ready=len(warnings) == 0,
             warnings=warnings,
-            items=[
-                PublishPlanItem(
-                    path=str(post_path),
-                    action="create" if not post_path.exists() else "overwrite",
-                    exists=post_path.exists(),
-                    description="Write generated article into homepage posts directory.",
-                ),
-                PublishPlanItem(
-                    path=str(eval_path),
-                    action="create" if not eval_path.exists() else "overwrite",
-                    exists=eval_path.exists(),
-                    description="Copy eval report into homepage posts directory.",
-                ),
-                PublishPlanItem(
-                    path=str(index_path),
-                    action="update",
-                    exists=index_path.exists(),
-                    description="Insert article card into homepage Writing grid.",
-                ),
-            ],
+            items=items,
+            metadata=metadata,
         )
 
     def _update_index(self, draft: Draft, report: EvaluationReport) -> None:
@@ -99,3 +106,69 @@ class HomepagePublisher:
             '<head>\n    <link rel="stylesheet" href="../assets/styles.css" />',
             1,
         )
+
+    def _plan_metadata(self, items: list[PublishPlanItem], draft: Draft) -> dict[str, object]:
+        relative_paths = [
+            str(Path(item.path).resolve().relative_to(self.homepage_repo_path.resolve())).replace(
+                "\\",
+                "/",
+            )
+            for item in items
+            if _is_relative_to(Path(item.path).resolve(), self.homepage_repo_path.resolve())
+        ]
+        git = self._git_metadata()
+        quoted_repo = str(self.homepage_repo_path).replace('"', '\\"')
+        add_paths = " ".join(relative_paths)
+        suggested_commands = [
+            f'git -C "{quoted_repo}" status --short',
+            f'git -C "{quoted_repo}" add {add_paths}',
+            f'git -C "{quoted_repo}" commit -m "Publish {draft.slug}"',
+            f'git -C "{quoted_repo}" push',
+        ]
+        return {
+            "homepage_repo_path": str(self.homepage_repo_path),
+            "relative_paths": relative_paths,
+            "git": git,
+            "suggested_commands": suggested_commands,
+        }
+
+    def _git_metadata(self) -> dict[str, object]:
+        if not (self.homepage_repo_path / ".git").exists():
+            return {
+                "is_repository": False,
+                "branch": None,
+                "commit": None,
+                "dirty": None,
+                "status_entries": [],
+            }
+        branch = _git_output(self.homepage_repo_path, "branch", "--show-current")
+        commit = _git_output(self.homepage_repo_path, "rev-parse", "--short", "HEAD")
+        status = _git_output(self.homepage_repo_path, "status", "--short")
+        status_entries = [line for line in status.splitlines() if line]
+        return {
+            "is_repository": True,
+            "branch": branch or "detached",
+            "commit": commit or None,
+            "dirty": bool(status_entries),
+            "status_entries": status_entries,
+        }
+
+
+def _git_output(repo: Path, *args: str) -> str:
+    result = run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True

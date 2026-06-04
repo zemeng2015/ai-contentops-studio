@@ -134,7 +134,9 @@ pytest -m integration tests/test_integration_smoke.py
 
 Set `CONTENTOPS_OPENAI_API_KEY` for the OpenAI generation smoke test,
 `CONTENTOPS_RESEARCH_SEARCH_API_KEY` for the Brave-compatible search smoke test, and
-`CONTENTOPS_HOMEPAGE_REPO_PATH` for the read-only homepage publisher plan check.
+`CONTENTOPS_HOMEPAGE_REPO_PATH` for the read-only homepage publisher plan check. The homepage
+target must be a git repository; publish plans include branch, dirty-state, relative paths, and
+suggested `git add`, `commit`, and `push` commands for the generated post.
 
 ## Release evidence
 

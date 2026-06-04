@@ -304,6 +304,12 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
         for change in receipt.file_changes
     )
     reviewer = receipt.approval.reviewer if receipt.approval is not None else "force"
+    metadata_html = ""
+    if receipt.plan_metadata:
+        metadata_html = (
+            "<h4>Publish Metadata</h4>"
+            f"<pre>{escape(json.dumps(receipt.plan_metadata, ensure_ascii=False, indent=2))}</pre>"
+        )
     return f"""
       <p>
         Provider: <strong>{escape(receipt.provider)}</strong> |
@@ -316,6 +322,7 @@ def _publish_receipt_html(receipt: PublishReceipt | None) -> str:
         <thead><tr><th>Action</th><th>Path</th><th>Description</th></tr></thead>
         <tbody>{item_rows}</tbody>
       </table>
+      {metadata_html}
       <h4>File Changes</h4>
       <table>
         <thead>
@@ -1646,10 +1653,17 @@ def _publish_plan_html(plan: PublishPlan) -> str:
         """
         for item in items
     )
+    metadata_html = ""
+    if plan.metadata:
+        metadata_html = (
+            "<h4>Publish Metadata</h4>"
+            f"<pre>{escape(json.dumps(plan.metadata, ensure_ascii=False, indent=2))}</pre>"
+        )
     return f"""
       <p>Provider: <strong>{provider}</strong> | Ready: <strong>{ready}</strong></p>
       <p>Target: {target_url}</p>
       <ul>{warning_html}</ul>
+      {metadata_html}
       <table>
         <thead><tr><th>Action</th><th>Path</th><th>Exists</th><th>Description</th></tr></thead>
         <tbody>{item_rows}</tbody>

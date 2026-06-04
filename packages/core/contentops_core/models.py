@@ -125,6 +125,7 @@ class PublishPlan(BaseModel):
     ready: bool
     items: list[PublishPlanItem]
     warnings: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ApprovalDecision(StrEnum):
@@ -175,6 +176,7 @@ class PublishReceipt(BaseModel):
     provider: str
     url: str
     plan_items: list[PublishPlanItem]
+    plan_metadata: dict[str, Any] = Field(default_factory=dict)
     file_changes: list[PublishFileChange] = Field(default_factory=list)
     approval: ApprovalRecord | None = None
     force: bool = False

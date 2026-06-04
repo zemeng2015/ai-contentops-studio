@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from subprocess import run
 
 import pytest
 from contentops_core.factory import build_pipeline
@@ -55,6 +56,7 @@ def test_hybrid_research_includes_url_and_local_context(monkeypatch: pytest.Monk
 def test_homepage_publisher_updates_post_grid(tmp_path: Path) -> None:
     homepage = tmp_path / "homepage"
     (homepage / "posts").mkdir(parents=True)
+    _init_git_repo(homepage)
     (homepage / "index.html").write_text(
         '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
         encoding="utf-8",
@@ -95,6 +97,7 @@ def test_homepage_publisher_updates_post_grid(tmp_path: Path) -> None:
 def test_homepage_publisher_plan_describes_file_changes(tmp_path: Path) -> None:
     homepage = tmp_path / "homepage"
     (homepage / "posts").mkdir(parents=True)
+    _init_git_repo(homepage)
     (homepage / "index.html").write_text(
         '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
         encoding="utf-8",
@@ -129,6 +132,52 @@ def test_homepage_publisher_plan_describes_file_changes(tmp_path: Path) -> None:
     assert plan.ready is True
     assert plan.target_url == "https://example.com/posts/generated-article.html"
     assert [item.action for item in plan.items] == ["create", "create", "update"]
+    assert plan.metadata["relative_paths"] == [
+        "posts/generated-article.html",
+        "posts/generated-article.eval.json",
+        "index.html",
+    ]
+    assert plan.metadata["git"]["is_repository"] is True
+    assert plan.metadata["git"]["dirty"] is True
+    assert 'git -C "' in plan.metadata["suggested_commands"][0]
+
+
+def test_homepage_publisher_requires_git_repository(tmp_path: Path) -> None:
+    homepage = tmp_path / "homepage"
+    (homepage / "posts").mkdir(parents=True)
+    (homepage / "index.html").write_text(
+        '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
+        encoding="utf-8",
+    )
+    artifact_dir = tmp_path / "artifacts"
+    artifact_dir.mkdir()
+    run = RunRecord(
+        topic="Topic",
+        slug="topic",
+        status=RunStatus.NEEDS_REVIEW,
+        artifact_dir=artifact_dir,
+    )
+    draft = Draft(
+        title="Generated Article",
+        slug="generated-article",
+        markdown="# x",
+        html="<html><head></head><body>x</body></html>",
+    )
+    report = EvaluationReport(
+        groundedness=0.9,
+        source_coverage=0.9,
+        source_quality=0.9,
+        career_relevance=0.9,
+        technical_depth=0.9,
+        publish_ready=True,
+        findings=["ready"],
+    )
+
+    plan = HomepagePublisher(homepage, "https://example.com").plan(run, draft, report)
+
+    assert plan.ready is False
+    assert "Homepage target must be a git repository." in plan.warnings
+    assert plan.metadata["git"]["is_repository"] is False
 
 
 def test_openai_provider_requires_api_key(tmp_path: Path) -> None:
@@ -140,6 +189,10 @@ def test_openai_provider_requires_api_key(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="CONTENTOPS_OPENAI_API_KEY"):
         build_pipeline(settings)
+
+
+def _init_git_repo(path: Path) -> None:
+    run(["git", "-C", str(path), "init"], check=True, capture_output=True)
 
 
 def test_openai_generator_retries_transient_errors(monkeypatch: pytest.MonkeyPatch) -> None:

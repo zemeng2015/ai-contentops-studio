@@ -255,4 +255,6 @@ Generation providers:
 Publishing providers:
 
 - `static`: writes generated content to a local static site directory
-- `homepage`: writes posts into Zack's GitHub Pages homepage repository and updates the Writing grid
+- `homepage`: writes posts into Zack's GitHub Pages homepage repository, updates the Writing grid,
+  records git branch/dirty state in the publish plan, and emits suggested `git add`, `commit`, and
+  `push` commands for the homepage repo handoff

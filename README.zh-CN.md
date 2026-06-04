@@ -107,7 +107,7 @@ Topic or URLs
 | Generation | 默认模板生成器，可选 OpenAI provider |
 | Evaluation | groundedness、source coverage、technical depth、publish readiness |
 | Review | review queue、状态过滤、批量 approve/reject、run comparison |
-| Publishing | static site 和 homepage publisher、receipt、verification、rollback |
+| Publishing | static site 和 git-aware homepage publisher、receipt、verification、rollback |
 | Observability | trace、scorecard、token budget、incident、operations summary |
 | Scheduling | YAML worker jobs、dry run、receipt、recovery plan |
 | Release Evidence | deployment manifest、release readiness gate、CI evidence artifacts |

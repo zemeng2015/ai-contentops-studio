@@ -192,6 +192,7 @@ class ReviewService:
                 provider=plan.provider,
                 url=run.published_url,
                 plan_items=plan.items,
+                plan_metadata=plan.metadata,
                 file_changes=file_changes,
                 approval=approval,
                 force=force,

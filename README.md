@@ -109,7 +109,7 @@ Each run writes inspectable artifacts such as:
 | Generation | Template generator by default, optional OpenAI provider |
 | Evaluation | Groundedness, source coverage, technical depth, publish readiness |
 | Review | Review queue, status filters, batch approve/reject, run comparison |
-| Publishing | Static site and homepage publishers, receipts, verification, rollback |
+| Publishing | Static site and git-aware homepage publishers, receipts, verification, rollback |
 | Observability | Trace artifacts, scorecards, token budgets, incidents, operations summary |
 | Scheduling | YAML worker jobs, dry runs, receipts, recovery plans |
 | Release Evidence | Deployment manifest, release readiness gate, release approvals, hashed CI evidence manifest |
