@@ -178,9 +178,9 @@ contentops release-gate --git-sha $env:GITHUB_SHA --json --record
 Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 ```
 
-The gate fails when release readiness fails, deployment preflight fails, no approval exists, the
-latest approval rejects deployment, or the approval git SHA does not match the commit being
-released.
+The gate fails when release readiness fails, deployment preflight fails, required configuration
+audit items are missing, no approval exists, the latest approval rejects deployment, or the approval
+git SHA does not match the commit being released.
 CI also uploads a non-blocking `release-gate/release-gate.json` report with
 `--no-require-approval`, so reviewers can inspect the gate shape before a human approval exists.
 Use `--strict` in an actual deployment job once approval is required.
@@ -201,7 +201,8 @@ through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set
 require `X-ContentOps-Api-Key` or an `api_key` query parameter.
 Run `contentops config-audit --json` or open `/config-audit` before sharing the deployment. The
 audit reports runtime provider choices and required secret readiness while redacting all secret
-values.
+values. The same redacted audit is embedded in `contentops release-gate --json`, and required
+configuration failures block deployment.
 Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` when dashboard pages, artifacts, source audits, job
 receipts, content inventory, or evidence bundles should not be publicly readable. Health and
 readiness probes remain unauthenticated. Read routes accept `CONTENTOPS_READ_API_KEY` or the

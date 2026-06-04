@@ -560,6 +560,7 @@ class ReleaseGateReport(BaseModel):
     checks: list[ReleaseGateItem]
     release_evidence: ReleaseEvidenceSummary
     latest_release_approval: ReleaseApprovalRecord | None = None
+    config_audit: ConfigAuditReport | None = None
 
 
 class ReleaseGateListResponse(BaseModel):

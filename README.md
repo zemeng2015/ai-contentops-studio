@@ -190,8 +190,8 @@ The release evidence dashboard also renders those preflight checks for human rev
 deployment is approved.
 Release approval records capture the approver, decision, notes, force flag, release/deployment
 status, evidence SHA, and evidence files in `artifacts/release-approvals`.
-`release-gate` combines readiness, deployment preflight, approval state, and git SHA matching into a
-single CI/CD pass/fail report.
+`release-gate` combines readiness, deployment preflight, redacted configuration audit, approval
+state, and git SHA matching into a single CI/CD pass/fail report.
 CI uploads `release-gate/release-gate.json` as a non-blocking report; deployment jobs can rerun the
 same command with `--strict` after an approval exists.
 Use `--record` to store local gate history under `artifacts/release-gates`, which is also exposed

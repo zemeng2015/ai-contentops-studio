@@ -187,6 +187,8 @@ def test_release_approval_api_and_dashboard(
     gate_payload = gate_response.json()
     assert gate_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
     assert gate_payload["git_sha"] == "api-release-sha"
+    assert gate_payload["config_audit"]["redacted"] is True
+    assert "configuration_audit" in {check["name"] for check in gate_payload["checks"]}
     assert evidence_response.status_code == 200
     evidence_payload = evidence_response.json()
     assert evidence_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]

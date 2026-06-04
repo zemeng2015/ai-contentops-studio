@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from contentops_core.config_audit import config_audit
 from contentops_core.models import (
+    ConfigAuditReport,
     ReleaseApprovalDecision,
     ReleaseEvidenceBundle,
     ReleaseGateItem,
@@ -26,6 +28,7 @@ def release_gate(
     require_approval: bool = True,
 ) -> ReleaseGateReport:
     resolved_git_sha = git_sha or os.getenv("GITHUB_SHA") or os.getenv("CONTENTOPS_GIT_SHA")
+    audit = config_audit(settings)
     bundle = build_release_evidence(
         settings=settings,
         repository=repository,
@@ -36,6 +39,7 @@ def release_gate(
     checks = [
         _release_readiness_check(bundle),
         _deployment_preflight_check(bundle),
+        _configuration_audit_check(audit),
         _approval_check(bundle, require_approval),
         _approval_git_sha_check(bundle, resolved_git_sha, require_approval),
     ]
@@ -47,6 +51,7 @@ def release_gate(
         checks=checks,
         release_evidence=bundle.summary,
         latest_release_approval=bundle.latest_release_approval,
+        config_audit=audit,
     )
 
 
@@ -111,6 +116,26 @@ def _deployment_preflight_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
         evidence={
             "deployment_status": bundle.deployment_check.status,
             "can_deploy": bundle.deployment_check.can_deploy,
+        },
+    )
+
+
+def _configuration_audit_check(audit: ConfigAuditReport) -> ReleaseGateItem:
+    failed_items = [item.name for item in audit.items if item.status == "fail"]
+    blocking = audit.status == "fail"
+    return ReleaseGateItem(
+        name="configuration_audit",
+        status="fail" if blocking else "pass",
+        message=(
+            "Configuration audit has no blocking failures."
+            if not blocking
+            else "Configuration audit blocks deployment because required settings are missing."
+        ),
+        evidence={
+            "audit_status": audit.status,
+            "redacted": audit.redacted,
+            "summary": audit.summary,
+            "failed_items": failed_items,
         },
     )
 

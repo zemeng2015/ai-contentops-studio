@@ -66,6 +66,9 @@ def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
     assert report.can_deploy is True
     assert report.latest_release_approval is not None
     assert report.latest_release_approval.approval_id == approval.approval_id
+    assert report.config_audit is not None
+    assert report.config_audit.redacted is True
+    assert "configuration_audit" in {check.name for check in report.checks}
 
 
 def test_release_gate_fails_when_approval_git_sha_does_not_match(tmp_path: Path) -> None:
@@ -95,6 +98,42 @@ def test_release_gate_fails_when_approval_git_sha_does_not_match(tmp_path: Path)
     assert report.status == "fail"
     assert report.can_deploy is False
     assert "approval_git_sha" in failed_checks
+
+
+def test_release_gate_fails_when_required_config_is_missing(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        generator_provider="openai",
+        openai_api_key=None,
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    approve_release(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        request=ReleaseApprovalRequest(decision=ReleaseApprovalDecision.APPROVED, force=True),
+        git_sha="release-sha",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="release-sha",
+    )
+
+    failed_checks = {check.name for check in report.checks if check.status == "fail"}
+    config_check = next(check for check in report.checks if check.name == "configuration_audit")
+
+    assert report.status == "fail"
+    assert report.can_deploy is False
+    assert "configuration_audit" in failed_checks
+    assert config_check.evidence["failed_items"] == ["openai_api_key"]
+    assert report.config_audit is not None
+    assert report.config_audit.status == "fail"
 
 
 def test_release_gate_reports_can_be_persisted_and_listed(tmp_path: Path) -> None:
