@@ -181,6 +181,9 @@ Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 The gate fails when release readiness fails, deployment preflight fails, no approval exists, the
 latest approval rejects deployment, or the approval git SHA does not match the commit being
 released.
+CI also uploads a non-blocking `release-gate/release-gate.json` report with
+`--no-require-approval`, so reviewers can inspect the gate shape before a human approval exists.
+Use `--strict` in an actual deployment job once approval is required.
 
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:

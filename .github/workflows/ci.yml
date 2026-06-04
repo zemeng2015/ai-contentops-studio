@@ -40,6 +40,13 @@ jobs:
         run: |
           export CONTENTOPS_DATABASE_URL=sqlite:///release-evidence.db
           python scripts/generate_release_evidence.py --output-dir release-evidence
+      - name: Release gate report
+        run: |
+          export CONTENTOPS_DATABASE_URL=sqlite:///release-gate.db
+          python scripts/generate_release_gate.py \
+            --output release-gate/release-gate.json \
+            --git-sha "$GITHUB_SHA" \
+            --no-require-approval
       - uses: actions/upload-artifact@v4
         with:
           name: deployment-check
@@ -48,6 +55,10 @@ jobs:
         with:
           name: release-evidence
           path: release-evidence/*.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-gate
+          path: release-gate/release-gate.json
       - name: Test
         run: pytest
 

@@ -10,6 +10,7 @@ from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
 from scripts.generate_deployment_check import generate_deployment_check
+from scripts.generate_release_gate import generate_release_gate
 
 
 def test_production_env_example_matches_renderer() -> None:
@@ -78,3 +79,26 @@ def test_generate_deployment_check_writes_json(
     assert '"profile": "production"' in text
     assert '"name": "environment_template"' in text
     assert report.profile == "production"
+
+
+def test_generate_release_gate_writes_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    output = tmp_path / "release-gate" / "release-gate.json"
+
+    report = generate_release_gate(
+        output,
+        git_sha="ci-sha",
+        require_approval=False,
+    )
+
+    assert output.exists()
+    text = output.read_text(encoding="utf-8")
+    assert '"git_sha": "ci-sha"' in text
+    assert '"name": "release_approval"' in text
+    assert report.git_sha == "ci-sha"
+    assert report.status in {"pass", "warn", "fail"}
