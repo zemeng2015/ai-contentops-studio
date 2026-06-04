@@ -10,6 +10,7 @@ from contentops_core.models import (
     ArtifactMirrorRecord,
     AuditEvent,
     AuditEventListResponse,
+    ConfigAuditReport,
     CostReportListResponse,
     DeploymentManifest,
     GenerationReceipt,
@@ -750,6 +751,39 @@ def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> s
       <table>
         <thead><tr><th>Capability</th><th>Status</th><th>Evidence</th></tr></thead>
         <tbody>{capability_rows}</tbody>
+      </table>
+    """
+
+
+def _config_audit_html(report: ConfigAuditReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.name)}</td>
+          <td>{escape(item.category)}</td>
+          <td><span class="pill">{escape(item.status)}</span></td>
+          <td>{str(item.required).lower()}</td>
+          <td>{str(item.configured).lower()}</td>
+          <td>{escape(item.message)}</td>
+        </tr>
+        """
+        for item in report.items
+    )
+    return f"""
+      <h2>Configuration Audit</h2>
+      <p>
+        <a href="/config-audit">Config audit JSON</a> |
+        Status: <strong>{escape(report.status)}</strong> |
+        Redacted: <strong>{str(report.redacted).lower()}</strong>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>Category</th><th>Status</th>
+            <th>Required</th><th>Configured</th><th>Message</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 

@@ -199,6 +199,9 @@ terraform apply \
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes
 require `X-ContentOps-Api-Key` or an `api_key` query parameter.
+Run `contentops config-audit --json` or open `/config-audit` before sharing the deployment. The
+audit reports runtime provider choices and required secret readiness while redacting all secret
+values.
 Set `CONTENTOPS_REQUIRE_READ_API_KEY=true` when dashboard pages, artifacts, source audits, job
 receipts, content inventory, or evidence bundles should not be publicly readable. Health and
 readiness probes remain unauthenticated. Read routes accept `CONTENTOPS_READ_API_KEY` or the

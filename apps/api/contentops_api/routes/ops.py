@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
+from contentops_core.config_audit import config_audit
 from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
@@ -22,6 +23,7 @@ from contentops_core.jobs import (
 )
 from contentops_core.models import (
     AuditEventListResponse,
+    ConfigAuditReport,
     CostReportListResponse,
     DeploymentCheckReport,
     DeploymentManifest,
@@ -98,6 +100,17 @@ def build_ops_router(
             content=render_env_template(profile),
             media_type="text/plain",
         )
+
+    @router.get(
+        "/config-audit",
+        response_model=ConfigAuditReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_config_audit(response: Response) -> ConfigAuditReport:
+        report = config_audit(settings)
+        if report.status == "fail":
+            response.status_code = 409
+        return report
 
     @router.get(
         "/deployment-check",

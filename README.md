@@ -118,6 +118,7 @@ Each run writes inspectable artifacts such as:
 ```powershell
 contentops demo-seed
 contentops queue --status needs_review --json
+contentops config-audit --json
 contentops scorecard <run_id>
 contentops source-audit <run_id>
 contentops publish-plan <run_id>
@@ -157,6 +158,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /ops-summary
+GET  /config-audit
 GET  /deployment-manifest
 GET  /deployment-check
 GET  /deployment-env-template
@@ -174,6 +176,8 @@ GET  /job-executions
 The system status dashboard turns `/ready` and deployment manifest checks into operator-facing
 configuration fixes, including missing API keys, scheduled research readiness, artifact storage,
 database, and publishing-provider risks.
+`config-audit` exposes a redacted runtime and secret posture report, so production operators can
+verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or
 `GET /deployment-env-template` to generate the same production environment template.
 Use `contentops deployment-check --json` or `GET /deployment-check` as a pre-deploy gate that

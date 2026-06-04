@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 import yaml
+from contentops_core.config_audit import config_audit
 from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
@@ -166,6 +167,23 @@ def show_deployment_manifest() -> None:
     settings = Settings()
     manifest = deployment_manifest(settings, RunRepository(settings.database_url))
     typer.echo(manifest.model_dump_json(indent=2))
+
+
+@app.command("config-audit")
+def show_config_audit(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    report = config_audit(Settings())
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.status != "fail" else 1)
+    typer.echo(f"Status: {report.status}")
+    for item in report.items:
+        typer.echo(f"- {item.name}: {item.status} - {item.message}")
+    raise typer.Exit(0 if report.status != "fail" else 1)
 
 
 @app.command("deployment-check")

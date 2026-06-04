@@ -24,6 +24,7 @@ def test_health_endpoint() -> None:
     response = client.get("/health")
     ready_response = client.get("/ready")
     manifest_response = client.get("/deployment-manifest")
+    config_audit_response = client.get("/config-audit")
     deployment_check_response = client.get("/deployment-check")
     env_template_response = client.get("/deployment-env-template")
     release_response = client.get("/release-readiness")
@@ -48,6 +49,12 @@ def test_health_endpoint() -> None:
     assert manifest_payload["status"] in {"ok", "degraded"}
     assert manifest_payload["runtime"]["database_engine"] in {"sqlite", "postgresql"}
     assert "openai_api_key" not in manifest_response.text
+    assert config_audit_response.status_code == 200
+    config_payload = config_audit_response.json()
+    assert config_payload["redacted"] is True
+    assert "items" in config_payload
+    assert "openai_api_key" in config_audit_response.text
+    assert "sk-" not in config_audit_response.text
     assert deployment_check_response.status_code == 200
     deployment_check_payload = deployment_check_response.json()
     assert deployment_check_payload["profile"] == "production"
@@ -672,6 +679,7 @@ def test_dashboard_system_status_renders() -> None:
 
     assert response.status_code == 200
     assert "System Status" in response.text
+    assert "Configuration Audit" in response.text
     assert "Recommended Fixes" in response.text
     assert "Component Checks" in response.text
     assert "Deployment Capabilities" in response.text
@@ -680,6 +688,7 @@ def test_dashboard_system_status_renders() -> None:
     assert "CONTENTOPS_OPERATOR_API_KEY" in response.text
     assert "CONTENTOPS_RESEARCH_PROVIDER" in response.text
     assert "Deployment check JSON" in response.text
+    assert "Config audit JSON" in response.text
     assert "Production env template" in response.text
     assert "System status JSON" in response.text
 

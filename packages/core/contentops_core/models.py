@@ -416,6 +416,25 @@ class ComponentCheck(BaseModel):
     fields: dict[str, Any] = Field(default_factory=dict)
 
 
+class ConfigAuditItem(BaseModel):
+    name: str
+    category: str
+    status: str
+    required: bool = False
+    configured: bool = False
+    secret: bool = False
+    message: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConfigAuditReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    items: list[ConfigAuditItem]
+    redacted: bool = True
+    summary: dict[str, int] = Field(default_factory=dict)
+
+
 class SystemStatus(BaseModel):
     status: str
     checks: list[ComponentCheck]
