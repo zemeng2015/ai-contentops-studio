@@ -573,10 +573,13 @@ def test_dashboard_system_status_renders() -> None:
 
     assert response.status_code == 200
     assert "System Status" in response.text
+    assert "Recommended Fixes" in response.text
     assert "Component Checks" in response.text
     assert "Deployment Capabilities" in response.text
     assert "provider_config" in response.text
     assert "operator_security" in response.text
+    assert "CONTENTOPS_OPERATOR_API_KEY" in response.text
+    assert "CONTENTOPS_RESEARCH_PROVIDER" in response.text
     assert "System status JSON" in response.text
 
 

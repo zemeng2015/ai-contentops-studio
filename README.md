@@ -158,6 +158,10 @@ GET  /worker-jobs
 GET  /job-executions
 ```
 
+The system status dashboard turns `/ready` and deployment manifest checks into operator-facing
+configuration fixes, including missing API keys, scheduled research readiness, artifact storage,
+database, and publishing-provider risks.
+
 ## Scheduled Jobs
 
 Worker jobs are defined in YAML:

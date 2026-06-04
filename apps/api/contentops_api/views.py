@@ -670,6 +670,25 @@ def _operations_summary_html(summary: OperationsSummary) -> str:
 
 
 def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> str:
+    recommendations = _system_status_recommendations(status, manifest)
+    recommendation_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item["area"])}</td>
+          <td><span class="pill">{escape(item["severity"])}</span></td>
+          <td>{escape(item["action"])}</td>
+        </tr>
+        """
+        for item in recommendations
+    )
+    if not recommendation_rows:
+        recommendation_rows = """
+        <tr>
+          <td>configuration</td>
+          <td><span class="pill">ok</span></td>
+          <td>No immediate configuration fixes required.</td>
+        </tr>
+        """
     check_rows = "".join(
         f"""
         <tr>
@@ -710,6 +729,11 @@ def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> s
           <span>Artifact store</span>
         </div>
       </div>
+      <h2>Recommended Fixes</h2>
+      <table>
+        <thead><tr><th>Area</th><th>Severity</th><th>Action</th></tr></thead>
+        <tbody>{recommendation_rows}</tbody>
+      </table>
       <h2>Component Checks</h2>
       <table>
         <thead>
@@ -723,6 +747,165 @@ def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> s
         <tbody>{capability_rows}</tbody>
       </table>
     """
+
+
+def _system_status_recommendations(
+    status: SystemStatus,
+    manifest: DeploymentManifest,
+) -> list[dict[str, str]]:
+    recommendations: list[dict[str, str]] = []
+    for check in status.checks:
+        if check.status == "ok":
+            continue
+        if check.name == "operator_security":
+            recommendations.append(
+                {
+                    "area": "operator security",
+                    "severity": check.status,
+                    "action": (
+                        "Set CONTENTOPS_OPERATOR_API_KEY before exposing mutating routes; "
+                        "set CONTENTOPS_REQUIRE_READ_API_KEY=true and CONTENTOPS_READ_API_KEY "
+                        "when read dashboards should be protected."
+                    ),
+                }
+            )
+            continue
+        if check.name == "provider_config":
+            recommendations.extend(_provider_recommendations(check.fields, check.status))
+            continue
+        if check.name == "artifact_store":
+            recommendations.append(
+                {
+                    "area": "artifact store",
+                    "severity": check.status,
+                    "action": (
+                        "Use a writable CONTENTOPS_ARTIFACT_ROOT locally, or set "
+                        "CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3 with CONTENTOPS_ARTIFACT_S3_BUCKET "
+                        "for deployable artifact mirroring."
+                    ),
+                }
+            )
+            continue
+        if check.name == "database":
+            recommendations.append(
+                {
+                    "area": "database",
+                    "severity": check.status,
+                    "action": (
+                        "Set CONTENTOPS_DATABASE_URL to a reachable SQLite or PostgreSQL database "
+                        "and run the migration command before starting workers."
+                    ),
+                }
+            )
+            continue
+        recommendations.append(
+            {
+                "area": check.name,
+                "severity": check.status,
+                "action": check.message,
+            }
+        )
+    for capability in manifest.capabilities:
+        if capability.status == "ok":
+            continue
+        if capability.name == "scheduled_research_ready":
+            recommendations.append(
+                {
+                    "area": "scheduled research",
+                    "severity": capability.status,
+                    "action": (
+                        "Use CONTENTOPS_RESEARCH_PROVIDER=feed, discovery, search, or github "
+                        "for unattended worker runs; configure feeds, search credentials, or a "
+                        "GitHub token according to the selected provider."
+                    ),
+                }
+            )
+        elif capability.name == "aws_deployment_ready":
+            recommendations.append(
+                {
+                    "area": "aws deployment",
+                    "severity": capability.status,
+                    "action": (
+                        "Use PostgreSQL/RDS instead of local SQLite and configure S3 artifact "
+                        "mirroring before treating this deployment as cloud-ready."
+                    ),
+                }
+            )
+        elif capability.name == "publishing_recovery":
+            recommendations.append(
+                {
+                    "area": "publishing",
+                    "severity": capability.status,
+                    "action": (
+                        "Verify CONTENTOPS_PUBLISHER_PROVIDER and its target path or homepage "
+                        "repository so publish receipts and rollback evidence can be generated."
+                    ),
+                }
+            )
+    return _unique_recommendations(recommendations)
+
+
+def _provider_recommendations(fields: dict[str, object], severity: str) -> list[dict[str, str]]:
+    recommendations: list[dict[str, str]] = []
+    failures = fields.get("failures", [])
+    if isinstance(failures, list):
+        for failure in failures:
+            recommendations.append(
+                {
+                    "area": "provider configuration",
+                    "severity": severity,
+                    "action": str(failure),
+                }
+            )
+    warnings = fields.get("warnings", [])
+    if isinstance(warnings, list):
+        for warning in warnings:
+            recommendations.append(
+                {
+                    "area": "provider configuration",
+                    "severity": severity,
+                    "action": str(warning),
+                }
+            )
+    research = fields.get("research_readiness", {})
+    if isinstance(research, dict) and research.get("scheduled_ready") is False:
+        recommendations.append(
+            {
+                "area": "research provider",
+                "severity": severity,
+                "action": (
+                    "Current research provider is not ideal for scheduled automation. "
+                    "Use feed/discovery with CONTENTOPS_RESEARCH_FEEDS, search with "
+                    "CONTENTOPS_RESEARCH_SEARCH_API_KEY and CONTENTOPS_RESEARCH_SEARCH_ENDPOINT, "
+                    "or github with CONTENTOPS_RESEARCH_GITHUB_TOKEN."
+                ),
+            }
+        )
+    publishing = fields.get("publishing_readiness", {})
+    if isinstance(publishing, dict) and publishing.get("ready") is False:
+        recommendations.append(
+            {
+                "area": "publishing provider",
+                "severity": severity,
+                "action": (
+                    "Fix CONTENTOPS_PUBLISHER_PROVIDER and its target path settings before "
+                    "enabling automated publish jobs."
+                ),
+            }
+        )
+    return recommendations
+
+
+def _unique_recommendations(items: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[tuple[str, str, str]] = set()
+    unique: list[dict[str, str]] = []
+    for item in items:
+        key = (item["area"], item["severity"], item["action"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
 
 
 def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:

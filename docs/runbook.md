@@ -83,6 +83,9 @@ configured SNS or incident-management targets. When an alarm fires, first inspec
 the relevant CloudWatch log table before rerunning or rolling back content. Use `/release-evidence`
 when an automation or deployment script needs the same evidence in JSON form, or
 `/release-evidence/bundle` when a reviewer needs a downloadable evidence package.
+The system status dashboard includes recommended fixes for degraded or failed checks, including
+the environment variables needed for API protection, scheduled research, artifact mirroring, and
+publishing readiness.
 
 ## 4. Review Queue
 
