@@ -26,6 +26,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
 
     expected_files = {
         "doctor.json",
+        "deployment_check.json",
         "deployment_manifest.json",
         "evidence_manifest.json",
         "operations_summary.json",
@@ -36,11 +37,16 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.summary.git_sha == "test-sha"
     assert bundle.summary.release_status in {"pass", "warn", "fail"}
     readiness = json.loads((output_dir / "release_readiness.json").read_text(encoding="utf-8"))
+    deployment_check = json.loads(
+        (output_dir / "deployment_check.json").read_text(encoding="utf-8")
+    )
     manifest = json.loads((output_dir / "deployment_manifest.json").read_text(encoding="utf-8"))
     evidence_manifest = json.loads(
         (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
     )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
+    assert deployment_check["profile"] == "production"
+    assert "environment_template" in {check["name"] for check in deployment_check["checks"]}
     assert "checks" in manifest
     assert "operator_api_key" not in json.dumps(manifest).casefold()
     assert set(bundle.summary.artifact_files) == expected_files
@@ -115,6 +121,9 @@ def test_generate_release_evidence_mirrors_to_s3_when_configured(
     assert uploads
     assert {item["bucket"] for item in uploads} == {"evidence-bucket"}
     assert "contentops-prod/release-evidence/release-sha/summary.json" in {
+        item["key"] for item in uploads
+    }
+    assert "contentops-prod/release-evidence/release-sha/deployment_check.json" in {
         item["key"] for item in uploads
     }
     assert mirror_log[0]["provider"] == "s3"

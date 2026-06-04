@@ -468,6 +468,7 @@ class ReleaseEvidenceBundle(BaseModel):
     deployment_manifest: DeploymentManifest
     operations_summary: OperationsSummary
     release_readiness: ReleaseReadinessReport
+    deployment_check: DeploymentCheckReport
 
 
 class DeploymentCheckItem(BaseModel):

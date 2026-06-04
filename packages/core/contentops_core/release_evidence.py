@@ -14,7 +14,12 @@ from contentops_core.artifacts import (
     mirror_files_to_s3,
     write_s3_mirror_log,
 )
-from contentops_core.diagnostics import deployment_manifest, release_readiness, system_status
+from contentops_core.diagnostics import (
+    deployment_check,
+    deployment_manifest,
+    release_readiness,
+    system_status,
+)
 from contentops_core.models import (
     ArtifactManifest,
     ArtifactMetadata,
@@ -38,6 +43,7 @@ def build_release_evidence(
     manifest = deployment_manifest(settings, repository)
     operations = review_service.operations_summary(window_size=window_size)
     readiness = release_readiness(settings, repository, operations)
+    preflight = deployment_check(settings, repository, operations)
     summary = ReleaseEvidenceSummary(
         git_sha=git_sha or os.getenv("GITHUB_SHA") or os.getenv("CONTENTOPS_GIT_SHA"),
         doctor_status=doctor.status,
@@ -45,6 +51,7 @@ def build_release_evidence(
         can_release=readiness.can_release,
         artifact_files=[
             "doctor.json",
+            "deployment_check.json",
             "deployment_manifest.json",
             "evidence_manifest.json",
             "operations_summary.json",
@@ -58,6 +65,7 @@ def build_release_evidence(
         deployment_manifest=manifest,
         operations_summary=operations,
         release_readiness=readiness,
+        deployment_check=preflight,
     )
 
 
@@ -69,6 +77,7 @@ def write_release_evidence(
     output_dir.mkdir(parents=True, exist_ok=True)
     payloads: dict[str, Any] = {
         "doctor": bundle.doctor.model_dump(mode="json"),
+        "deployment_check": bundle.deployment_check.model_dump(mode="json"),
         "deployment_manifest": bundle.deployment_manifest.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),

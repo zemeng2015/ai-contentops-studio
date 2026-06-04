@@ -128,8 +128,9 @@ contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 ```
 
-`release-evidence` writes `evidence_manifest.json` with SHA-256 hashes and file metadata for every
-evidence artifact, so CI output can be archived and compared during deployment reviews.
+`release-evidence` writes system status, deployment preflight, release gates, and
+`evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence artifact, so CI
+output can be archived and compared during deployment reviews.
 
 ## API Surface
 
@@ -168,8 +169,9 @@ Use `contentops init-config --profile production --path .env.production` or
 Use `contentops deployment-check --json` or `GET /deployment-check` as a pre-deploy gate that
 combines system readiness, deployment capabilities, release gates, API security, and env-template
 placeholder checks.
-CI uploads `deployment-check/deployment-check.json` alongside release evidence so deployment
-reviews can inspect the preflight gate output without rerunning local commands.
+CI includes `deployment_check.json` inside release evidence and also uploads the standalone
+`deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
+gate output without rerunning local commands.
 
 ## Scheduled Jobs
 

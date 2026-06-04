@@ -145,11 +145,11 @@ reviewed during deployment approval:
 python scripts/generate_release_evidence.py --output-dir release-evidence
 ```
 
-The evidence bundle includes system status, a redacted deployment manifest, operations summary,
-release readiness gates, a summary file with the commit SHA, and `evidence_manifest.json` with
-SHA-256 hashes, sizes, media types, and timestamps for the generated evidence artifacts. The
-command exits non-zero only when release readiness is `fail`; local-development `warn` states
-remain inspectable without blocking ordinary CI.
+The evidence bundle includes system status, deployment preflight checks, a redacted deployment
+manifest, operations summary, release readiness gates, a summary file with the commit SHA, and
+`evidence_manifest.json` with SHA-256 hashes, sizes, media types, and timestamps for the generated
+evidence artifacts. The command exits non-zero only when release readiness is `fail`;
+local-development `warn` states remain inspectable without blocking ordinary CI.
 The same bundle is also available through the product surface:
 
 ```powershell
