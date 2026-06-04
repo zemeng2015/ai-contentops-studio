@@ -21,6 +21,7 @@ from contentops_core.diagnostics import (
     system_status,
 )
 from contentops_core.jobs import (
+    job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
     job_execution_trends,
@@ -61,6 +62,9 @@ def build_release_evidence(
         job_execution_dir(settings.artifact_root),
         days=14,
     )
+    worker_alert_deliveries = job_execution_alert_notification_log(
+        job_execution_dir(settings.artifact_root)
+    )
     artifact_files = [
         "doctor.json",
         "deployment_check.json",
@@ -70,6 +74,7 @@ def build_release_evidence(
         "operations_summary.json",
         "release_readiness.json",
         "summary.json",
+        "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
         "worker_execution_trends.json",
     ]
@@ -91,6 +96,9 @@ def build_release_evidence(
         deployment_check=preflight,
         homepage_handoffs=homepage_handoffs,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
+        worker_execution_alert_deliveries=[
+            delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
+        ],
         worker_execution_trends=worker_execution_trends.model_dump(mode="json"),
         latest_release_approval=approval,
     )
@@ -110,6 +118,7 @@ def write_release_evidence(
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
+        "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
         "worker_execution_alerts": bundle.worker_execution_alerts,
         "worker_execution_trends": bundle.worker_execution_trends,
     }

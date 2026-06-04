@@ -11,6 +11,7 @@ from contentops_core.diagnostics import (
     system_status,
 )
 from contentops_core.jobs import (
+    JobExecutionAlertDelivery,
     JobExecutionAlertReport,
     JobExecutionListResponse,
     JobExecutionReport,
@@ -19,6 +20,7 @@ from contentops_core.jobs import (
     JobRecoveryPlan,
     WorkerJobCatalogResponse,
     get_job_execution_report,
+    job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
     job_execution_run_ids,
@@ -27,6 +29,7 @@ from contentops_core.jobs import (
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
+    notify_job_execution_alert,
 )
 from contentops_core.models import (
     AuditEventListResponse,
@@ -285,6 +288,29 @@ def build_ops_router(
         days: int = Query(default=14, ge=1, le=90),
     ) -> JobExecutionAlertReport:
         return job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
+
+    @router.get(
+        "/job-executions/alerts/notifications",
+        response_model=list[JobExecutionAlertDelivery],
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_job_execution_alert_notifications() -> list[JobExecutionAlertDelivery]:
+        return job_execution_alert_notification_log(job_execution_dir(settings.artifact_root))
+
+    @router.post(
+        "/job-executions/alerts/notify",
+        response_model=JobExecutionAlertDelivery,
+        dependencies=[Depends(require_operator)],
+    )
+    def notify_job_execution_alerts(
+        days: int = Query(default=14, ge=1, le=90),
+    ) -> JobExecutionAlertDelivery:
+        return notify_job_execution_alert(
+            job_execution_dir(settings.artifact_root),
+            days=days,
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
+        )
 
     @router.get(
         "/job-executions/{execution_id}",

@@ -333,6 +333,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     ops_summary_response = client.get("/ops-summary")
     ops_trends_response = client.get("/ops-trends?days=7")
     worker_alerts_response = client.get("/job-executions/alerts?days=7")
+    worker_alert_notify_response = client.post("/job-executions/alerts/notify?days=7")
+    worker_alert_notifications_response = client.get("/job-executions/alerts/notifications")
     release_readiness_response = client.get("/release-readiness")
     release_evidence_response = client.get("/release-evidence")
     retention_response = client.get("/retention-report?days=3650")
@@ -389,6 +391,10 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert any(bucket["run_count"] >= 1 for bucket in ops_trends_response.json()["buckets"])
     assert worker_alerts_response.status_code == 200
     assert worker_alerts_response.json()["severity"] in {"info", "warning", "critical"}
+    assert worker_alert_notify_response.status_code == 200
+    assert worker_alert_notify_response.json()["status"] in {"skipped", "delivered", "failed"}
+    assert worker_alert_notifications_response.status_code == 200
+    assert worker_alert_notifications_response.json()
     assert release_readiness_response.status_code == 200
     assert release_readiness_response.json()["operations"]["total_runs"] >= 1
     assert release_evidence_response.status_code == 200
@@ -398,6 +404,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "deployment_manifest" in release_evidence_payload
     assert "worker_execution_trends" in release_evidence_payload
     assert "worker_execution_alerts" in release_evidence_payload
+    assert "worker_execution_alert_deliveries" in release_evidence_payload
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
     assert retention_response.status_code == 200
     assert retention_response.json()["total_runs_scanned"] >= 1
@@ -888,6 +895,8 @@ def test_dashboard_job_execution_trends_renders() -> None:
     assert "Worker Execution Trends" in response.text
     assert "Worker execution trends JSON" in response.text
     assert "Worker execution alerts JSON" in response.text
+    assert "Notify worker alert" in response.text
+    assert "Worker Alert Notifications" in response.text
     assert "Alert Signals" in response.text
     assert "Handoff success" in response.text
     assert "Failure Diagnostics" in response.text
@@ -930,6 +939,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Homepage Handoffs" in response.text
     assert "Worker Execution Trends" in response.text
     assert "Worker alert" in response.text
+    assert "Worker Alert Notifications" in response.text
     assert "Worker Failure Diagnostics" in response.text
     assert "Download evidence bundle" in response.text
     assert "environment_template" in response.text

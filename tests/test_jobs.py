@@ -10,6 +10,7 @@ from contentops_core.jobs import (
     JobRunner,
     JobRunResult,
     get_job_execution_report,
+    job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_summary,
     job_execution_trends,
@@ -17,6 +18,7 @@ from contentops_core.jobs import (
     list_job_execution_reports,
     list_worker_job_catalog,
     load_job_file,
+    notify_job_execution_alert,
     write_job_execution_report,
 )
 from contentops_core.settings import Settings
@@ -328,6 +330,34 @@ def test_job_execution_alert_report_flags_actionable_worker_failures(tmp_path: P
     assert "research provider timeout" in report.message
     assert report.signals[0].category == "worker_failure"
     assert "job-recovery-plan" in report.recommended_actions[1]
+
+
+def test_notify_job_execution_alert_writes_delivery_receipt(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    failed = JobExecutionReport(
+        name="notify-alert",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="roundup",
+                topic="Roundup",
+                status="failed",
+                error="provider timeout",
+            )
+        ],
+    )
+    write_job_execution_report(failed, receipt_dir)
+
+    delivery = notify_job_execution_alert(receipt_dir, days=1)
+    deliveries = job_execution_alert_notification_log(receipt_dir)
+
+    assert delivery.status == "skipped"
+    assert delivery.provider == "local"
+    assert delivery.action_required is True
+    assert delivery.severity.value == "critical"
+    assert deliveries[0].delivery_id == delivery.delivery_id
 
 
 def test_job_execution_alert_report_is_info_when_worker_window_is_clean(tmp_path: Path) -> None:

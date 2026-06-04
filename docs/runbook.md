@@ -68,9 +68,13 @@ latest successful execution, latest action-required execution, and top failure r
 can separate provider failures, homepage handoff failures, and release evidence failures quickly.
 Use `contentops job-execution-alerts --days 14` or `GET /job-executions/alerts?days=14` when the
 scheduler should return a single severity, action-required flag, and recommended actions for
-on-call review. The same trend and alert payloads are written to release evidence as
-`worker_execution_trends.json` and `worker_execution_alerts.json`, so compare the dashboard with the
-latest CI evidence bundle when investigating scheduled automation regressions.
+on-call review. Use `contentops job-execution-alert-notify --days 14` or
+`POST /job-executions/alerts/notify?days=14` to write an auditable delivery receipt; with no webhook
+configured the receipt is local and skipped, while a configured webhook records delivered or failed.
+The same trend, alert, and notification payloads are written to release evidence as
+`worker_execution_trends.json`, `worker_execution_alerts.json`, and
+`worker_execution_alert_deliveries.json`, so compare the dashboard with the latest CI evidence
+bundle when investigating scheduled automation regressions.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced

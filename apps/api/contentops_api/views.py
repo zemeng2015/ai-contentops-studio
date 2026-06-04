@@ -5,6 +5,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from contentops_core.jobs import (
+    JobExecutionAlertDelivery,
     JobExecutionAlertReport,
     JobExecutionReport,
     JobExecutionTrendReport,
@@ -897,6 +898,42 @@ def _job_execution_alerts_html(report: JobExecutionAlertReport) -> str:
     """
 
 
+def _job_execution_alert_deliveries_html(
+    deliveries: list[JobExecutionAlertDelivery],
+) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(delivery.delivered_at.isoformat())}</td>
+          <td>{escape(delivery.provider)}</td>
+          <td><span class="pill">{escape(delivery.status)}</span></td>
+          <td>{escape(delivery.severity.value)}</td>
+          <td>{escape(str(delivery.action_required).lower())}</td>
+          <td>{escape(delivery.endpoint or "local")}</td>
+        </tr>
+        """
+        for delivery in deliveries[:10]
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="6"><span class="muted">No worker alert notifications recorded.</span></td>
+        </tr>
+        """
+    return f"""
+      <p><a href="/job-executions/alerts/notifications">Worker alert notifications JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Delivered at</th><th>Provider</th><th>Status</th>
+            <th>Severity</th><th>Action</th><th>Endpoint</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
 def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> str:
     recommendations = _system_status_recommendations(status, manifest)
     recommendation_rows = "".join(
@@ -1176,6 +1213,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     deploy_status = escape(bundle.deployment_check.status)
     can_deploy = str(bundle.deployment_check.can_deploy).lower()
     worker_alerts = bundle.worker_execution_alerts
+    worker_alert_deliveries = bundle.worker_execution_alert_deliveries
     worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
     worker_buckets = bundle.worker_execution_trends.get("buckets", [])
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
@@ -1294,6 +1332,25 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="4"><span class="muted">No worker alert signals recorded.</span></td>
         </tr>
         """
+    worker_alert_delivery_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(str(delivery.get("delivered_at", "n/a")))}</td>
+          <td>{escape(str(delivery.get("provider", "n/a")))}</td>
+          <td>{escape(str(delivery.get("status", "n/a")))}</td>
+          <td>{escape(str(delivery.get("severity", "n/a")))}</td>
+          <td>{escape(str(delivery.get("action_required", "n/a")).lower())}</td>
+        </tr>
+        """
+        for delivery in worker_alert_deliveries[:10]
+        if isinstance(delivery, dict)
+    )
+    if not worker_alert_delivery_rows:
+        worker_alert_delivery_rows = """
+        <tr>
+          <td colspan="5"><span class="muted">No worker alert notifications recorded.</span></td>
+        </tr>
+        """
     return f"""
       <p>
         <a href="/release-evidence/bundle">Download evidence bundle</a> |
@@ -1368,6 +1425,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <tr><th>Severity</th><th>Category</th><th>Message</th><th>Latest execution</th></tr>
         </thead>
         <tbody>{worker_alert_signal_rows}</tbody>
+      </table>
+      <h2>Worker Alert Notifications</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Delivered at</th><th>Provider</th><th>Status</th>
+            <th>Severity</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody>{worker_alert_delivery_rows}</tbody>
       </table>
       <table>
         <thead>

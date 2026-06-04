@@ -11,12 +11,14 @@ from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.jobs import (
     JobExecutionReport,
     get_job_execution_report,
+    job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
     job_execution_run_ids,
     job_execution_trends,
     list_job_execution_reports,
     list_worker_job_catalog,
+    notify_job_execution_alert,
 )
 from contentops_core.models import (
     ArtifactMirrorRecord,
@@ -51,6 +53,7 @@ from contentops_api.views import (
     _generation_receipt_html,
     _incident_report_html,
     _incident_reports_html,
+    _job_execution_alert_deliveries_html,
     _job_execution_alerts_html,
     _job_execution_detail_html,
     _job_execution_trends_html,
@@ -309,6 +312,10 @@ def build_dashboard_router(
     ) -> HTMLResponse:
         report = job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
         alerts = job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
+        deliveries = job_execution_alert_notification_log(job_execution_dir(settings.artifact_root))
+        notify_action = (
+            f"/dashboard/job-execution-alerts/notify{_api_key_query(api_key)}"
+        )
         return HTMLResponse(
             _page(
                 "Worker Execution Trends",
@@ -320,11 +327,37 @@ def build_dashboard_router(
                     Daily automation execution health, generated runs, publishing,
                     handoff readiness, and action-required posture.
                   </p>
+                  <form method="post" action="{notify_action}">
+                    {_api_key_hidden(api_key)}
+                    <input type="hidden" name="days" value="{days}">
+                    <button type="submit">Notify worker alert</button>
+                  </form>
                   {_job_execution_alerts_html(alerts)}
+                  <h2>Worker Alert Notifications</h2>
+                  {_job_execution_alert_deliveries_html(deliveries)}
                   {_job_execution_trends_html(report)}
                 </section>
                 """,
             )
+        )
+
+    @router.post(
+        "/dashboard/job-execution-alerts/notify",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_notify_job_execution_alerts(
+        days: Annotated[int, Form()] = 14,
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        notify_job_execution_alert(
+            job_execution_dir(settings.artifact_root),
+            days=days,
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
+        )
+        return RedirectResponse(
+            f"/dashboard/job-execution-trends{_api_key_query(api_key)}",
+            status_code=303,
         )
 
 

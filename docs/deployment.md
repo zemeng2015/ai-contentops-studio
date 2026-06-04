@@ -161,6 +161,9 @@ action-required rates, latest success/failure timestamps, and top failure reason
 reviewers can see whether recurring content operations are healthy and why they degraded.
 `worker_execution_alerts.json` condenses the same worker signal into severity, action-required
 state, alert signals, and recommended actions for release managers or on-call handoff.
+`worker_execution_alert_deliveries.json` records worker alert notification receipts so release
+reviewers can distinguish healthy no-op checks, local skipped delivery, successful webhook delivery,
+and failed notification attempts.
 If a release approval has been recorded, the same bundle includes `release_approval.json` and the
 API response exposes it as `latest_release_approval`.
 The same bundle is also available through the product surface:

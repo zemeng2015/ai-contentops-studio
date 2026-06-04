@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import Counter
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
@@ -7,6 +8,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+import httpx
 import yaml
 from pydantic import BaseModel, Field
 
@@ -169,6 +171,20 @@ class JobExecutionAlertReport(BaseModel):
     signals: list[JobExecutionAlertSignal] = Field(default_factory=list)
     recommended_actions: list[str] = Field(default_factory=list)
     trend_summary: JobExecutionTrendSummary
+
+
+class JobExecutionAlertDelivery(BaseModel):
+    delivery_id: str = Field(default_factory=lambda: uuid4().hex[:12])
+    action: str = "worker_execution_alert"
+    provider: str
+    status: str
+    severity: IncidentSeverity
+    action_required: bool
+    message: str
+    endpoint: str | None = None
+    status_code: int | None = None
+    error: str | None = None
+    delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class JobExecutionListResponse(BaseModel):
@@ -488,6 +504,54 @@ def job_execution_alert_report(receipt_dir: Path, days: int = 14) -> JobExecutio
     )
 
 
+def notify_job_execution_alert(
+    receipt_dir: Path,
+    *,
+    days: int = 14,
+    endpoint: str | None = None,
+    timeout_seconds: float = 5.0,
+) -> JobExecutionAlertDelivery:
+    report = job_execution_alert_report(receipt_dir, days=days)
+    delivery = _deliver_job_execution_alert(
+        report,
+        endpoint=endpoint,
+        timeout_seconds=timeout_seconds,
+    )
+    write_job_execution_alert_delivery(delivery, receipt_dir)
+    return delivery
+
+
+def write_job_execution_alert_delivery(
+    delivery: JobExecutionAlertDelivery,
+    receipt_dir: Path,
+) -> Path:
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    path = job_execution_alert_notification_log_path(receipt_dir)
+    if path.exists():
+        deliveries = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        deliveries = []
+    deliveries.append(delivery.model_dump(mode="json"))
+    path.write_text(json.dumps(deliveries, indent=2), encoding="utf-8")
+    return path
+
+
+def job_execution_alert_notification_log(
+    receipt_dir: Path,
+) -> list[JobExecutionAlertDelivery]:
+    path = job_execution_alert_notification_log_path(receipt_dir)
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        return []
+    return [JobExecutionAlertDelivery.model_validate(item) for item in data]
+
+
+def job_execution_alert_notification_log_path(receipt_dir: Path) -> Path:
+    return receipt_dir / "worker-alert-notification-log.json"
+
+
 def get_job_execution_report(receipt_dir: Path, execution_id: str) -> JobExecutionReport:
     normalized = execution_id.strip()
     if not normalized:
@@ -684,6 +748,56 @@ def _normalize_failure_reason(reason: str) -> str:
     return normalized[:180] if normalized else "unknown failure"
 
 
+def _deliver_job_execution_alert(
+    report: JobExecutionAlertReport,
+    *,
+    endpoint: str | None,
+    timeout_seconds: float,
+) -> JobExecutionAlertDelivery:
+    if not report.action_required:
+        return JobExecutionAlertDelivery(
+            provider="local",
+            status="skipped",
+            severity=report.severity,
+            action_required=report.action_required,
+            message=report.message,
+        )
+    if endpoint is None:
+        return JobExecutionAlertDelivery(
+            provider="local",
+            status="skipped",
+            severity=report.severity,
+            action_required=report.action_required,
+            message=report.message,
+        )
+    try:
+        response = httpx.post(
+            endpoint,
+            json={"worker_execution_alert": report.model_dump(mode="json")},
+            timeout=timeout_seconds,
+        )
+    except httpx.HTTPError as exc:
+        return JobExecutionAlertDelivery(
+            provider="webhook",
+            status="failed",
+            severity=report.severity,
+            action_required=report.action_required,
+            message=report.message,
+            endpoint=endpoint,
+            error=str(exc),
+        )
+    return JobExecutionAlertDelivery(
+        provider="webhook",
+        status="delivered" if response.is_success else "failed",
+        severity=report.severity,
+        action_required=report.action_required,
+        message=report.message,
+        endpoint=endpoint,
+        status_code=response.status_code,
+        error=None if response.is_success else response.text[:500],
+    )
+
+
 def _latest_failure_execution_id(summary: JobExecutionTrendSummary) -> str | None:
     if not summary.top_failure_reasons:
         return None
@@ -747,8 +861,9 @@ def _ratio(numerator: int, denominator: int) -> float:
 def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:
     if not receipt_dir.exists():
         return []
+    ignored_names = {"s3-mirror-log.json", "worker-alert-notification-log.json"}
     return sorted(
-        (path for path in receipt_dir.glob("*.json") if path.name != "s3-mirror-log.json"),
+        (path for path in receipt_dir.glob("*.json") if path.name not in ignored_names),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )

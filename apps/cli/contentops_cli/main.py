@@ -17,6 +17,7 @@ from contentops_core.diagnostics import (
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     get_job_execution_report,
+    job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
     job_execution_summary,
@@ -24,6 +25,7 @@ from contentops_core.jobs import (
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
+    notify_job_execution_alert,
 )
 from contentops_core.models import (
     ReleaseApprovalDecision,
@@ -589,6 +591,27 @@ def job_execution_alerts_command(
     settings = Settings()
     report = job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
     typer.echo(report.model_dump_json(indent=2))
+
+
+@app.command("job-execution-alert-notify")
+def job_execution_alert_notify_command(
+    days: Annotated[int, typer.Option(help="Number of days to include.")] = 14,
+) -> None:
+    settings = Settings()
+    delivery = notify_job_execution_alert(
+        job_execution_dir(settings.artifact_root),
+        days=days,
+        endpoint=settings.notification_webhook_url,
+        timeout_seconds=settings.notification_timeout_seconds,
+    )
+    typer.echo(delivery.model_dump_json(indent=2))
+
+
+@app.command("job-execution-alert-notifications")
+def job_execution_alert_notifications_command() -> None:
+    settings = Settings()
+    deliveries = job_execution_alert_notification_log(job_execution_dir(settings.artifact_root))
+    typer.echo(json.dumps([delivery.model_dump(mode="json") for delivery in deliveries], indent=2))
 
 
 @app.command("job-recovery-plan")
