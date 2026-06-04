@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import deployment_check
 from contentops_core.factory import build_review_service
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
+
+from scripts.generate_deployment_check import generate_deployment_check
 
 
 def test_production_env_example_matches_renderer() -> None:
@@ -57,3 +60,21 @@ def test_deployment_check_reports_template_and_release_gates(tmp_path: Path) -> 
     template_check = next(check for check in report.checks if check.name == "environment_template")
     assert template_check.status == "warn"
     assert "CONTENTOPS_OPENAI_API_KEY" in template_check.evidence["placeholders"]
+
+
+def test_generate_deployment_check_writes_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    output = tmp_path / "deployment-check" / "deployment-check.json"
+
+    report = generate_deployment_check(output)
+
+    assert output.exists()
+    text = output.read_text(encoding="utf-8")
+    assert '"profile": "production"' in text
+    assert '"name": "environment_template"' in text
+    assert report.profile == "production"

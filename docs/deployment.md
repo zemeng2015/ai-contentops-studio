@@ -29,9 +29,13 @@ The same template can be generated from the installed CLI or fetched from the AP
 ```powershell
 contentops init-config --profile production --path .env.production
 contentops deployment-check --json
+python scripts/generate_deployment_check.py --output deployment-check/deployment-check.json
 Invoke-WebRequest http://127.0.0.1:8000/deployment-env-template -OutFile .env.production
 Invoke-RestMethod http://127.0.0.1:8000/deployment-check
 ```
+
+CI runs the same deployment preflight script and uploads `deployment-check.json` as an artifact
+next to the release evidence bundle.
 
 `CONTENTOPS_RUN_MIGRATIONS=true` tells the image entrypoint to run `alembic upgrade head` before
 starting Uvicorn. The image also includes a `/ready` healthcheck so container platforms can detect

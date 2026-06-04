@@ -32,10 +32,18 @@ jobs:
         run: |
           contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run
           contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run
+      - name: Deployment preflight
+        run: |
+          export CONTENTOPS_DATABASE_URL=sqlite:///deployment-check.db
+          python scripts/generate_deployment_check.py --output deployment-check/deployment-check.json
       - name: Release evidence
         run: |
           export CONTENTOPS_DATABASE_URL=sqlite:///release-evidence.db
           python scripts/generate_release_evidence.py --output-dir release-evidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deployment-check
+          path: deployment-check/deployment-check.json
       - uses: actions/upload-artifact@v4
         with:
           name: release-evidence

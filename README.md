@@ -168,6 +168,8 @@ Use `contentops init-config --profile production --path .env.production` or
 Use `contentops deployment-check --json` or `GET /deployment-check` as a pre-deploy gate that
 combines system readiness, deployment capabilities, release gates, API security, and env-template
 placeholder checks.
+CI uploads `deployment-check/deployment-check.json` alongside release evidence so deployment
+reviews can inspect the preflight gate output without rerunning local commands.
 
 ## Scheduled Jobs
 

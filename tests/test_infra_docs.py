@@ -42,6 +42,8 @@ def test_ci_validates_terraform() -> None:
     assert "terraform validate" in workflow
     assert "pipelines/project_repository_updates.yaml" in workflow
     assert "scripts/generate_release_evidence.py" in workflow
+    assert "scripts/generate_deployment_check.py" in workflow
+    assert "deployment-check/deployment-check.json" in workflow
     assert "actions/upload-artifact" in workflow
 
 
