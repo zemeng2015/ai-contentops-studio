@@ -60,6 +60,9 @@ In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tr
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced
 for CI/CD release reviews.
+If a scheduled job declares `homepage_handoff: true`, inspect `homepage_handoff_path` on that job
+result before committing the personal homepage repository. A populated `homepage_handoff_error`
+usually means the homepage publisher is not configured or the target path is not a git repository.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

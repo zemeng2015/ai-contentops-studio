@@ -631,6 +631,7 @@ jobs:
   - name: ai-roundup
     topic: AI engineering roundup
     publish: true
+    homepage_handoff: true
     tags: [ai, aws]
 """,
         encoding="utf-8",
@@ -646,7 +647,10 @@ jobs:
     assert payload["total"] == 1
     assert payload["job_count"] == 1
     assert payload["publish_count"] == 1
+    assert payload["handoff_count"] == 1
     assert payload["items"][0]["path"] == "calendar.yaml"
+    assert payload["items"][0]["handoff_count"] == 1
+    assert payload["items"][0]["jobs"][0]["homepage_handoff"] is True
     assert payload["items"][0]["jobs"][0]["topic"] == "AI engineering roundup"
 
 
@@ -662,6 +666,7 @@ jobs:
   - name: github-project-update
     topic: GitHub project update for portfolio readers
     publish: false
+    homepage_handoff: true
     source_urls:
       - https://github.com/zemeng2015/ai-contentops-studio
     tags: [github, portfolio]
@@ -683,6 +688,7 @@ jobs:
     assert "Open content calendar" in dashboard_response.text
     assert "Content Calendar" in calendar_response.text
     assert "github-project-update" in calendar_response.text
+    assert "Homepage handoffs" in calendar_response.text
     assert "review first" in calendar_response.text
     assert "github.com/zemeng2015/ai-contentops-studio" in calendar_response.text
     assert "research_provider=github" in calendar_response.text

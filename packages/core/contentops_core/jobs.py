@@ -17,6 +17,7 @@ class ContentJob(BaseModel):
     topic: str
     source_urls: list[str] = Field(default_factory=list)
     publish: bool = False
+    homepage_handoff: bool = False
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
 
@@ -24,6 +25,7 @@ class ContentJob(BaseModel):
         metadata = dict(self.metadata)
         metadata["contentops_job_name"] = self.name
         metadata["contentops_publish_intent"] = "publish" if self.publish else "review"
+        metadata["contentops_homepage_handoff"] = str(self.homepage_handoff).lower()
         if self.tags:
             metadata["contentops_job_tags"] = ",".join(self.tags)
         if workflow_name:
@@ -53,12 +55,15 @@ class JobRunResult(BaseModel):
     topic: str
     source_urls: list[str] = Field(default_factory=list)
     publish: bool = False
+    homepage_handoff: bool = False
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
     run_id: str | None = None
     status: RunStatus | str
     artifact_dir: str | None = None
     published_url: str | None = None
+    homepage_handoff_path: str | None = None
+    homepage_handoff_error: str | None = None
     duration_ms: int | None = None
     error: str | None = None
 
@@ -95,6 +100,7 @@ class WorkerJobCatalogItem(BaseModel):
     total: int = 0
     publish_count: int = 0
     review_count: int = 0
+    handoff_count: int = 0
     topics: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     jobs: list[ContentJob] = Field(default_factory=list)
@@ -107,6 +113,7 @@ class WorkerJobCatalogResponse(BaseModel):
     job_count: int
     publish_count: int
     review_count: int
+    handoff_count: int
     invalid_count: int
 
 
@@ -140,6 +147,7 @@ class JobRunner:
                         topic=job.topic,
                         source_urls=job.source_urls,
                         publish=job.publish,
+                        homepage_handoff=job.homepage_handoff,
                         tags=job.tags,
                         metadata=job.metadata,
                         run_id=run_result.run.id,
@@ -156,6 +164,7 @@ class JobRunner:
                         topic=job.topic,
                         source_urls=job.source_urls,
                         publish=job.publish,
+                        homepage_handoff=job.homepage_handoff,
                         tags=job.tags,
                         metadata=job.metadata,
                         status="failed",
@@ -186,6 +195,7 @@ class JobRunner:
                 topic=job.topic,
                 source_urls=job.source_urls,
                 publish=job.publish,
+                homepage_handoff=job.homepage_handoff,
                 tags=job.tags,
                 metadata=job.metadata,
                 status="dry_run",
@@ -230,6 +240,7 @@ def list_worker_job_catalog(pipeline_dir: Path) -> WorkerJobCatalogResponse:
         job_count=sum(item.total for item in items),
         publish_count=sum(item.publish_count for item in items),
         review_count=sum(item.review_count for item in items),
+        handoff_count=sum(item.handoff_count for item in items),
         invalid_count=sum(1 for item in items if not item.valid),
     )
 
@@ -279,6 +290,7 @@ def _worker_job_catalog_item(path: Path, pipeline_dir: Path) -> WorkerJobCatalog
         )
     tags = sorted({tag for job in job_file.jobs for tag in job.tags})
     publish_count = sum(1 for job in job_file.jobs if job.publish)
+    handoff_count = sum(1 for job in job_file.jobs if job.homepage_handoff)
     return WorkerJobCatalogItem(
         path=display_path,
         name=job_file.name,
@@ -286,6 +298,7 @@ def _worker_job_catalog_item(path: Path, pipeline_dir: Path) -> WorkerJobCatalog
         total=len(job_file.jobs),
         publish_count=publish_count,
         review_count=len(job_file.jobs) - publish_count,
+        handoff_count=handoff_count,
         topics=[job.topic for job in job_file.jobs],
         tags=tags,
         jobs=job_file.jobs,
@@ -333,6 +346,7 @@ def job_recovery_plan(receipt_dir: Path, execution_id: str) -> JobRecoveryPlan:
             topic=result.topic,
             source_urls=result.source_urls,
             publish=result.publish,
+            homepage_handoff=result.homepage_handoff,
             tags=result.tags,
             metadata={
                 **result.metadata,

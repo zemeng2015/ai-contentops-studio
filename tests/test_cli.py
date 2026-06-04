@@ -468,6 +468,7 @@ jobs:
   - name: aws-ai
     topic: AWS AI content operations
     publish: true
+    homepage_handoff: true
     tags: [aws, ai]
 """,
         encoding="utf-8",
@@ -482,7 +483,9 @@ jobs:
     assert payload["total"] == 1
     assert payload["job_count"] == 1
     assert payload["publish_count"] == 1
+    assert payload["handoff_count"] == 1
     assert payload["items"][0]["name"] == "cli-calendar"
+    assert payload["items"][0]["jobs"][0]["homepage_handoff"] is True
     assert payload["items"][0]["jobs"][0]["tags"] == ["aws", "ai"]
 
 

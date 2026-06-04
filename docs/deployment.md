@@ -232,6 +232,10 @@ with the rest of the run artifacts and release evidence.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.
+Jobs that set `homepage_handoff: true` generate a homepage handoff zip after a successful run when
+`CONTENTOPS_PUBLISHER_PROVIDER=homepage` is configured. The worker receipt stores the handoff path
+or error for each job, and the post-run release evidence records those zip files in
+`homepage_handoffs.json`.
 In Terraform deployments, set `worker_pipeline_path` to select the scheduled YAML calendar, such as
 `pipelines/daily_ai_roundup.yaml` or `pipelines/project_repository_updates.yaml`. Set
 `research_provider` with `research_search_api_key_secret_arn` or `research_github_token_secret_arn`

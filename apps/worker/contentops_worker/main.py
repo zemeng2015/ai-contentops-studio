@@ -54,6 +54,10 @@ def run_pipeline(
         bool,
         typer.Option(help="Skip post-run release evidence generation for executed jobs."),
     ] = False,
+    skip_homepage_handoff: Annotated[
+        bool,
+        typer.Option(help="Skip homepage handoff generation for jobs that request it."),
+    ] = False,
 ) -> None:
     job_file = load_job_file(path)
     settings = Settings()
@@ -73,6 +77,9 @@ def run_pipeline(
         return
 
     report = JobRunner(build_pipeline(settings)).run(job_file, receipt_dir=resolved_receipt_dir)
+    handoff_errors: list[str] = []
+    if not skip_homepage_handoff:
+        handoff_errors = _attach_homepage_handoffs(settings, report)
     if not skip_release_evidence:
         try:
             _attach_release_evidence(settings, report, release_evidence_dir)
@@ -84,6 +91,8 @@ def run_pipeline(
     _mirror_receipt_if_configured(settings, report.receipt_path)
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
+        if handoff_errors:
+            raise typer.Exit(1)
         return
     typer.echo(f"Job file {report.name}: {report.succeeded}/{report.total} succeeded")
     typer.echo(f"Receipt: {report.receipt_path}")
@@ -92,6 +101,34 @@ def run_pipeline(
     for result in report.results:
         run_label = result.run_id or "no-run"
         typer.echo(f"- {result.job_name}: {run_label} {result.status}")
+        if result.homepage_handoff_path:
+            typer.echo(f"  homepage handoff: {result.homepage_handoff_path}")
+        if result.homepage_handoff_error:
+            typer.echo(f"  homepage handoff error: {result.homepage_handoff_error}")
+    if handoff_errors:
+        raise typer.Exit(1)
+
+
+def _attach_homepage_handoffs(settings: Settings, report: JobExecutionReport) -> list[str]:
+    if not any(result.homepage_handoff for result in report.results):
+        return []
+    service = build_review_service(settings)
+    errors: list[str] = []
+    for result in report.results:
+        if not result.homepage_handoff:
+            continue
+        if result.error is not None or result.run_id is None:
+            result.homepage_handoff_error = result.error or "Run id is missing."
+            errors.append(f"{result.job_name}: {result.homepage_handoff_error}")
+            continue
+        try:
+            result.homepage_handoff_path = str(service.create_homepage_handoff(result.run_id))
+            result.homepage_handoff_error = None
+        except Exception as exc:
+            result.homepage_handoff_error = str(exc)
+            errors.append(f"{result.job_name}: {exc}")
+    rewrite_job_execution_report(report)
+    return errors
 
 
 def _attach_release_evidence(

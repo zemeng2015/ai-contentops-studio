@@ -214,6 +214,7 @@ jobs:
   - name: production-llm-systems
     topic: "AI engineering signals for production LLM systems"
     publish: false
+    homepage_handoff: false
     source_urls: []
     tags:
       - ai-engineering
@@ -233,6 +234,10 @@ Executed worker jobs automatically write post-run release evidence under
 and file list in the job execution receipt. Use `--release-evidence-dir` to choose a specific
 evidence directory, or `--skip-release-evidence` for local smoke tests that should only write the
 worker receipt.
+Set `homepage_handoff: true` on a job when the homepage publisher is configured and the scheduled
+run should prepare a reviewable GitHub Pages handoff zip after the draft is generated. The handoff
+path and any handoff error are stored on that job's execution result, and the post-run release
+evidence indexes the zip in `homepage_handoffs.json`.
 
 Generate review-ready posts from GitHub project repositories:
 

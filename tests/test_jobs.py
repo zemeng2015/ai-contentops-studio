@@ -49,6 +49,7 @@ jobs:
   - name: agents
     topic: Agent workflow observability
     publish: true
+    homepage_handoff: true
 """,
         encoding="utf-8",
     )
@@ -58,6 +59,7 @@ jobs:
     assert job_file.name == "content-calendar"
     assert [job.name for job in job_file.jobs] == ["evals", "agents"]
     assert job_file.jobs[1].publish is True
+    assert job_file.jobs[1].homepage_handoff is True
 
 
 def test_job_runner_executes_batch(tmp_path: Path) -> None:
@@ -137,6 +139,7 @@ jobs:
   - name: roundup
     topic: AI platform weekly roundup
     publish: true
+    homepage_handoff: true
     tags: [ai, roundup]
     metadata:
       owner: zack
@@ -152,6 +155,7 @@ jobs:
     assert report.succeeded == 1
     assert report.results[0].status == "dry_run"
     assert report.results[0].publish is True
+    assert report.results[0].homepage_handoff is True
     assert report.results[0].tags == ["ai", "roundup"]
     assert report.results[0].metadata == {"owner": "zack"}
 
@@ -192,6 +196,7 @@ def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:
                 topic="Failed job",
                 source_urls=["https://example.com/source"],
                 publish=True,
+                homepage_handoff=True,
                 tags=["retry"],
                 metadata={"owner": "zack"},
                 status="failed",
@@ -210,6 +215,7 @@ def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:
     assert job_file.jobs[0].name == "failed"
     assert job_file.jobs[0].source_urls == ["https://example.com/source"]
     assert job_file.jobs[0].publish is True
+    assert job_file.jobs[0].homepage_handoff is True
     assert job_file.jobs[0].metadata["recovery_source_execution_id"] == report.execution_id
 
 
@@ -230,6 +236,7 @@ jobs:
   - name: production-llm
     topic: Production LLM systems
     publish: true
+    homepage_handoff: true
     tags: [llm, portfolio]
   - name: agent-watch
     topic: Agent workflow reliability
@@ -245,11 +252,13 @@ jobs:
     assert catalog.job_count == 2
     assert catalog.publish_count == 1
     assert catalog.review_count == 1
+    assert catalog.handoff_count == 1
     assert catalog.invalid_count == 1
     daily = next(item for item in catalog.items if item.name == "daily-calendar")
     assert daily.path == "daily.yaml"
     assert daily.topics == ["Production LLM systems", "Agent workflow reliability"]
     assert daily.tags == ["agents", "llm", "portfolio"]
+    assert daily.handoff_count == 1
     broken = next(item for item in catalog.items if item.path == "broken.yaml")
     assert broken.valid is False
     assert broken.errors

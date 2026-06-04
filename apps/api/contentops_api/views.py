@@ -419,11 +419,12 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
           <td>{_job_intent_label(result.publish)}</td>
           <td>{escape(str(result.status))}</td>
           <td>{_run_link(result.run_id)}</td>
+          <td>{escape(result.homepage_handoff_path or "n/a")}</td>
           <td>{escape(result.topic)}</td>
           <td>{_source_urls_html(result.source_urls)}</td>
           <td>{escape(", ".join(result.tags) or "none")}</td>
           <td>{escape(_metadata_label(result.metadata))}</td>
-          <td>{escape(result.error or "")}</td>
+          <td>{escape(result.error or result.homepage_handoff_error or "")}</td>
         </tr>
         """
         for result in report.results
@@ -451,7 +452,7 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
       <table>
         <thead>
           <tr>
-            <th>Job</th><th>Intent</th><th>Status</th><th>Run</th><th>Topic</th>
+            <th>Job</th><th>Intent</th><th>Status</th><th>Run</th><th>Handoff</th><th>Topic</th>
             <th>Sources</th><th>Tags</th><th>Metadata</th><th>Error</th>
           </tr>
         </thead>
@@ -549,6 +550,7 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
         return "<p>No worker job files found.</p>"
     publish_count = sum(item.publish_count for item in items)
     review_count = sum(item.review_count for item in items)
+    handoff_count = sum(item.handoff_count for item in items)
     invalid_count = sum(1 for item in items if not item.valid)
     job_count = sum(item.total for item in items)
     file_rows = "".join(
@@ -560,6 +562,7 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
           <td>{item.total}</td>
           <td>{item.publish_count}</td>
           <td>{item.review_count}</td>
+          <td>{item.handoff_count}</td>
           <td>{escape(", ".join(item.tags) or "none")}</td>
           <td>{escape("; ".join(item.topics[:3]) or "; ".join(item.errors) or "n/a")}</td>
         </tr>
@@ -574,13 +577,14 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
         <div><strong>{job_count}</strong><span>Planned jobs</span></div>
         <div><strong>{review_count}</strong><span>Review first</span></div>
         <div><strong>{publish_count}</strong><span>Auto publish</span></div>
+        <div><strong>{handoff_count}</strong><span>Homepage handoffs</span></div>
         <div><strong>{invalid_count}</strong><span>Invalid files</span></div>
       </div>
       <h3>Planned Jobs</h3>
       <table>
         <thead>
           <tr>
-            <th>File</th><th>Job</th><th>Intent</th><th>Topic</th>
+            <th>File</th><th>Job</th><th>Intent</th><th>Handoff</th><th>Topic</th>
             <th>Sources</th><th>Tags</th><th>Metadata</th>
           </tr>
         </thead>
@@ -591,7 +595,7 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
         <thead>
           <tr>
             <th>File</th><th>Name</th><th>Valid</th><th>Jobs</th>
-            <th>Publish</th><th>Review</th><th>Tags</th><th>Topics</th>
+            <th>Publish</th><th>Review</th><th>Handoffs</th><th>Tags</th><th>Topics</th>
           </tr>
         </thead>
         <tbody>{file_rows}</tbody>
@@ -611,6 +615,7 @@ def _worker_job_rows(item: WorkerJobCatalogItem) -> str:
             <td>n/a</td>
             <td>n/a</td>
             <td>n/a</td>
+            <td>n/a</td>
           </tr>
         """
     return "".join(
@@ -619,6 +624,7 @@ def _worker_job_rows(item: WorkerJobCatalogItem) -> str:
           <td>{escape(item.path)}</td>
           <td>{escape(job.name)}</td>
           <td>{_job_intent_label(job.publish)}</td>
+          <td>{_handoff_label(job.homepage_handoff)}</td>
           <td>{escape(job.topic)}</td>
           <td>{_source_urls_html(job.source_urls)}</td>
           <td>{escape(", ".join(job.tags) or "none")}</td>
@@ -632,6 +638,12 @@ def _worker_job_rows(item: WorkerJobCatalogItem) -> str:
 def _job_intent_label(publish: bool) -> str:
     css_class = "publish" if publish else "review"
     label = "publish if ready" if publish else "review first"
+    return f'<span class="pill {css_class}">{label}</span>'
+
+
+def _handoff_label(homepage_handoff: bool) -> str:
+    css_class = "publish" if homepage_handoff else "review"
+    label = "homepage handoff" if homepage_handoff else "none"
     return f'<span class="pill {css_class}">{label}</span>'
 
 
