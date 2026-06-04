@@ -535,6 +535,7 @@ class ReleaseEvidenceBundle(BaseModel):
     release_readiness: ReleaseReadinessReport
     deployment_check: DeploymentCheckReport
     homepage_handoffs: HomepageHandoffEvidence
+    worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     latest_release_approval: ReleaseApprovalRecord | None = None
 
 

@@ -393,6 +393,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert release_evidence_payload["summary"]["release_status"] in {"pass", "warn", "fail"}
     assert release_evidence_payload["release_readiness"]["operations"]["total_runs"] >= 1
     assert "deployment_manifest" in release_evidence_payload
+    assert "worker_execution_trends" in release_evidence_payload
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
     assert retention_response.status_code == 200
     assert retention_response.json()["total_runs_scanned"] >= 1
@@ -919,6 +920,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
+    assert "Worker Execution Trends" in response.text
     assert "Download evidence bundle" in response.text
     assert "environment_template" in response.text
     assert "evidence_manifest.json" in response.text

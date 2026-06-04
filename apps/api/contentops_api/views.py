@@ -1086,6 +1086,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     summary = bundle.summary
     deploy_status = escape(bundle.deployment_check.status)
     can_deploy = str(bundle.deployment_check.can_deploy).lower()
+    worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
+    worker_buckets = bundle.worker_execution_trends.get("buckets", [])
     gate_rows = "".join(
         f"""
         <tr>
@@ -1146,6 +1148,25 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="5"><span class="muted">No homepage handoff bundles recorded.</span></td>
         </tr>
         """
+    worker_trend_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(str(bucket.get("date", "n/a")))}</td>
+          <td>{escape(str(bucket.get("execution_count", 0)))}</td>
+          <td>{escape(str(bucket.get("generated_runs", 0)))}</td>
+          <td>{escape(str(bucket.get("published_runs", 0)))}</td>
+          <td>{escape(str(bucket.get("action_required", 0)))}</td>
+        </tr>
+        """
+        for bucket in worker_buckets[-14:]
+        if isinstance(bucket, dict)
+    )
+    if not worker_trend_rows:
+        worker_trend_rows = """
+        <tr>
+          <td colspan="5"><span class="muted">No worker execution trend data recorded.</span></td>
+        </tr>
+        """
     return f"""
       <p>
         <a href="/release-evidence/bundle">Download evidence bundle</a> |
@@ -1162,6 +1183,14 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
+        <div>
+          <strong>{escape(str(worker_trends_summary.get("execution_count", 0)))}</strong>
+          <span>Worker executions</span>
+        </div>
+        <div>
+          <strong>{escape(str(worker_trends_summary.get("action_required", 0)))}</strong>
+          <span>Worker actions</span>
+        </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
       <h2>Deployment Preflight</h2>
@@ -1194,6 +1223,13 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <tr><th>Run</th><th>Artifact</th><th>Size</th><th>SHA256</th><th>Updated</th></tr>
         </thead>
         <tbody>{handoff_rows}</tbody>
+      </table>
+      <h2>Worker Execution Trends</h2>
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Executions</th><th>Generated</th><th>Published</th><th>Action</th></tr>
+        </thead>
+        <tbody>{worker_trend_rows}</tbody>
       </table>
     """
 
