@@ -150,6 +150,8 @@ manifest, operations summary, release readiness gates, a summary file with the c
 `evidence_manifest.json` with SHA-256 hashes, sizes, media types, and timestamps for the generated
 evidence artifacts. The command exits non-zero only when release readiness is `fail`;
 local-development `warn` states remain inspectable without blocking ordinary CI.
+If a release approval has been recorded, the same bundle includes `release_approval.json` and the
+API response exposes it as `latest_release_approval`.
 The same bundle is also available through the product surface:
 
 ```powershell

@@ -101,6 +101,11 @@ def test_cli_release_approval_records_decision(
         ],
     )
     list_result = runner.invoke(app, ["release-approvals"])
+    evidence_dir = tmp_path / "release-evidence"
+    evidence_result = runner.invoke(
+        app,
+        ["release-evidence", "--output-dir", str(evidence_dir)],
+    )
 
     assert approval_result.exit_code == 0
     approval_payload = json.loads(approval_result.output)
@@ -111,6 +116,12 @@ def test_cli_release_approval_records_decision(
     list_payload = json.loads(list_result.output)
     assert list_payload["total"] == 1
     assert list_payload["items"][0]["notes"] == "CLI approval record."
+    assert evidence_result.exit_code == 0
+    evidence_payload = json.loads(evidence_result.output)
+    assert evidence_payload["latest_release_approval"]["approval_id"] == (
+        approval_payload["approval_id"]
+    )
+    assert (evidence_dir / "release_approval.json").exists()
 
 
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:

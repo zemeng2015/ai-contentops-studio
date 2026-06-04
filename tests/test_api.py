@@ -130,6 +130,8 @@ def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
         )
         list_response = client.get("/release-approvals")
         dashboard_response = client.get("/dashboard/release-evidence")
+        evidence_response = client.get("/release-evidence")
+        evidence_bundle_response = client.get("/release-evidence/bundle")
         dashboard_post_response = client.post(
             "/dashboard/release-approval",
             data={
@@ -149,6 +151,12 @@ def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
     assert "deployment_check.json" in approval["evidence_files"]
     assert list_response.status_code == 200
     assert list_response.json()["total"] == 1
+    assert evidence_response.status_code == 200
+    evidence_payload = evidence_response.json()
+    assert evidence_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
+    assert "release_approval.json" in evidence_payload["summary"]["artifact_files"]
+    assert evidence_bundle_response.status_code == 200
+    assert b"release_approval.json" in evidence_bundle_response.content
     assert dashboard_response.status_code == 200
     assert "Release Approval" in dashboard_response.text
     assert "Recent Release Approvals" in dashboard_response.text

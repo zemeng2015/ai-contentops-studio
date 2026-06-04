@@ -133,6 +133,8 @@ contentops release-approvals
 `release-evidence` writes system status, deployment preflight, release gates, and
 `evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence artifact, so CI
 output can be archived and compared during deployment reviews.
+When a release approval exists, the evidence bundle also includes `release_approval.json` and the
+API response includes `latest_release_approval`, closing the audit loop between review and deploy.
 
 ## API Surface
 

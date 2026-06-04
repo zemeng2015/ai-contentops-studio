@@ -6,7 +6,12 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
+from contentops_core.factory import build_review_service
+from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest
+from contentops_core.release_approvals import approve_release
 from contentops_core.release_evidence import create_release_evidence_archive
+from contentops_core.repository import RunRepository
+from contentops_core.settings import Settings
 
 from scripts.generate_release_evidence import generate_release_evidence
 
@@ -54,6 +59,46 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert set(evidence_manifest["artifacts"]) == expected_files - {"evidence_manifest.json"}
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
+
+
+def test_release_evidence_includes_latest_release_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("CONTENTOPS_GIT_SHA", "approval-sha")
+    settings = Settings()
+    repository = RunRepository(settings.database_url)
+    output_dir = tmp_path / "release-evidence"
+
+    approval = approve_release(
+        settings=settings,
+        repository=repository,
+        review_service=build_review_service(settings),
+        request=ReleaseApprovalRequest(
+            decision=ReleaseApprovalDecision.APPROVED,
+            approver="zack",
+            notes="Evidence reviewed.",
+        ),
+    )
+    bundle = generate_release_evidence(output_dir)
+
+    approval_payload = json.loads(
+        (output_dir / "release_approval.json").read_text(encoding="utf-8")
+    )
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert bundle.latest_release_approval is not None
+    assert bundle.latest_release_approval.approval_id == approval.approval_id
+    assert "release_approval.json" in bundle.summary.artifact_files
+    assert approval_payload["approval_id"] == approval.approval_id
+    assert evidence_manifest["artifacts"]["release_approval.json"]["media_type"] == (
+        "application/json"
+    )
 
 
 def test_create_release_evidence_archive_writes_zip(

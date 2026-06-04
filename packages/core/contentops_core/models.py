@@ -469,6 +469,7 @@ class ReleaseEvidenceBundle(BaseModel):
     operations_summary: OperationsSummary
     release_readiness: ReleaseReadinessReport
     deployment_check: DeploymentCheckReport
+    latest_release_approval: ReleaseApprovalRecord | None = None
 
 
 class DeploymentCheckItem(BaseModel):

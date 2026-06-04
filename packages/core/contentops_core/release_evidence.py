@@ -44,20 +44,24 @@ def build_release_evidence(
     operations = review_service.operations_summary(window_size=window_size)
     readiness = release_readiness(settings, repository, operations)
     preflight = deployment_check(settings, repository, operations)
+    approval = _latest_release_approval(settings.artifact_root)
+    artifact_files = [
+        "doctor.json",
+        "deployment_check.json",
+        "deployment_manifest.json",
+        "evidence_manifest.json",
+        "operations_summary.json",
+        "release_readiness.json",
+        "summary.json",
+    ]
+    if approval is not None:
+        artifact_files.append("release_approval.json")
     summary = ReleaseEvidenceSummary(
         git_sha=git_sha or os.getenv("GITHUB_SHA") or os.getenv("CONTENTOPS_GIT_SHA"),
         doctor_status=doctor.status,
         release_status=readiness.status,
         can_release=readiness.can_release,
-        artifact_files=[
-            "doctor.json",
-            "deployment_check.json",
-            "deployment_manifest.json",
-            "evidence_manifest.json",
-            "operations_summary.json",
-            "release_readiness.json",
-            "summary.json",
-        ],
+        artifact_files=artifact_files,
     )
     return ReleaseEvidenceBundle(
         summary=summary,
@@ -66,6 +70,7 @@ def build_release_evidence(
         operations_summary=operations,
         release_readiness=readiness,
         deployment_check=preflight,
+        latest_release_approval=approval,
     )
 
 
@@ -83,6 +88,8 @@ def write_release_evidence(
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
     }
+    if bundle.latest_release_approval is not None:
+        payloads["release_approval"] = bundle.latest_release_approval.model_dump(mode="json")
     for name, payload in payloads.items():
         (output_dir / f"{name}.json").write_text(
             json.dumps(payload, indent=2) + "\n",
@@ -144,6 +151,12 @@ def _release_evidence_collection_id(bundle: ReleaseEvidenceBundle) -> str:
     marker = bundle.summary.git_sha or f"{bundle.summary.generated_at:%Y%m%dT%H%M%SZ}"
     safe_marker = "".join(char if char.isalnum() or char in ".-_" else "-" for char in marker)
     return f"release-evidence/{safe_marker}"
+
+
+def _latest_release_approval(artifact_root: Path) -> Any | None:
+    from contentops_core.release_approvals import latest_release_approval
+
+    return latest_release_approval(artifact_root)
 
 
 def _evidence_manifest(output_dir: Path, artifact_files: list[str]) -> ArtifactManifest:
