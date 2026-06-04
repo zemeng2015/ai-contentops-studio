@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 import yaml
+from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_manifest,
     release_readiness,
@@ -895,59 +896,19 @@ def rerun(
 @app.command()
 def init_config(
     path: Annotated[Path, typer.Option(help="Config file to create.")] = Path(".env"),
+    profile: Annotated[
+        str,
+        typer.Option(help="Config template profile to render."),
+    ] = "local",
 ) -> None:
     if path.exists():
         raise typer.BadParameter(f"File already exists: {path}")
-    path.write_text(
-        "\n".join(
-            [
-                "CONTENTOPS_ARTIFACT_ROOT=artifacts",
-                "CONTENTOPS_ARTIFACT_STORE_PROVIDER=local",
-                "# CONTENTOPS_ARTIFACT_S3_BUCKET=",
-                "CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts",
-                "CONTENTOPS_DATABASE_URL=sqlite:///contentops.db",
-                "CONTENTOPS_PIPELINE_DIR=pipelines",
-                "CONTENTOPS_SITE_OUTPUT_DIR=site",
-                "CONTENTOPS_PUBLIC_BASE_URL=http://localhost:8000/site",
-                "CONTENTOPS_MIN_PUBLISH_SCORE=0.72",
-                "CONTENTOPS_RESEARCH_PROVIDER=discovery",
-                (
-                    "CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?"
-                    "search_query=cat:cs.AI%20OR%20cat:cs.CL%20OR%20cat:cs.LG"
-                    "&start=0&max_results=25&sortBy=submittedDate&sortOrder=descending"
-                ),
-                "CONTENTOPS_RESEARCH_MAX_SOURCES=6",
-                "CONTENTOPS_RESEARCH_RETRY_ATTEMPTS=2",
-                "CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS=0.1",
-                "CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search",
-                "# CONTENTOPS_RESEARCH_SEARCH_API_KEY=",
-                "CONTENTOPS_RESEARCH_SEARCH_ENRICH=true",
-                "CONTENTOPS_RESEARCH_GITHUB_API_BASE_URL=https://api.github.com",
-                "# CONTENTOPS_RESEARCH_GITHUB_TOKEN=",
-                "CONTENTOPS_GENERATOR_PROVIDER=template",
-                "CONTENTOPS_PUBLISHER_PROVIDER=static",
-                "CONTENTOPS_OPENAI_MODEL=gpt-5-mini",
-                "CONTENTOPS_OPENAI_TIMEOUT_SECONDS=60",
-                "CONTENTOPS_OPENAI_RETRY_ATTEMPTS=2",
-                "CONTENTOPS_OPENAI_RETRY_BACKOFF_SECONDS=0.5",
-                "CONTENTOPS_OPENAI_FALLBACK_ON_FAILURE=true",
-                "# CONTENTOPS_OPENAI_API_KEY=",
-                "# CONTENTOPS_OPERATOR_API_KEY=",
-                "# CONTENTOPS_READ_API_KEY=",
-                "CONTENTOPS_REQUIRE_READ_API_KEY=false",
-                "# CONTENTOPS_NOTIFICATION_WEBHOOK_URL=",
-                "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS=5",
-                "CONTENTOPS_LATENCY_SLO_MS=120000",
-                "CONTENTOPS_MIN_SOURCE_COUNT=1",
-                "CONTENTOPS_TOKEN_BUDGET_PER_RUN=12000",
-                "# CONTENTOPS_HOMEPAGE_REPO_PATH=C:\\path\\to\\zack-ai-homepage",
-                "# CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    typer.echo(f"Created {path}")
+    try:
+        template = render_env_template(profile)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    path.write_text(template, encoding="utf-8")
+    typer.echo(f"Created {path} from {profile} profile")
 
 
 def _parse_status(status: str) -> RunStatus | None:

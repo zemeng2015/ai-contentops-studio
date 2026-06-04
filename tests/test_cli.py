@@ -71,6 +71,33 @@ def test_cli_doctor_reports_system_status(
     assert release_payload["can_release"] is True
 
 
+def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:
+    runner = CliRunner()
+    path = tmp_path / ".env.production"
+
+    result = runner.invoke(app, ["init-config", "--path", str(path), "--profile", "production"])
+    second_result = runner.invoke(
+        app,
+        ["init-config", "--path", str(path), "--profile", "production"],
+    )
+    invalid_result = runner.invoke(
+        app,
+        ["init-config", "--path", str(tmp_path / ".env.bad"), "--profile", "staging"],
+    )
+
+    assert result.exit_code == 0
+    assert "production profile" in result.output
+    content = path.read_text(encoding="utf-8")
+    assert "CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3" in content
+    assert "CONTENTOPS_DATABASE_URL=postgresql+psycopg://" in content
+    assert "CONTENTOPS_OPERATOR_API_KEY=replace-with-long-random-operator-key" in content
+    assert second_result.exit_code != 0
+    assert "File already exists" in second_result.output
+    assert invalid_result.exit_code != 0
+    assert "Unknown config profile" in invalid_result.output
+    assert "Traceback" not in invalid_result.output
+
+
 def test_cli_approve_then_publish(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

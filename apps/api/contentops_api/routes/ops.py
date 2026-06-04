@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
+from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_manifest,
     release_readiness,
@@ -74,6 +75,18 @@ def build_ops_router(
     )
     def get_deployment_manifest() -> DeploymentManifest:
         return deployment_manifest(settings, repository)
+
+    @router.get(
+        "/deployment-env-template",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_deployment_env_template(
+        profile: str = Query(default="production", pattern="^(local|production)$"),
+    ) -> Response:
+        return Response(
+            content=render_env_template(profile),
+            media_type="text/plain",
+        )
 
     @router.get(
         "/release-readiness",

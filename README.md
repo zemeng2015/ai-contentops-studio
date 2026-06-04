@@ -151,6 +151,7 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /ops-summary
 GET  /deployment-manifest
+GET  /deployment-env-template
 GET  /release-readiness
 GET  /release-evidence
 GET  /release-evidence/bundle
@@ -161,6 +162,8 @@ GET  /job-executions
 The system status dashboard turns `/ready` and deployment manifest checks into operator-facing
 configuration fixes, including missing API keys, scheduled research readiness, artifact storage,
 database, and publishing-provider risks.
+Use `contentops init-config --profile production --path .env.production` or
+`GET /deployment-env-template` to generate the same production environment template.
 
 ## Scheduled Jobs
 

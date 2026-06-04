@@ -24,6 +24,13 @@ Copy-Item config/production.env.example .env.production
 docker run --rm -p 8000:8000 --env-file .env.production ai-contentops-studio
 ```
 
+The same template can be generated from the installed CLI or fetched from the API:
+
+```powershell
+contentops init-config --profile production --path .env.production
+Invoke-WebRequest http://127.0.0.1:8000/deployment-env-template -OutFile .env.production
+```
+
 `CONTENTOPS_RUN_MIGRATIONS=true` tells the image entrypoint to run `alembic upgrade head` before
 starting Uvicorn. The image also includes a `/ready` healthcheck so container platforms can detect
 database, artifact store, and provider configuration failures.
