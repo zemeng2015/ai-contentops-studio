@@ -5,13 +5,15 @@ from pathlib import Path
 
 import pytest
 from contentops_api.main import app, settings
-from contentops_core.factory import build_pipeline
+from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobRunner,
     job_execution_dir,
     load_job_file,
     write_job_execution_report,
 )
+from contentops_core.release_gate import release_gate, write_release_gate_report
+from contentops_core.repository import RunRepository
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -124,6 +126,16 @@ def test_release_approval_api_and_dashboard(
     monkeypatch.setenv("CONTENTOPS_GIT_SHA", "api-release-sha")
     settings.artifact_root = tmp_path / "artifacts"
     try:
+        write_release_gate_report(
+            release_gate(
+                settings=settings,
+                repository=RunRepository(settings.database_url),
+                review_service=build_review_service(settings),
+                git_sha="api-history-sha",
+                require_approval=False,
+            ),
+            settings.artifact_root,
+        )
         blocked_gate_response = client.get("/release-gate?git_sha=api-release-sha")
         create_response = client.post(
             "/release-approvals",
@@ -136,6 +148,7 @@ def test_release_approval_api_and_dashboard(
             },
         )
         list_response = client.get("/release-approvals")
+        gate_history_response = client.get("/release-gates")
         gate_response = client.get("/release-gate?git_sha=api-release-sha")
         dashboard_response = client.get("/dashboard/release-evidence")
         evidence_response = client.get("/release-evidence")
@@ -160,6 +173,9 @@ def test_release_approval_api_and_dashboard(
     assert "deployment_check.json" in approval["evidence_files"]
     assert list_response.status_code == 200
     assert list_response.json()["total"] == 1
+    assert gate_history_response.status_code == 200
+    assert gate_history_response.json()["total"] == 1
+    assert gate_history_response.json()["items"][0]["git_sha"] == "api-history-sha"
     assert gate_response.status_code in {200, 409}
     gate_payload = gate_response.json()
     assert gate_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
@@ -172,6 +188,8 @@ def test_release_approval_api_and_dashboard(
     assert b"release_approval.json" in evidence_bundle_response.content
     assert dashboard_response.status_code == 200
     assert "Release Approval" in dashboard_response.text
+    assert "Recent Release Gates" in dashboard_response.text
+    assert "api-history-sha" in dashboard_response.text
     assert "Recent Release Approvals" in dashboard_response.text
     assert "API approval record." in dashboard_response.text
     assert dashboard_post_response.status_code == 303

@@ -30,7 +30,11 @@ from contentops_core.models import (
 )
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
-from contentops_core.release_gate import release_gate
+from contentops_core.release_gate import (
+    list_release_gate_reports,
+    release_gate,
+    write_release_gate_report,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -318,6 +322,10 @@ def show_release_gate(
         bool,
         typer.Option("--json", help="Print structured JSON."),
     ] = False,
+    record: Annotated[
+        bool,
+        typer.Option(help="Persist the release gate report under the artifact root."),
+    ] = False,
 ) -> None:
     settings = Settings()
     report = release_gate(
@@ -328,6 +336,8 @@ def show_release_gate(
         git_sha=git_sha,
         require_approval=require_approval,
     )
+    if record:
+        write_release_gate_report(report, settings.artifact_root)
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
         raise typer.Exit(0 if report.can_deploy else 1)
@@ -336,6 +346,28 @@ def show_release_gate(
     for check in report.checks:
         typer.echo(f"- {check.name}: {check.status} - {check.message}")
     raise typer.Exit(0 if report.can_deploy else 1)
+
+
+@app.command("release-gates")
+def release_gates(
+    limit: Annotated[int, typer.Option(help="Maximum release gate reports to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of release gate reports to skip.")] = 0,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    reports = list_release_gate_reports(settings.artifact_root, limit=limit, offset=offset)
+    if json_output:
+        typer.echo(reports.model_dump_json(indent=2))
+        return
+    typer.echo(f"Showing {len(reports.items)} of {reports.total} release gate reports")
+    for report in reports.items:
+        typer.echo(
+            f"{report.generated_at.isoformat()}  {report.status:5}  "
+            f"can_deploy={str(report.can_deploy).lower()}  git_sha={report.git_sha or 'n/a'}"
+        )
 
 
 @app.command("ops-summary")

@@ -94,6 +94,7 @@ def test_generate_release_gate_writes_json(
         output,
         git_sha="ci-sha",
         require_approval=False,
+        record=True,
     )
 
     assert output.exists()
@@ -102,3 +103,4 @@ def test_generate_release_gate_writes_json(
     assert '"name": "release_approval"' in text
     assert report.git_sha == "ci-sha"
     assert report.status in {"pass", "warn", "fail"}
+    assert list((tmp_path / "artifacts" / "release-gates").glob("*.json"))

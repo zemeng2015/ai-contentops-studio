@@ -543,6 +543,13 @@ class ReleaseGateReport(BaseModel):
     latest_release_approval: ReleaseApprovalRecord | None = None
 
 
+class ReleaseGateListResponse(BaseModel):
+    items: list[ReleaseGateReport]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

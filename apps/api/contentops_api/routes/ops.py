@@ -32,6 +32,7 @@ from contentops_core.models import (
     ReleaseApprovalRecord,
     ReleaseApprovalRequest,
     ReleaseEvidenceBundle,
+    ReleaseGateListResponse,
     ReleaseGateReport,
     ReleaseReadinessReport,
     RetentionReport,
@@ -44,7 +45,7 @@ from contentops_core.release_evidence import (
     build_release_evidence,
     create_release_evidence_archive,
 )
-from contentops_core.release_gate import release_gate
+from contentops_core.release_gate import list_release_gate_reports, release_gate
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -206,6 +207,17 @@ def build_ops_router(
         if not report.can_deploy:
             response.status_code = 409
         return report
+
+    @router.get(
+        "/release-gates",
+        response_model=ReleaseGateListResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_release_gates(
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> ReleaseGateListResponse:
+        return list_release_gate_reports(settings.artifact_root, limit=limit, offset=offset)
 
     @router.get(
         "/worker-jobs",

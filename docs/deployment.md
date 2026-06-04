@@ -174,7 +174,7 @@ decisions require release readiness and deployment preflight to pass unless `--f
 Use the release gate in deployment automation after the approval is recorded:
 
 ```powershell
-contentops release-gate --git-sha $env:GITHUB_SHA --json
+contentops release-gate --git-sha $env:GITHUB_SHA --json --record
 Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 ```
 
@@ -184,6 +184,8 @@ released.
 CI also uploads a non-blocking `release-gate/release-gate.json` report with
 `--no-require-approval`, so reviewers can inspect the gate shape before a human approval exists.
 Use `--strict` in an actual deployment job once approval is required.
+Recorded gate reports are stored under `artifacts/release-gates` and can be inspected through
+`contentops release-gates --json` or `GET /release-gates`.
 
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:

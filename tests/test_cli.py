@@ -112,8 +112,9 @@ def test_cli_release_approval_records_decision(
     approval_payload = json.loads(approval_result.output)
     gate_result = runner.invoke(
         app,
-        ["release-gate", "--git-sha", approval_payload["git_sha"], "--json"],
+        ["release-gate", "--git-sha", approval_payload["git_sha"], "--json", "--record"],
     )
+    gate_history_result = runner.invoke(app, ["release-gates", "--json"])
     assert approval_payload["decision"] == "approved"
     assert approval_payload["approver"] == "zack"
     assert "deployment_check.json" in approval_payload["evidence_files"]
@@ -133,6 +134,10 @@ def test_cli_release_approval_records_decision(
     assert gate_payload["latest_release_approval"]["approval_id"] == (
         approval_payload["approval_id"]
     )
+    assert gate_history_result.exit_code == 0
+    gate_history_payload = json.loads(gate_history_result.output)
+    assert gate_history_payload["total"] == 1
+    assert gate_history_payload["items"][0]["git_sha"] == approval_payload["git_sha"]
 
 
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:

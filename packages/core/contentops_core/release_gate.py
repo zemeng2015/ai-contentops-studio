@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from contentops_core.models import (
     ReleaseApprovalDecision,
     ReleaseEvidenceBundle,
     ReleaseGateItem,
+    ReleaseGateListResponse,
     ReleaseGateReport,
 )
 from contentops_core.release_evidence import build_release_evidence
@@ -46,6 +48,37 @@ def release_gate(
         release_evidence=bundle.summary,
         latest_release_approval=bundle.latest_release_approval,
     )
+
+
+def write_release_gate_report(report: ReleaseGateReport, artifact_root: Path) -> Path:
+    directory = release_gate_dir(artifact_root)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{_release_gate_report_id(report)}.json"
+    path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def list_release_gate_reports(
+    artifact_root: Path,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> ReleaseGateListResponse:
+    reports = sorted(
+        (_read_release_gate_report(path) for path in _release_gate_report_paths(artifact_root)),
+        key=lambda report: report.generated_at,
+        reverse=True,
+    )
+    return ReleaseGateListResponse(
+        items=reports[offset : offset + limit],
+        total=len(reports),
+        limit=limit,
+        offset=offset,
+    )
+
+
+def release_gate_dir(artifact_root: Path) -> Path:
+    return artifact_root / "release-gates"
 
 
 def _release_readiness_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
@@ -156,3 +189,20 @@ def _gate_status(checks: list[ReleaseGateItem]) -> str:
     if any(check.status == "warn" for check in checks):
         return "warn"
     return "pass"
+
+
+def _release_gate_report_paths(artifact_root: Path) -> list[Path]:
+    directory = release_gate_dir(artifact_root)
+    if not directory.exists():
+        return []
+    return sorted(directory.glob("*.json"))
+
+
+def _read_release_gate_report(path: Path) -> ReleaseGateReport:
+    return ReleaseGateReport.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def _release_gate_report_id(report: ReleaseGateReport) -> str:
+    marker = report.git_sha or f"{report.generated_at:%Y%m%dT%H%M%SZ}"
+    safe_marker = "".join(char if char.isalnum() or char in ".-_" else "-" for char in marker)
+    return f"{report.generated_at:%Y%m%dT%H%M%SZ}-{safe_marker[:24]}"

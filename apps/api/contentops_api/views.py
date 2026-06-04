@@ -22,6 +22,7 @@ from contentops_core.models import (
     PublishVerificationReport,
     ReleaseApprovalListResponse,
     ReleaseEvidenceBundle,
+    ReleaseGateListResponse,
     ReleaseGateReport,
     RetentionReport,
     RunComparison,
@@ -1024,6 +1025,39 @@ def _release_gate_html(report: ReleaseGateReport) -> str:
       <table>
         <thead>
           <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _release_gate_history_html(reports: ReleaseGateListResponse) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(report.generated_at.isoformat())}</td>
+          <td><span class="pill">{escape(report.status)}</span></td>
+          <td>{str(report.can_deploy).lower()}</td>
+          <td>{escape(report.git_sha or "n/a")}</td>
+          <td>{len(report.checks)}</td>
+        </tr>
+        """
+        for report in reports.items
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="5"><span class="muted">No release gate reports recorded.</span></td>
+        </tr>
+        """
+    return f"""
+      <h2>Recent Release Gates</h2>
+      <p><a href="/release-gates">Release gate history JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Generated</th><th>Status</th><th>Can deploy</th><th>Git SHA</th><th>Checks</th>
+          </tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>

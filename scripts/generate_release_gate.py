@@ -5,7 +5,7 @@ from pathlib import Path
 
 from contentops_core.factory import build_review_service
 from contentops_core.models import ReleaseGateReport
-from contentops_core.release_gate import release_gate
+from contentops_core.release_gate import release_gate, write_release_gate_report
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -39,6 +39,11 @@ def main() -> None:
         action="store_true",
         help="Exit non-zero when the release gate fails.",
     )
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Persist the release gate report under the artifact root.",
+    )
     args = parser.parse_args()
 
     report = generate_release_gate(
@@ -46,6 +51,7 @@ def main() -> None:
         git_sha=args.git_sha,
         window_size=args.window_size,
         require_approval=not args.no_require_approval,
+        record=args.record,
     )
     print(report.model_dump_json(indent=2))
     if args.strict and not report.can_deploy:
@@ -58,6 +64,7 @@ def generate_release_gate(
     git_sha: str | None = None,
     window_size: int = 100,
     require_approval: bool = True,
+    record: bool = False,
 ) -> ReleaseGateReport:
     settings = Settings()
     repository = RunRepository(settings.database_url)
@@ -70,6 +77,8 @@ def generate_release_gate(
         git_sha=git_sha,
         require_approval=require_approval,
     )
+    if record:
+        write_release_gate_report(report, settings.artifact_root)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return report

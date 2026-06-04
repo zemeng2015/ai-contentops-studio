@@ -25,7 +25,7 @@ from contentops_core.models import (
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence
-from contentops_core.release_gate import release_gate
+from contentops_core.release_gate import list_release_gate_reports, release_gate
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -58,6 +58,7 @@ from contentops_api.views import (
     _published_content_html,
     _release_approvals_html,
     _release_evidence_html,
+    _release_gate_history_html,
     _release_gate_html,
     _retention_report_html,
     _s3_mirror_log_html,
@@ -329,6 +330,7 @@ def build_dashboard_router(
             window_size=window_size,
         )
         approvals = list_release_approvals(settings.artifact_root, limit=10)
+        gate_history = list_release_gate_reports(settings.artifact_root, limit=10)
         return HTMLResponse(
             _page(
                 "Release Evidence",
@@ -339,6 +341,7 @@ def build_dashboard_router(
                     Human-readable release evidence for deployment review and audit handoff.
                   </p>
                   {_release_gate_html(gate)}
+                  {_release_gate_history_html(gate_history)}
                   {_release_evidence_html(bundle)}
                   {_release_approvals_html(approvals, api_key)}
                 </section>

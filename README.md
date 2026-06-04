@@ -128,7 +128,8 @@ contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
-contentops release-gate --git-sha <commit_sha> --json
+contentops release-gate --git-sha <commit_sha> --json --record
+contentops release-gates --json
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, and
@@ -165,6 +166,7 @@ GET  /release-evidence/bundle
 GET  /release-approvals
 POST /release-approvals
 GET  /release-gate
+GET  /release-gates
 GET  /worker-jobs
 GET  /job-executions
 ```
@@ -188,6 +190,8 @@ status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 single CI/CD pass/fail report.
 CI uploads `release-gate/release-gate.json` as a non-blocking report; deployment jobs can rerun the
 same command with `--strict` after an approval exists.
+Use `--record` to store local gate history under `artifacts/release-gates`, which is also exposed
+through `/release-gates` and the release evidence dashboard.
 
 ## Scheduled Jobs
 
