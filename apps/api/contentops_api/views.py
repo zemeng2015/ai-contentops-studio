@@ -1045,6 +1045,24 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     )
     if not artifact_rows:
         artifact_rows = '<tr><td><span class="muted">No files recorded.</span></td></tr>'
+    handoff_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.run_id)}</td>
+          <td>{escape(item.artifact_path)}</td>
+          <td>{item.size_bytes}</td>
+          <td><code>{escape(item.sha256[:16])}...</code></td>
+          <td>{escape(item.updated_at.isoformat())}</td>
+        </tr>
+        """
+        for item in bundle.homepage_handoffs.items
+    )
+    if not handoff_rows:
+        handoff_rows = """
+        <tr>
+          <td colspan="5"><span class="muted">No homepage handoff bundles recorded.</span></td>
+        </tr>
+        """
     return f"""
       <p>
         <a href="/release-evidence/bundle">Download evidence bundle</a> |
@@ -1060,6 +1078,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <div><strong>{escape(summary.doctor_status)}</strong><span>Doctor status</span></div>
         <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
+        <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
       <h2>Deployment Preflight</h2>
@@ -1085,6 +1104,13 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <table>
         <thead><tr><th>File</th></tr></thead>
         <tbody>{artifact_rows}</tbody>
+      </table>
+      <h2>Homepage Handoffs</h2>
+      <table>
+        <thead>
+          <tr><th>Run</th><th>Artifact</th><th>Size</th><th>SHA256</th><th>Updated</th></tr>
+        </thead>
+        <tbody>{handoff_rows}</tbody>
       </table>
     """
 

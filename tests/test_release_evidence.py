@@ -34,6 +34,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "deployment_check.json",
         "deployment_manifest.json",
         "evidence_manifest.json",
+        "homepage_handoffs.json",
         "operations_summary.json",
         "release_readiness.json",
         "summary.json",
@@ -59,6 +60,40 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert set(evidence_manifest["artifacts"]) == expected_files - {"evidence_manifest.json"}
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
+
+
+def test_release_evidence_indexes_homepage_handoff_bundles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(artifact_root))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    run_artifact_dir = artifact_root / "run-homepage"
+    run_artifact_dir.mkdir(parents=True)
+    handoff_path = run_artifact_dir / "run-homepage-homepage-handoff.zip"
+    handoff_path.write_bytes(b"homepage handoff evidence")
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    handoffs = json.loads((output_dir / "homepage_handoffs.json").read_text(encoding="utf-8"))
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    expected_sha = hashlib.sha256(handoff_path.read_bytes()).hexdigest()
+    assert bundle.homepage_handoffs.total == 1
+    assert bundle.homepage_handoffs.items[0].run_id == "run-homepage"
+    assert bundle.homepage_handoffs.items[0].artifact_path == (
+        "run-homepage/run-homepage-homepage-handoff.zip"
+    )
+    assert bundle.homepage_handoffs.items[0].sha256 == expected_sha
+    assert handoffs["items"][0]["sha256"] == expected_sha
+    assert "homepage_handoffs.json" in bundle.summary.artifact_files
+    assert evidence_manifest["artifacts"]["homepage_handoffs.json"]["media_type"] == (
+        "application/json"
+    )
 
 
 def test_release_evidence_includes_latest_release_approval(

@@ -355,8 +355,10 @@ def test_cli_queue_and_manifest_commands(
     assert release_evidence_payload["summary"]["can_release"] is True
     assert release_evidence_payload["operations_summary"]["total_runs"] == 1
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
+    assert release_evidence_payload["homepage_handoffs"]["total"] == 0
     assert (release_evidence_dir / "summary.json").exists()
     assert (release_evidence_dir / "deployment_check.json").exists()
+    assert (release_evidence_dir / "homepage_handoffs.json").exists()
     assert (release_evidence_dir / "evidence_manifest.json").exists()
     assert (release_evidence_dir / "release_readiness.json").exists()
     evidence_manifest = json.loads(

@@ -504,6 +504,20 @@ class ReleaseEvidenceSummary(BaseModel):
     artifact_files: list[str] = Field(default_factory=list)
 
 
+class HomepageHandoffEvidenceItem(BaseModel):
+    run_id: str
+    artifact_path: str
+    size_bytes: int
+    sha256: str
+    updated_at: datetime
+
+
+class HomepageHandoffEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int
+    items: list[HomepageHandoffEvidenceItem] = Field(default_factory=list)
+
+
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
@@ -511,6 +525,7 @@ class ReleaseEvidenceBundle(BaseModel):
     operations_summary: OperationsSummary
     release_readiness: ReleaseReadinessReport
     deployment_check: DeploymentCheckReport
+    homepage_handoffs: HomepageHandoffEvidence
     latest_release_approval: ReleaseApprovalRecord | None = None
 
 

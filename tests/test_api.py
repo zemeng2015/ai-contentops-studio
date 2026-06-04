@@ -801,6 +801,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Release Gate Checks" in response.text
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
+    assert "Homepage Handoffs" in response.text
     assert "Download evidence bundle" in response.text
     assert "environment_template" in response.text
     assert "evidence_manifest.json" in response.text

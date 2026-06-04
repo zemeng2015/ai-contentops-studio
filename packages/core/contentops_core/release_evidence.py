@@ -23,6 +23,8 @@ from contentops_core.diagnostics import (
 from contentops_core.models import (
     ArtifactManifest,
     ArtifactMetadata,
+    HomepageHandoffEvidence,
+    HomepageHandoffEvidenceItem,
     ReleaseEvidenceBundle,
     ReleaseEvidenceSummary,
 )
@@ -45,11 +47,13 @@ def build_release_evidence(
     readiness = release_readiness(settings, repository, operations)
     preflight = deployment_check(settings, repository, operations)
     approval = _latest_release_approval(settings.artifact_root)
+    homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
     artifact_files = [
         "doctor.json",
         "deployment_check.json",
         "deployment_manifest.json",
         "evidence_manifest.json",
+        "homepage_handoffs.json",
         "operations_summary.json",
         "release_readiness.json",
         "summary.json",
@@ -70,6 +74,7 @@ def build_release_evidence(
         operations_summary=operations,
         release_readiness=readiness,
         deployment_check=preflight,
+        homepage_handoffs=homepage_handoffs,
         latest_release_approval=approval,
     )
 
@@ -84,6 +89,7 @@ def write_release_evidence(
         "doctor": bundle.doctor.model_dump(mode="json"),
         "deployment_check": bundle.deployment_check.model_dump(mode="json"),
         "deployment_manifest": bundle.deployment_manifest.model_dump(mode="json"),
+        "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
@@ -157,6 +163,38 @@ def _latest_release_approval(artifact_root: Path) -> Any | None:
     from contentops_core.release_approvals import latest_release_approval
 
     return latest_release_approval(artifact_root)
+
+
+def _homepage_handoff_evidence(artifact_root: Path, limit: int = 50) -> HomepageHandoffEvidence:
+    if not artifact_root.exists():
+        return HomepageHandoffEvidence(total=0)
+    paths = sorted(
+        artifact_root.rglob("*-homepage-handoff.zip"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    items = [_homepage_handoff_item(artifact_root, path) for path in paths[:limit]]
+    return HomepageHandoffEvidence(total=len(paths), items=items)
+
+
+def _homepage_handoff_item(
+    artifact_root: Path,
+    path: Path,
+) -> HomepageHandoffEvidenceItem:
+    stat = path.stat()
+    file_name = path.name
+    run_id = file_name.removesuffix("-homepage-handoff.zip")
+    try:
+        artifact_path = path.relative_to(artifact_root).as_posix()
+    except ValueError:
+        artifact_path = path.as_posix()
+    return HomepageHandoffEvidenceItem(
+        run_id=run_id,
+        artifact_path=artifact_path,
+        size_bytes=stat.st_size,
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
+    )
 
 
 def _evidence_manifest(output_dir: Path, artifact_files: list[str]) -> ArtifactManifest:

@@ -259,4 +259,6 @@ Publishing providers:
   records git branch/dirty state in the publish plan, and emits suggested `git add`, `commit`, and
   `push` commands for the homepage repo handoff. `contentops homepage-handoff` and
   `/runs/{id}/homepage-handoff` package the plan, generated article, eval report, and command list
-  into a reviewable zip before the homepage repository is committed.
+  into a reviewable zip before the homepage repository is committed. Release evidence indexes
+  generated homepage handoff zips in `homepage_handoffs.json` with path, size, digest, and update
+  time, keeping personal-site publish packages tied to the deployment evidence trail.

@@ -137,9 +137,9 @@ contentops release-gates --json
 contentops ops-trends --days 14 --json
 ```
 
-`release-evidence` writes system status, deployment preflight, release gates, and
-`evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence artifact, so CI
-output can be archived and compared during deployment reviews.
+`release-evidence` writes system status, deployment preflight, release gates, homepage handoff
+inventory, and `evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence
+artifact, so CI output can be archived and compared during deployment reviews.
 When a release approval exists, the evidence bundle also includes `release_approval.json` and the
 API response includes `latest_release_approval`, closing the audit loop between review and deploy.
 
