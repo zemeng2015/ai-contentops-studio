@@ -8,6 +8,7 @@ import typer
 import yaml
 from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
+    deployment_check,
     deployment_manifest,
     release_readiness,
     system_status,
@@ -153,6 +154,39 @@ def show_deployment_manifest() -> None:
     settings = Settings()
     manifest = deployment_manifest(settings, RunRepository(settings.database_url))
     typer.echo(manifest.model_dump_json(indent=2))
+
+
+@app.command("deployment-check")
+def show_deployment_check(
+    profile: Annotated[
+        str,
+        typer.Option(help="Environment template profile to include in deployment checks."),
+    ] = "production",
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to include in release gates."),
+    ] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    service = build_review_service(settings)
+    report = deployment_check(
+        settings,
+        RunRepository(settings.database_url),
+        service.operations_summary(window_size=window_size),
+        profile=profile,
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.can_deploy else 1)
+    typer.echo(f"Status: {report.status}")
+    typer.echo(f"Can deploy: {str(report.can_deploy).lower()}")
+    for check in report.checks:
+        typer.echo(f"- {check.name}: {check.status} - {check.message}")
+    raise typer.Exit(0 if report.can_deploy else 1)
 
 
 @app.command("release-readiness")

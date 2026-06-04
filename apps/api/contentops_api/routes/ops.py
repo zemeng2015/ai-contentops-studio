@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 
 from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
+    deployment_check,
     deployment_manifest,
     release_readiness,
     system_status,
@@ -22,6 +23,7 @@ from contentops_core.jobs import (
 from contentops_core.models import (
     AuditEventListResponse,
     CostReportListResponse,
+    DeploymentCheckReport,
     DeploymentManifest,
     IncidentReportListResponse,
     OperationsSummary,
@@ -87,6 +89,18 @@ def build_ops_router(
             content=render_env_template(profile),
             media_type="text/plain",
         )
+
+    @router.get(
+        "/deployment-check",
+        response_model=DeploymentCheckReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_deployment_check(
+        profile: str = Query(default="production", pattern="^(local|production)$"),
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> DeploymentCheckReport:
+        operations = review_service.operations_summary(window_size=window_size)
+        return deployment_check(settings, repository, operations, profile=profile)
 
     @router.get(
         "/release-readiness",

@@ -28,7 +28,9 @@ The same template can be generated from the installed CLI or fetched from the AP
 
 ```powershell
 contentops init-config --profile production --path .env.production
+contentops deployment-check --json
 Invoke-WebRequest http://127.0.0.1:8000/deployment-env-template -OutFile .env.production
+Invoke-RestMethod http://127.0.0.1:8000/deployment-check
 ```
 
 `CONTENTOPS_RUN_MIGRATIONS=true` tells the image entrypoint to run `alembic upgrade head` before

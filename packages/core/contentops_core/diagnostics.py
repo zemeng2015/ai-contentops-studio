@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contentops_core.config_templates import render_env_template
 from contentops_core.models import (
     ComponentCheck,
     DeploymentCapability,
+    DeploymentCheckItem,
+    DeploymentCheckReport,
     DeploymentManifest,
     OperationsSummary,
     ReleaseGateCheck,
@@ -67,6 +70,32 @@ def release_readiness(
         checks=checks,
         operations=operations,
         deployment=deployment,
+    )
+
+
+def deployment_check(
+    settings: Settings,
+    repository: RunRepository,
+    operations: OperationsSummary,
+    profile: str = "production",
+) -> DeploymentCheckReport:
+    deployment = deployment_manifest(settings, repository)
+    readiness = release_readiness(settings, repository, operations)
+    checks = [
+        _deployment_status_check(deployment),
+        _release_gate_check(readiness),
+        _capability_status_check(deployment),
+        _security_configuration_check(deployment),
+        _production_template_check(profile),
+    ]
+    status = _deployment_check_status(checks)
+    return DeploymentCheckReport(
+        profile=profile,
+        status=status,
+        can_deploy=status != "fail",
+        checks=checks,
+        deployment=deployment,
+        release_readiness=readiness,
     )
 
 
@@ -646,6 +675,123 @@ def _security_gate(deployment: DeploymentManifest) -> ReleaseGateCheck:
 
 
 def _release_status(checks: list[ReleaseGateCheck]) -> str:
+    statuses = {check.status for check in checks}
+    if "fail" in statuses:
+        return "fail"
+    if "warn" in statuses:
+        return "warn"
+    return "pass"
+
+
+def _deployment_status_check(deployment: DeploymentManifest) -> DeploymentCheckItem:
+    if deployment.status == "fail":
+        return DeploymentCheckItem(
+            name="system_status",
+            status="fail",
+            message="System readiness has failing checks.",
+            evidence={"status": deployment.status},
+        )
+    if deployment.status == "degraded":
+        return DeploymentCheckItem(
+            name="system_status",
+            status="warn",
+            message="System readiness is degraded; review before deploying.",
+            evidence={"status": deployment.status},
+        )
+    return DeploymentCheckItem(
+        name="system_status",
+        status="pass",
+        message="System readiness is passing.",
+        evidence={"status": deployment.status},
+    )
+
+
+def _release_gate_check(readiness: ReleaseReadinessReport) -> DeploymentCheckItem:
+    status = "pass" if readiness.status == "pass" else readiness.status
+    return DeploymentCheckItem(
+        name="release_gates",
+        status=status,
+        message="Release readiness gates are evaluated.",
+        evidence={
+            "release_status": readiness.status,
+            "can_release": readiness.can_release,
+            "gates": {check.name: check.status for check in readiness.checks},
+        },
+    )
+
+
+def _capability_status_check(deployment: DeploymentManifest) -> DeploymentCheckItem:
+    failed = [item.name for item in deployment.capabilities if item.status == "fail"]
+    degraded = [item.name for item in deployment.capabilities if item.status == "degraded"]
+    if failed:
+        return DeploymentCheckItem(
+            name="deployment_capabilities",
+            status="fail",
+            message="One or more deployment capabilities are failing.",
+            evidence={"failed": failed, "degraded": degraded},
+        )
+    if degraded:
+        return DeploymentCheckItem(
+            name="deployment_capabilities",
+            status="warn",
+            message="One or more deployment capabilities are degraded.",
+            evidence={"degraded": degraded},
+        )
+    return DeploymentCheckItem(
+        name="deployment_capabilities",
+        status="pass",
+        message="Deployment capabilities are ready.",
+    )
+
+
+def _security_configuration_check(deployment: DeploymentManifest) -> DeploymentCheckItem:
+    operator_configured = bool(deployment.security.get("operator_credentials_configured"))
+    read_protected = bool(deployment.security.get("read_routes_protected"))
+    if not operator_configured:
+        return DeploymentCheckItem(
+            name="api_security",
+            status="warn",
+            message="Operator API key should be configured before shared deployment.",
+            evidence={"read_routes_protected": read_protected},
+        )
+    if not read_protected:
+        return DeploymentCheckItem(
+            name="api_security",
+            status="warn",
+            message="Read API key protection is disabled.",
+            evidence={"operator_credentials_configured": operator_configured},
+        )
+    return DeploymentCheckItem(
+        name="api_security",
+        status="pass",
+        message="Operator and read-route protection are configured.",
+        evidence={"read_routes_protected": read_protected},
+    )
+
+
+def _production_template_check(profile: str) -> DeploymentCheckItem:
+    template = render_env_template(profile)
+    placeholders = sorted(
+        line.split("=", 1)[0]
+        for line in template.splitlines()
+        if "replace-with-" in line
+    )
+    if profile == "production" and placeholders:
+        return DeploymentCheckItem(
+            name="environment_template",
+            status="warn",
+            message="Production template contains placeholder values that must be replaced.",
+            evidence={"profile": profile, "placeholders": placeholders},
+        )
+    return DeploymentCheckItem(
+        name="environment_template",
+        status="pass",
+        message="Environment template profile is available.",
+        evidence={"profile": profile},
+    )
+
+
+def _deployment_check_status(checks: list[DeploymentCheckItem]) -> str:
     statuses = {check.status for check in checks}
     if "fail" in statuses:
         return "fail"

@@ -49,6 +49,7 @@ def test_cli_doctor_reports_system_status(
 
     result = runner.invoke(app, ["doctor", "--json"])
     manifest_result = runner.invoke(app, ["deployment-manifest"])
+    deployment_check_result = runner.invoke(app, ["deployment-check", "--json"])
     release_result = runner.invoke(app, ["release-readiness", "--json"])
 
     assert result.exit_code == 0
@@ -65,6 +66,13 @@ def test_cli_doctor_reports_system_status(
     assert manifest_payload["status"] in {"ok", "degraded"}
     assert manifest_payload["runtime"]["database_engine"] == "sqlite"
     assert "openai_api_key" not in manifest_result.output
+    assert deployment_check_result.exit_code == 0
+    deployment_check_payload = json.loads(deployment_check_result.output)
+    assert deployment_check_payload["profile"] == "production"
+    assert deployment_check_payload["status"] in {"pass", "warn"}
+    assert "environment_template" in {
+        item["name"] for item in deployment_check_payload["checks"]
+    }
     assert release_result.exit_code == 0
     release_payload = json.loads(release_result.output)
     assert release_payload["status"] in {"pass", "warn"}

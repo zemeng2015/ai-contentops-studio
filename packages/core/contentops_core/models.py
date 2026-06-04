@@ -470,6 +470,23 @@ class ReleaseEvidenceBundle(BaseModel):
     release_readiness: ReleaseReadinessReport
 
 
+class DeploymentCheckItem(BaseModel):
+    name: str
+    status: str
+    message: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class DeploymentCheckReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    profile: str
+    status: str
+    can_deploy: bool
+    checks: list[DeploymentCheckItem]
+    deployment: DeploymentManifest
+    release_readiness: ReleaseReadinessReport
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

@@ -151,6 +151,7 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /ops-summary
 GET  /deployment-manifest
+GET  /deployment-check
 GET  /deployment-env-template
 GET  /release-readiness
 GET  /release-evidence
@@ -164,6 +165,9 @@ configuration fixes, including missing API keys, scheduled research readiness, a
 database, and publishing-provider risks.
 Use `contentops init-config --profile production --path .env.production` or
 `GET /deployment-env-template` to generate the same production environment template.
+Use `contentops deployment-check --json` or `GET /deployment-check` as a pre-deploy gate that
+combines system readiness, deployment capabilities, release gates, API security, and env-template
+placeholder checks.
 
 ## Scheduled Jobs
 

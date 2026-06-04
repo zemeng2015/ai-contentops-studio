@@ -714,6 +714,7 @@ def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> s
       <p>
         <a href="/ready">System status JSON</a> |
         <a href="/deployment-manifest">Deployment manifest JSON</a> |
+        <a href="/deployment-check">Deployment check JSON</a> |
         <a href="/deployment-env-template">Production env template</a>
       </p>
       <div class="metrics">
