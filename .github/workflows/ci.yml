@@ -9,12 +9,15 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -47,15 +50,15 @@ jobs:
             --output release-gate/release-gate.json \
             --git-sha "$GITHUB_SHA" \
             --no-require-approval
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: deployment-check
           path: deployment-check/deployment-check.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-evidence
           path: release-evidence/*.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-gate
           path: release-gate/release-gate.json
@@ -65,7 +68,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build API image
         run: docker build -f infra/docker/Dockerfile -t ai-contentops-studio:ci .
 
@@ -75,8 +78,8 @@ jobs:
       run:
         working-directory: infra/aws/terraform
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: "1.8.5"
       - name: Terraform fmt

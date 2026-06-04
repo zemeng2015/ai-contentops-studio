@@ -37,7 +37,11 @@ def test_terraform_skeleton_contains_core_resources() -> None:
 def test_ci_validates_terraform() -> None:
     workflow = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 
-    assert "hashicorp/setup-terraform" in workflow
+    assert "permissions:\n  contents: read" in workflow
+    assert "actions/checkout@v5" in workflow
+    assert "actions/setup-python@v6" in workflow
+    assert "actions/upload-artifact@v7" in workflow
+    assert "hashicorp/setup-terraform@v4" in workflow
     assert "terraform fmt -check" in workflow
     assert "terraform validate" in workflow
     assert "pipelines/project_repository_updates.yaml" in workflow
@@ -46,7 +50,6 @@ def test_ci_validates_terraform() -> None:
     assert "scripts/generate_release_gate.py" in workflow
     assert "deployment-check/deployment-check.json" in workflow
     assert "release-gate/release-gate.json" in workflow
-    assert "actions/upload-artifact" in workflow
 
 
 def test_docker_image_contains_release_profile() -> None:
