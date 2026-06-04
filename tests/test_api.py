@@ -884,6 +884,8 @@ def test_dashboard_job_execution_trends_renders() -> None:
     assert "Worker Execution Trends" in response.text
     assert "Worker execution trends JSON" in response.text
     assert "Handoff success" in response.text
+    assert "Failure Diagnostics" in response.text
+    assert "Latest execution" in response.text
 
 
 def test_dashboard_system_status_renders() -> None:
@@ -921,6 +923,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
     assert "Worker Execution Trends" in response.text
+    assert "Worker Failure Diagnostics" in response.text
     assert "Download evidence bundle" in response.text
     assert "environment_template" in response.text
     assert "evidence_manifest.json" in response.text

@@ -156,8 +156,9 @@ blocking ordinary CI.
 When homepage handoff zip files exist under the artifact root, `homepage_handoffs.json` records
 their run id, relative artifact path, size, SHA-256 digest, and update time so personal homepage
 publishing packages remain part of the release review trail.
-`worker_execution_trends.json` records recent scheduled automation success, publish, handoff, and
-action-required rates so release reviewers can see whether recurring content operations are healthy.
+`worker_execution_trends.json` records recent scheduled automation success, publish, handoff,
+action-required rates, latest success/failure timestamps, and top failure reasons so release
+reviewers can see whether recurring content operations are healthy and why they degraded.
 If a release approval has been recorded, the same bundle includes `release_approval.json` and the
 API response exposes it as `latest_release_approval`.
 The same bundle is also available through the product surface:

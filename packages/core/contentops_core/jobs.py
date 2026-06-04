@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -115,6 +116,14 @@ class JobExecutionTrendBucket(BaseModel):
     success_rate: float = Field(ge=0, le=1)
     publish_rate: float = Field(ge=0, le=1)
     handoff_success_rate: float = Field(ge=0, le=1)
+    top_failure_reasons: list[JobExecutionFailureReason] = Field(default_factory=list)
+
+
+class JobExecutionFailureReason(BaseModel):
+    reason: str
+    count: int = Field(ge=0)
+    latest_execution_id: str | None = None
+    latest_at: datetime | None = None
 
 
 class JobExecutionTrendSummary(BaseModel):
@@ -130,6 +139,9 @@ class JobExecutionTrendSummary(BaseModel):
     success_rate: float = Field(ge=0, le=1)
     publish_rate: float = Field(ge=0, le=1)
     handoff_success_rate: float = Field(ge=0, le=1)
+    latest_success_at: datetime | None = None
+    latest_failure_at: datetime | None = None
+    top_failure_reasons: list[JobExecutionFailureReason] = Field(default_factory=list)
 
 
 class JobExecutionTrendReport(BaseModel):
@@ -508,6 +520,7 @@ def _job_execution_trend_bucket(
         success_rate=summary.success_rate,
         publish_rate=summary.publish_rate,
         handoff_success_rate=summary.handoff_success_rate,
+        top_failure_reasons=summary.top_failure_reasons,
     )
 
 
@@ -522,6 +535,18 @@ def _job_execution_trend_summary(
     handoff_ready = sum(summary.homepage_handoff_ready for summary in summaries)
     handoff_failed = sum(summary.homepage_handoff_failed for summary in summaries)
     handoff_total = handoff_ready + handoff_failed
+    latest_success_at = max(
+        (report.completed_at for report in reports if report.failed == 0),
+        default=None,
+    )
+    latest_failure_at = max(
+        (
+            report.completed_at
+            for report in reports
+            if job_execution_summary(report).action_required
+        ),
+        default=None,
+    )
     return JobExecutionTrendSummary(
         execution_count=len(reports),
         total_jobs=total_jobs,
@@ -535,7 +560,59 @@ def _job_execution_trend_summary(
         success_rate=_ratio(succeeded_jobs, total_jobs),
         publish_rate=_ratio(published_runs, generated_runs),
         handoff_success_rate=_ratio(handoff_ready, handoff_total),
+        latest_success_at=latest_success_at,
+        latest_failure_at=latest_failure_at,
+        top_failure_reasons=_top_failure_reasons(reports),
     )
+
+
+def _top_failure_reasons(
+    reports: list[JobExecutionReport],
+    limit: int = 5,
+) -> list[JobExecutionFailureReason]:
+    counts: Counter[str] = Counter()
+    latest: dict[str, tuple[str, datetime]] = {}
+    for report in reports:
+        for reason in _job_execution_failure_reasons(report):
+            counts[reason] += 1
+            current = latest.get(reason)
+            if current is None or report.completed_at > current[1]:
+                latest[reason] = (report.execution_id, report.completed_at)
+    return [
+        JobExecutionFailureReason(
+            reason=reason,
+            count=count,
+            latest_execution_id=latest[reason][0],
+            latest_at=latest[reason][1],
+        )
+        for reason, count in counts.most_common(limit)
+    ]
+
+
+def _job_execution_failure_reasons(report: JobExecutionReport) -> list[str]:
+    reasons: list[str] = []
+    if report.dry_run:
+        reasons.append("dry run: execution did not generate persisted runs")
+    if report.release_evidence_error:
+        reasons.append(
+            f"release evidence: {_normalize_failure_reason(report.release_evidence_error)}"
+        )
+    for result in report.results:
+        if result.error:
+            reasons.append(f"{result.job_name}: {_normalize_failure_reason(result.error)}")
+        if result.homepage_handoff_error:
+            reasons.append(
+                f"{result.job_name} homepage handoff: "
+                f"{_normalize_failure_reason(result.homepage_handoff_error)}"
+            )
+        if not result.error and str(result.status) == "failed":
+            reasons.append(f"{result.job_name}: failed status without error detail")
+    return reasons
+
+
+def _normalize_failure_reason(reason: str) -> str:
+    normalized = " ".join(reason.strip().split())
+    return normalized[:180] if normalized else "unknown failure"
 
 
 def _date_range(start: date, end: date) -> list[date]:

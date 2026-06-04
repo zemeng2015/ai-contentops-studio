@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -230,12 +231,14 @@ def test_job_execution_summary_counts_outcomes() -> None:
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
     receipt_dir = tmp_path / "receipts"
+    completed_at = datetime.now(UTC)
     first = JobExecutionReport(
         name="first",
         total=2,
         succeeded=2,
         failed=0,
         release_evidence_path="release-evidence/first",
+        completed_at=completed_at - timedelta(minutes=5),
         results=[
             JobRunResult(
                 job_name="published",
@@ -260,6 +263,8 @@ def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
         total=1,
         succeeded=0,
         failed=1,
+        release_evidence_error="release evidence archive failed",
+        completed_at=completed_at,
         results=[
             JobRunResult(
                 job_name="failed",
@@ -286,7 +291,15 @@ def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
     assert report.summary.homepage_handoff_failed == 1
     assert report.summary.action_required == 1
     assert report.summary.success_rate == pytest.approx(2 / 3)
+    assert report.summary.latest_success_at == first.completed_at
+    assert report.summary.latest_failure_at == second.completed_at
+    assert [reason.reason for reason in report.summary.top_failure_reasons] == [
+        "release evidence: release evidence archive failed",
+        "failed: provider failed",
+        "failed homepage handoff: missing homepage repo",
+    ]
     assert report.buckets[-1].execution_count == 2
+    assert report.buckets[-1].top_failure_reasons[0].latest_execution_id == second.execution_id
 
 
 def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:

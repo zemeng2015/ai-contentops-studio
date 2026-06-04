@@ -464,6 +464,15 @@ def test_cli_job_execution_commands(
     assert trends_result.exit_code == 0
     trends_payload = json.loads(trends_result.output)
     assert trends_payload["summary"]["execution_count"] == 1
+    assert trends_payload["summary"]["latest_failure_at"] is not None
+    assert trends_payload["summary"]["top_failure_reasons"] == [
+        {
+            "reason": "dry run: execution did not generate persisted runs",
+            "count": 1,
+            "latest_execution_id": report.execution_id,
+            "latest_at": trends_payload["summary"]["latest_failure_at"],
+        }
+    ]
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

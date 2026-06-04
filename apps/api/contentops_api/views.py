@@ -761,6 +761,29 @@ def _ops_trends_html(report: OpsTrendReport) -> str:
 
 
 def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
+    latest_success = (
+        report.summary.latest_success_at.isoformat() if report.summary.latest_success_at else "n/a"
+    )
+    latest_failure = (
+        report.summary.latest_failure_at.isoformat() if report.summary.latest_failure_at else "n/a"
+    )
+    failure_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(reason.reason)}</td>
+          <td>{reason.count}</td>
+          <td>{escape(reason.latest_execution_id or "n/a")}</td>
+          <td>{escape(reason.latest_at.isoformat() if reason.latest_at else "n/a")}</td>
+        </tr>
+        """
+        for reason in report.summary.top_failure_reasons
+    )
+    if not failure_rows:
+        failure_rows = """
+        <tr>
+          <td colspan="4"><span class="muted">No worker failure reasons recorded.</span></td>
+        </tr>
+        """
     rows = "".join(
         f"""
         <tr>
@@ -794,7 +817,22 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
           <strong>{report.summary.handoff_success_rate:.0%}</strong>
           <span>Handoff success</span>
         </div>
+        <div>
+          <strong>{escape(latest_success)}</strong>
+          <span>Latest success</span>
+        </div>
+        <div>
+          <strong>{escape(latest_failure)}</strong>
+          <span>Latest action</span>
+        </div>
       </div>
+      <h2>Failure Diagnostics</h2>
+      <table>
+        <thead>
+          <tr><th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th></tr>
+        </thead>
+        <tbody>{failure_rows}</tbody>
+      </table>
       <table>
         <thead>
           <tr>
@@ -1088,6 +1126,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     can_deploy = str(bundle.deployment_check.can_deploy).lower()
     worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
     worker_buckets = bundle.worker_execution_trends.get("buckets", [])
+    worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
     gate_rows = "".join(
         f"""
         <tr>
@@ -1167,6 +1206,24 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="5"><span class="muted">No worker execution trend data recorded.</span></td>
         </tr>
         """
+    worker_failure_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(str(reason.get("reason", "n/a")))}</td>
+          <td>{escape(str(reason.get("count", 0)))}</td>
+          <td>{escape(str(reason.get("latest_execution_id") or "n/a"))}</td>
+          <td>{escape(str(reason.get("latest_at") or "n/a"))}</td>
+        </tr>
+        """
+        for reason in worker_failure_reasons
+        if isinstance(reason, dict)
+    )
+    if not worker_failure_rows:
+        worker_failure_rows = """
+        <tr>
+          <td colspan="4"><span class="muted">No worker failure reasons recorded.</span></td>
+        </tr>
+        """
     return f"""
       <p>
         <a href="/release-evidence/bundle">Download evidence bundle</a> |
@@ -1230,6 +1287,13 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <tr><th>Date</th><th>Executions</th><th>Generated</th><th>Published</th><th>Action</th></tr>
         </thead>
         <tbody>{worker_trend_rows}</tbody>
+      </table>
+      <h2>Worker Failure Diagnostics</h2>
+      <table>
+        <thead>
+          <tr><th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th></tr>
+        </thead>
+        <tbody>{worker_failure_rows}</tbody>
       </table>
     """
 

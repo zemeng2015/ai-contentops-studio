@@ -240,7 +240,9 @@ Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
 and file list in the job execution receipt. Use `--release-evidence-dir` to choose a specific
 evidence directory, or `--skip-release-evidence` for local smoke tests that should only write the
-worker receipt.
+worker receipt. Worker execution trends also report the latest successful execution, the latest
+action-required execution, and the most common failure reasons so recurring automation issues can be
+triaged from the dashboard or release evidence bundle.
 Set `homepage_handoff: true` on a job when the homepage publisher is configured and the scheduled
 run should prepare a reviewable GitHub Pages handoff zip after the draft is generated. The handoff
 path and any handoff error are stored on that job's execution result, and the post-run release
