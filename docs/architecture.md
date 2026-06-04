@@ -91,7 +91,9 @@ system a real editorial control point instead of treating publish as a casual bu
 Approval also enforces operational governance: the run scorecard must pass and the estimated token
 budget must remain within the configured per-run budget before an approval record is written.
 The review queue supports batch approve and reject operations through the API, CLI, and dashboard;
-each item returns its own result so one invalid run does not mask the rest of the batch.
+each item returns its own result so one invalid run does not mask the rest of the batch. Worker
+execution detail pages and `POST /job-executions/{id}/approve-runs` also approve all generated run
+ids from one scheduled execution, giving operators a natural review unit for recurring calendars.
 Successful publishes write `publish-receipt.json`, which links the public URL back to the run,
 publisher, approval record, force flag, publish plan items, before/after file hashes, and rollback
 hints. Existing publish targets are backed up under the run artifact directory before they are

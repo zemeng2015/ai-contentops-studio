@@ -63,6 +63,9 @@ for CI/CD release reviews.
 If a scheduled job declares `homepage_handoff: true`, inspect `homepage_handoff_path` on that job
 result before committing the personal homepage repository. A populated `homepage_handoff_error`
 usually means the homepage publisher is not configured or the target path is not a git repository.
+After reviewing a successful scheduled execution, use the dashboard job execution detail page or
+`POST /job-executions/{execution_id}/approve-runs` to approve every generated run from that
+execution as one operator action.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

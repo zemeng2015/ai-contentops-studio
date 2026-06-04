@@ -147,6 +147,11 @@ class ReviewBatchRequest(BaseModel):
     notes: str = ""
 
 
+class JobExecutionReviewRequest(BaseModel):
+    reviewer: str = "operator"
+    notes: str = ""
+
+
 class ReviewActionResult(BaseModel):
     run_id: str
     action: str

@@ -10,7 +10,9 @@ from contentops_api.routes.dashboard import build_dashboard_router
 from contentops_api.routes.runs import build_runs_router
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
+    JobExecutionReport,
     JobRunner,
+    JobRunResult,
     job_execution_dir,
     load_job_file,
     write_job_execution_report,
@@ -746,6 +748,46 @@ def test_review_queue_batch_approve_returns_per_run_results() -> None:
     assert "Run not found" in payload["results"][2]["error"]
 
 
+def test_job_execution_runs_can_be_batch_approved() -> None:
+    client = TestClient(app)
+
+    first = client.post("/runs", json={"topic": "Execution approve first"}).json()
+    second = client.post("/runs", json={"topic": "Execution approve second"}).json()
+    report = JobExecutionReport(
+        name="execution-approval",
+        total=2,
+        succeeded=2,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="first",
+                topic=first["topic"],
+                status=first["status"],
+                run_id=first["id"],
+            ),
+            JobRunResult(
+                job_name="second",
+                topic=second["topic"],
+                status=second["status"],
+                run_id=second["id"],
+            ),
+        ],
+    )
+    write_job_execution_report(report, job_execution_dir(settings.artifact_root))
+
+    response = client.post(
+        f"/job-executions/{report.execution_id}/approve-runs",
+        json={"reviewer": "zack", "notes": "Reviewed from execution."},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["action"] == "approve"
+    assert [item["status"] for item in payload["results"]] == ["ok", "ok"]
+    assert client.get(f"/runs/{first['id']}").json()["status"] == "approved"
+    assert client.get(f"/runs/{second['id']}").json()["status"] == "approved"
+
+
 def test_dashboard_renders() -> None:
     client = TestClient(app)
 
@@ -889,6 +931,48 @@ def test_dashboard_can_approve_run() -> None:
     assert response.status_code == 303
     assert approval_response.status_code == 200
     assert approval_response.json()["decision"] == "approved"
+
+
+def test_dashboard_can_approve_runs_from_job_execution() -> None:
+    client = TestClient(app)
+
+    first = client.post("/runs", json={"topic": "Dashboard execution approve first"}).json()
+    second = client.post("/runs", json={"topic": "Dashboard execution approve second"}).json()
+    report = JobExecutionReport(
+        name="dashboard-execution-approval",
+        total=2,
+        succeeded=2,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="first",
+                topic=first["topic"],
+                status=first["status"],
+                run_id=first["id"],
+            ),
+            JobRunResult(
+                job_name="second",
+                topic=second["topic"],
+                status=second["status"],
+                run_id=second["id"],
+            ),
+        ],
+    )
+    write_job_execution_report(report, job_execution_dir(settings.artifact_root))
+
+    detail = client.get(f"/dashboard/job-executions/{report.execution_id}")
+    response = client.post(
+        f"/dashboard/job-executions/{report.execution_id}/approve-runs",
+        data={"reviewer": "zack", "notes": "Approved execution."},
+        follow_redirects=False,
+    )
+
+    assert detail.status_code == 200
+    assert "Execution Review" in detail.text
+    assert "Approve generated runs" in detail.text
+    assert response.status_code == 303
+    assert client.get(f"/runs/{first['id']}").json()["status"] == RunStatus.APPROVED.value
+    assert client.get(f"/runs/{second['id']}").json()["status"] == RunStatus.APPROVED.value
 
 
 def test_dashboard_can_batch_reject_runs() -> None:

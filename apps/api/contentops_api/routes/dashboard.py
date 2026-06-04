@@ -12,6 +12,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     get_job_execution_report,
     job_execution_dir,
+    job_execution_run_ids,
     list_job_execution_reports,
     list_worker_job_catalog,
 )
@@ -401,6 +402,22 @@ def build_dashboard_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        execution_run_ids = job_execution_run_ids(report)
+        approval_form = ""
+        if execution_run_ids:
+            approval_action = (
+                f"/dashboard/job-executions/{escape(report.execution_id)}/approve-runs"
+                f"{_api_key_query(api_key)}"
+            )
+            approval_form = f"""
+              <h3>Execution Review</h3>
+              <form method="post" action="{approval_action}">
+                {_api_key_hidden(api_key)}
+                <input name="reviewer" placeholder="Reviewer" value="operator">
+                <input name="notes" placeholder="Approval notes">
+                <button type="submit">Approve generated runs</button>
+              </form>
+            """
         return HTMLResponse(
             _page(
                 f"Job Execution {report.execution_id}",
@@ -408,11 +425,40 @@ def build_dashboard_router(
                 <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
                 <section class="hero">
                   {_job_execution_detail_html(report)}
+                  {approval_form}
                   <h3>S3 Mirror Log</h3>
                   {_s3_mirror_log_html(_job_execution_s3_mirror_log(report))}
                 </section>
                 """,
             )
+        )
+
+
+    @router.post(
+        "/dashboard/job-executions/{execution_id}/approve-runs",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_approve_job_execution_runs(
+        execution_id: str,
+        api_key: str = Query(default=""),
+        reviewer: Annotated[str, Form()] = "operator",
+        notes: Annotated[str, Form()] = "",
+    ) -> RedirectResponse:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        review_service.approve_many(
+            job_execution_run_ids(report),
+            reviewer=reviewer,
+            notes=notes,
+        )
+        return RedirectResponse(
+            f"/dashboard/job-executions/{execution_id}{_api_key_query(api_key)}",
+            status_code=303,
         )
 
 

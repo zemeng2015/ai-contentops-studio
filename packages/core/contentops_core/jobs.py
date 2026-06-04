@@ -364,6 +364,17 @@ def job_recovery_plan(receipt_dir: Path, execution_id: str) -> JobRecoveryPlan:
     )
 
 
+def job_execution_run_ids(report: JobExecutionReport) -> list[str]:
+    seen: set[str] = set()
+    run_ids: list[str] = []
+    for result in report.results:
+        if result.run_id is None or result.run_id in seen:
+            continue
+        seen.add(result.run_id)
+        run_ids.append(result.run_id)
+    return run_ids
+
+
 def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:
     if not receipt_dir.exists():
         return []

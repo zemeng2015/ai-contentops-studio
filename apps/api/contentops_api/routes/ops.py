@@ -17,6 +17,7 @@ from contentops_core.jobs import (
     WorkerJobCatalogResponse,
     get_job_execution_report,
     job_execution_dir,
+    job_execution_run_ids,
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -28,6 +29,7 @@ from contentops_core.models import (
     DeploymentCheckReport,
     DeploymentManifest,
     IncidentReportListResponse,
+    JobExecutionReviewRequest,
     OperationsSummary,
     OpsTrendReport,
     PublishedContentListResponse,
@@ -39,6 +41,7 @@ from contentops_core.models import (
     ReleaseGateReport,
     ReleaseReadinessReport,
     RetentionReport,
+    ReviewBatchResult,
     RunStatus,
     ScorecardListResponse,
     SystemStatus,
@@ -283,6 +286,28 @@ def build_ops_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.post(
+        "/job-executions/{execution_id}/approve-runs",
+        response_model=ReviewBatchResult,
+        dependencies=[Depends(require_operator)],
+    )
+    def approve_job_execution_runs(
+        execution_id: str,
+        request: JobExecutionReviewRequest,
+    ) -> ReviewBatchResult:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return review_service.approve_many(
+            job_execution_run_ids(report),
+            reviewer=request.reviewer,
+            notes=request.notes,
+        )
 
     @router.get(
         "/content",
