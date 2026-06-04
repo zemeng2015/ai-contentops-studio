@@ -912,6 +912,8 @@ def _unique_recommendations(items: list[dict[str, str]]) -> list[dict[str, str]]
 
 def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     summary = bundle.summary
+    deploy_status = escape(bundle.deployment_check.status)
+    can_deploy = str(bundle.deployment_check.can_deploy).lower()
     gate_rows = "".join(
         f"""
         <tr>
@@ -922,6 +924,17 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </tr>
         """
         for check in bundle.release_readiness.checks
+    )
+    preflight_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(check.name)}</td>
+          <td><span class="pill">{escape(check.status)}</span></td>
+          <td>{escape(check.message)}</td>
+          <td><pre>{escape(json.dumps(check.evidence, ensure_ascii=False, indent=2))}</pre></td>
+        </tr>
+        """
+        for check in bundle.deployment_check.checks
     )
     capability_rows = "".join(
         f"""
@@ -953,11 +966,20 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <div class="metrics">
         <div><strong>{escape(summary.release_status)}</strong><span>Release status</span></div>
         <div><strong>{str(summary.can_release).lower()}</strong><span>Can release</span></div>
+        <div><strong>{deploy_status}</strong><span>Deploy status</span></div>
+        <div><strong>{can_deploy}</strong><span>Can deploy</span></div>
         <div><strong>{escape(summary.doctor_status)}</strong><span>Doctor status</span></div>
         <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
+      <h2>Deployment Preflight</h2>
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
+        </thead>
+        <tbody>{preflight_rows}</tbody>
+      </table>
       <h2>Release Gate Checks</h2>
       <table>
         <thead>

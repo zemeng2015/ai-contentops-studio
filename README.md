@@ -172,6 +172,8 @@ placeholder checks.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.
+The release evidence dashboard also renders those preflight checks for human review before a
+deployment is approved.
 
 ## Scheduled Jobs
 
