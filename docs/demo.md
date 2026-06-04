@@ -27,6 +27,7 @@ The same data is available through API and CLI surfaces:
 ```powershell
 docker compose exec api contentops runs
 docker compose exec api contentops ops-summary --json
+docker compose exec api contentops ops-trends --days 4 --json
 docker compose exec api contentops content --json
 docker compose exec api contentops release-readiness --json
 ```
@@ -65,6 +66,8 @@ http://127.0.0.1:8000/dashboard
 ## What to Inspect
 
 - Dashboard queue depth, operations summary, scorecards, incidents, and published content.
+- Operations trends at `/dashboard/ops-trends?days=4` for daily throughput, quality, budget, and
+  incident posture.
 - Content calendar page at `/dashboard/worker-jobs` with review-first GitHub project update jobs.
 - Worker execution detail pages that connect automation receipts back to generated runs.
 - Run detail pages with workflow context, source audit, evaluation report, timeline, publish plan,

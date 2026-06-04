@@ -65,6 +65,17 @@ def test_docker_image_contains_release_profile() -> None:
     assert "os.execvp" in entrypoint
 
 
+def test_showcase_documents_ops_trends_screenshot() -> None:
+    asset = Path("docs/assets/ops-trends-dashboard.png")
+    readme = Path("README.md").read_text(encoding="utf-8")
+    showcase = Path("docs/showcase.md").read_text(encoding="utf-8")
+
+    assert asset.exists()
+    assert asset.stat().st_size > 0
+    assert "docs/assets/ops-trends-dashboard.png" in readme
+    assert "assets/ops-trends-dashboard.png" in showcase
+
+
 def test_production_env_template_documents_required_release_settings() -> None:
     template = Path("config/production.env.example").read_text(encoding="utf-8")
 

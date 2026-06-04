@@ -29,6 +29,8 @@ approved work, and stores receipts so every run can be inspected later.
 
 ![AI ContentOps Studio dashboard](docs/assets/dashboard-screenshot.png)
 
+![AI ContentOps Studio operations trends](docs/assets/ops-trends-dashboard.png)
+
 ![AI ContentOps Studio architecture overview](docs/assets/architecture-overview.svg)
 
 ## Quick Start

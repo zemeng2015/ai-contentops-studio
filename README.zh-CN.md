@@ -27,6 +27,8 @@ AI ContentOps Studio 是一个开源平台，用来把 AI 和技术选题变成�
 
 ![AI ContentOps Studio dashboard](docs/assets/dashboard-screenshot.png)
 
+![AI ContentOps Studio operations trends](docs/assets/ops-trends-dashboard.png)
+
 ![AI ContentOps Studio architecture overview](docs/assets/architecture-overview.svg)
 
 ## 快速 Demo

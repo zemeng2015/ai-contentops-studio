@@ -14,6 +14,8 @@ checks, approval gates, publishing receipts, scheduled workers, and AWS-ready ob
 
 ![AI ContentOps Studio dashboard](assets/dashboard-screenshot.png)
 
+![AI ContentOps Studio operations trends](assets/ops-trends-dashboard.png)
+
 ## Architecture Snapshot
 
 ![AI ContentOps Studio architecture overview](assets/architecture-overview.svg)
@@ -32,13 +34,14 @@ understand the business value before they inspect the source code.
 ## Two-Minute Demo Script
 
 1. Open `/dashboard` and show the three statuses: `needs_review`, `approved`, and `published`.
-2. Open a run detail page and point to the source review, scorecard, cost report, and incident
+2. Open `/dashboard/ops-trends` and show daily throughput, quality, budget, and incident posture.
+3. Open a run detail page and point to the source review, scorecard, cost report, and incident
    report.
-3. Approve a run and explain that publishing is gated by review.
-4. Publish the approved run and open the publish receipt.
-5. Show `/release-evidence` or `contentops release-evidence` to prove the system has operational
+4. Approve a run and explain that publishing is gated by review.
+5. Publish the approved run and open the publish receipt.
+6. Show `/release-evidence` or `contentops release-evidence` to prove the system has operational
    evidence.
-6. Mention the AWS Terraform layer: scheduled worker, S3 artifacts, RDS metadata, CloudWatch
+7. Mention the AWS Terraform layer: scheduled worker, S3 artifacts, RDS metadata, CloudWatch
    dashboard, and alarms.
 
 ## Interview Talking Points
@@ -47,6 +50,7 @@ understand the business value before they inspect the source code.
   search, S3, or database implementations.
 - Every run writes artifacts, so generated content is inspectable instead of opaque.
 - Quality gates and approval records make publishing a controlled workflow.
+- Operations trends show whether throughput, quality, cost, and incidents are improving over time.
 - Worker receipts and recovery plans make scheduled automation debuggable.
 - Terraform and CloudWatch resources show how the same app can move from local demo to an
   AWS-shaped production environment.
