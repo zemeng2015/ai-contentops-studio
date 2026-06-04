@@ -482,6 +482,28 @@ def test_review_service_batch_approve_records_partial_results(tmp_path: Path) ->
     assert review_service.approval(first.id) is not None
 
 
+def test_review_service_batch_publish_records_partial_results(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    pipeline = build_pipeline(settings)
+    approved = pipeline.run(RunRequest(topic="Batch publish approved")).run
+    blocked = pipeline.run(RunRequest(topic="Batch publish blocked")).run
+    review_service = build_review_service(settings)
+    review_service.approve(approved.id, reviewer="zack")
+
+    result = review_service.publish_many([approved.id, blocked.id, "missing-run"])
+
+    assert result.action == "publish"
+    assert [item.status for item in result.results] == ["ok", "failed", "failed"]
+    assert result.results[0].new_status == RunStatus.PUBLISHED
+    assert "approved before publishing" in str(result.results[1].error)
+    assert "Run not found" in str(result.results[2].error)
+    assert review_service.publish_receipt(approved.id) is not None
+
+
 def test_review_service_records_forced_publish_receipt(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",

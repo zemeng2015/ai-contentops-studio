@@ -29,6 +29,7 @@ from contentops_core.models import (
     DeploymentCheckReport,
     DeploymentManifest,
     IncidentReportListResponse,
+    JobExecutionPublishRequest,
     JobExecutionReviewRequest,
     OperationsSummary,
     OpsTrendReport,
@@ -307,6 +308,27 @@ def build_ops_router(
             job_execution_run_ids(report),
             reviewer=request.reviewer,
             notes=request.notes,
+        )
+
+    @router.post(
+        "/job-executions/{execution_id}/publish-runs",
+        response_model=ReviewBatchResult,
+        dependencies=[Depends(require_operator)],
+    )
+    def publish_job_execution_runs(
+        execution_id: str,
+        request: JobExecutionPublishRequest,
+    ) -> ReviewBatchResult:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return review_service.publish_many(
+            job_execution_run_ids(report),
+            force=request.force,
         )
 
     @router.get(

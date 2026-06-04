@@ -66,6 +66,9 @@ usually means the homepage publisher is not configured or the target path is not
 After reviewing a successful scheduled execution, use the dashboard job execution detail page or
 `POST /job-executions/{execution_id}/approve-runs` to approve every generated run from that
 execution as one operator action.
+Then use the same dashboard detail page or `POST /job-executions/{execution_id}/publish-runs` to
+publish approved runs from the execution. The response is per-run, so keep any failed item in the
+review queue and inspect its run detail before retrying or forcing publication.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

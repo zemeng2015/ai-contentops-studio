@@ -94,6 +94,9 @@ The review queue supports batch approve and reject operations through the API, C
 each item returns its own result so one invalid run does not mask the rest of the batch. Worker
 execution detail pages and `POST /job-executions/{id}/approve-runs` also approve all generated run
 ids from one scheduled execution, giving operators a natural review unit for recurring calendars.
+After approval, `POST /job-executions/{id}/publish-runs` applies the same publish gates per run and
+returns individual success or failure records, so one blocked article does not hide successful
+publishes from the same worker execution.
 Successful publishes write `publish-receipt.json`, which links the public URL back to the run,
 publisher, approval record, force flag, publish plan items, before/after file hashes, and rollback
 hints. Existing publish targets are backed up under the run artifact directory before they are

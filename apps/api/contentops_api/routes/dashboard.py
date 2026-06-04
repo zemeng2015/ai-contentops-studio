@@ -403,19 +403,30 @@ def build_dashboard_router(
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         execution_run_ids = job_execution_run_ids(report)
-        approval_form = ""
+        execution_review_forms = ""
         if execution_run_ids:
             approval_action = (
                 f"/dashboard/job-executions/{escape(report.execution_id)}/approve-runs"
                 f"{_api_key_query(api_key)}"
             )
-            approval_form = f"""
+            publish_action = (
+                f"/dashboard/job-executions/{escape(report.execution_id)}/publish-runs"
+                f"{_api_key_query(api_key)}"
+            )
+            execution_review_forms = f"""
               <h3>Execution Review</h3>
               <form method="post" action="{approval_action}">
                 {_api_key_hidden(api_key)}
                 <input name="reviewer" placeholder="Reviewer" value="operator">
                 <input name="notes" placeholder="Approval notes">
                 <button type="submit">Approve generated runs</button>
+              </form>
+              <form method="post" action="{publish_action}">
+                {_api_key_hidden(api_key)}
+                <label>
+                  <input type="checkbox" name="force" value="true"> force publish
+                </label>
+                <button type="submit">Publish approved runs</button>
               </form>
             """
         return HTMLResponse(
@@ -425,7 +436,7 @@ def build_dashboard_router(
                 <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
                 <section class="hero">
                   {_job_execution_detail_html(report)}
-                  {approval_form}
+                  {execution_review_forms}
                   <h3>S3 Mirror Log</h3>
                   {_s3_mirror_log_html(_job_execution_s3_mirror_log(report))}
                 </section>
@@ -456,6 +467,29 @@ def build_dashboard_router(
             reviewer=reviewer,
             notes=notes,
         )
+        return RedirectResponse(
+            f"/dashboard/job-executions/{execution_id}{_api_key_query(api_key)}",
+            status_code=303,
+        )
+
+
+    @router.post(
+        "/dashboard/job-executions/{execution_id}/publish-runs",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_publish_job_execution_runs(
+        execution_id: str,
+        api_key: str = Query(default=""),
+        force: Annotated[bool, Form()] = False,
+    ) -> RedirectResponse:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        review_service.publish_many(job_execution_run_ids(report), force=force)
         return RedirectResponse(
             f"/dashboard/job-executions/{execution_id}{_api_key_query(api_key)}",
             status_code=303,

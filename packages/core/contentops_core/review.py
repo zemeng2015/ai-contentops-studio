@@ -360,6 +360,35 @@ class ReviewService:
             notes=notes,
         )
 
+    def publish_many(
+        self,
+        run_ids: list[str],
+        force: bool = False,
+    ) -> ReviewBatchResult:
+        results: list[ReviewActionResult] = []
+        for run_id in run_ids:
+            try:
+                run = self.publish(run_id, force=force)
+            except (FileNotFoundError, ValueError) as exc:
+                results.append(
+                    ReviewActionResult(
+                        run_id=run_id,
+                        action="publish",
+                        status="failed",
+                        error=str(exc),
+                    )
+                )
+                continue
+            results.append(
+                ReviewActionResult(
+                    run_id=run_id,
+                    action="publish",
+                    status="ok",
+                    new_status=run.status,
+                )
+            )
+        return ReviewBatchResult(action="publish", results=results)
+
     def audit_log(self, run_id: str) -> list[AuditEvent]:
         run = self._get_run(run_id)
         path = run.artifact_dir / "audit-log.json"

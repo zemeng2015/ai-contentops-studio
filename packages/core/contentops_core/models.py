@@ -152,6 +152,10 @@ class JobExecutionReviewRequest(BaseModel):
     notes: str = ""
 
 
+class JobExecutionPublishRequest(BaseModel):
+    force: bool = False
+
+
 class ReviewActionResult(BaseModel):
     run_id: str
     action: str
