@@ -168,6 +168,21 @@ def build_runs_router(
         )
 
 
+    @router.get("/runs/{run_id}/homepage-handoff", dependencies=[Depends(require_read_access)])
+    def get_homepage_handoff(run_id: str) -> FileResponse:
+        try:
+            bundle_path = review_service.create_homepage_handoff(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return FileResponse(
+            bundle_path,
+            media_type="application/zip",
+            filename=bundle_path.name,
+        )
+
+
     @router.get(
         "/runs/{run_id}/artifacts/{artifact_name}",
         dependencies=[Depends(require_read_access)],

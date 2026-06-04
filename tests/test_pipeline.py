@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from subprocess import run
+from zipfile import ZipFile
 
 import pytest
 from contentops_core.artifacts import S3MirroringArtifactStore
@@ -234,6 +237,42 @@ def test_review_service_requires_approval_before_publish(tmp_path: Path) -> None
     assert published.status == RunStatus.PUBLISHED
     assert receipt is not None
     assert receipt.force is False
+
+
+def test_review_service_exports_homepage_handoff_bundle(tmp_path: Path) -> None:
+    homepage = tmp_path / "homepage"
+    (homepage / "posts").mkdir(parents=True)
+    _init_git_repo(homepage)
+    (homepage / "index.html").write_text(
+        '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
+        encoding="utf-8",
+    )
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        publisher_provider="homepage",
+        homepage_repo_path=homepage,
+        homepage_public_base_url="https://example.com",
+        min_publish_score=0.5,
+    )
+    result = build_pipeline(settings).run(RunRequest(topic="Homepage handoff bundle"))
+    review_service = build_review_service(settings)
+
+    bundle_path = review_service.create_homepage_handoff(result.run.id)
+
+    assert bundle_path.exists()
+    with ZipFile(bundle_path) as bundle:
+        names = set(bundle.namelist())
+        manifest = json.loads(bundle.read("handoff-manifest.json"))
+        plan = json.loads(bundle.read("publish-plan.json"))
+        commands = bundle.read("suggested-git-commands.txt").decode("utf-8")
+
+    assert "artifacts/draft.md" in names
+    assert "artifacts/eval-report.json" in names
+    assert manifest["bundle_type"] == "homepage_handoff"
+    assert manifest["publish_plan"]["provider"] == "homepage"
+    assert plan["metadata"]["git"]["is_repository"] is True
+    assert "git -C" in commands
 
 
 def test_review_service_blocks_approval_when_scorecard_fails(tmp_path: Path) -> None:
@@ -749,3 +788,7 @@ def test_system_status_accepts_dedicated_read_key_for_read_protection(tmp_path: 
     assert security_check.status == "ok"
     assert security_check.fields["read_routes_protected"] is True
     assert security_check.fields["read_api_key_configured"] is True
+
+
+def _init_git_repo(path: Path) -> None:
+    run(["git", "-C", str(path), "init"], check=True, capture_output=True)

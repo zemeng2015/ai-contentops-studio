@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from subprocess import run
 
 import pytest
 from contentops_api.main import app, settings
+from contentops_api.routes.dashboard import build_dashboard_router
+from contentops_api.routes.runs import build_runs_router
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobRunner,
@@ -12,8 +15,11 @@ from contentops_core.jobs import (
     load_job_file,
     write_job_execution_report,
 )
+from contentops_core.models import RunStatus
 from contentops_core.release_gate import release_gate, write_release_gate_report
 from contentops_core.repository import RunRepository
+from contentops_core.settings import Settings
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
@@ -420,6 +426,76 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert audit_events_payload["total"] >= 1
     assert audit_events_payload["action_counts"]["publish"] >= 1
     assert any(item["run_id"] == run["id"] for item in audit_events_payload["items"])
+
+
+def test_homepage_handoff_endpoint_and_dashboard_link(tmp_path: Path) -> None:
+    homepage = tmp_path / "homepage"
+    (homepage / "posts").mkdir(parents=True)
+    _init_git_repo(homepage)
+    (homepage / "index.html").write_text(
+        '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
+        encoding="utf-8",
+    )
+    local_settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        publisher_provider="homepage",
+        homepage_repo_path=homepage,
+        homepage_public_base_url="https://example.com",
+    )
+    local_pipeline = build_pipeline(local_settings)
+    local_repository = RunRepository(local_settings.database_url)
+    local_review_service = build_review_service(local_settings)
+    local_app = FastAPI()
+
+    async def allow_read(_request: Request) -> None:
+        return None
+
+    async def allow_operator(_request: Request) -> None:
+        return None
+
+    def parse_status(status: str) -> RunStatus | None:
+        if not status:
+            return None
+        try:
+            return RunStatus(status)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Unknown run status: {status}") from exc
+
+    local_app.include_router(
+        build_runs_router(
+            pipeline=local_pipeline,
+            repository=local_repository,
+            review_service=local_review_service,
+            require_read_access=allow_read,
+            require_operator=allow_operator,
+            parse_status_filter=parse_status,
+        )
+    )
+    local_app.include_router(
+        build_dashboard_router(
+            settings=local_settings,
+            pipeline=local_pipeline,
+            repository=local_repository,
+            review_service=local_review_service,
+            require_read_access=allow_read,
+            require_operator=allow_operator,
+            parse_status_filter=parse_status,
+        )
+    )
+    client = TestClient(local_app)
+
+    create_response = client.post("/runs", json={"topic": "API homepage handoff"})
+    run_payload = create_response.json()
+    handoff_response = client.get(f"/runs/{run_payload['id']}/homepage-handoff")
+    dashboard_response = client.get(f"/dashboard/runs/{run_payload['id']}")
+
+    assert create_response.status_code == 200
+    assert handoff_response.status_code == 200
+    assert handoff_response.content.startswith(b"PK")
+    assert dashboard_response.status_code == 200
+    assert "Download homepage handoff" in dashboard_response.text
+    assert "Publish Metadata" in dashboard_response.text
 
 
 def test_publish_rollback_endpoint_restores_run_state() -> None:
@@ -871,3 +947,7 @@ def test_operator_api_key_protects_mutations() -> None:
     assert blocked_response.status_code == 401
     assert allowed_response.status_code == 200
     assert read_response.status_code == 200
+
+
+def _init_git_repo(path: Path) -> None:
+    run(["git", "-C", str(path), "init"], check=True, capture_output=True)

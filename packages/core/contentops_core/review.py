@@ -158,6 +158,51 @@ class ReviewService:
                 bundle.write(path, f"artifacts/{path.name}")
         return target
 
+    def create_homepage_handoff(self, run_id: str, output_path: Path | None = None) -> Path:
+        run = self._get_run(run_id)
+        draft = self._load_json(run, "draft.json", Draft)
+        report = self._load_json(run, "eval-report.json", EvaluationReport)
+        plan = self.publisher.plan(run, draft, report)
+        if plan.provider != "homepage":
+            raise ValueError("Homepage handoff requires CONTENTOPS_PUBLISHER_PROVIDER=homepage.")
+        target = output_path or run.artifact_dir / f"{run.id}-homepage-handoff.zip"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        artifact_names = [
+            "draft.md",
+            "draft.json",
+            "eval-report.json",
+            "final.html",
+            "scorecard.json",
+            "source-audit.json",
+        ]
+        artifact_paths = [
+            run.artifact_dir / artifact_name
+            for artifact_name in artifact_names
+            if (run.artifact_dir / artifact_name).is_file()
+        ]
+        commands = plan.metadata.get("suggested_commands", [])
+        manifest = {
+            "bundle_type": "homepage_handoff",
+            "run": run.model_dump(mode="json"),
+            "publish_plan": plan.model_dump(mode="json"),
+            "created_at": datetime.now(UTC).isoformat(),
+            "artifacts": {
+                path.name: {
+                    "size_bytes": path.stat().st_size,
+                    "media_type": mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+                    "sha256": sha256(path.read_bytes()).hexdigest(),
+                }
+                for path in artifact_paths
+            },
+        }
+        with ZipFile(target, "w", compression=ZIP_DEFLATED) as bundle:
+            bundle.writestr("handoff-manifest.json", json.dumps(manifest, indent=2))
+            bundle.writestr("publish-plan.json", plan.model_dump_json(indent=2))
+            bundle.writestr("suggested-git-commands.txt", _command_text(commands))
+            for path in artifact_paths:
+                bundle.write(path, f"artifacts/{path.name}")
+        return target
+
     def publish(self, run_id: str, force: bool = False) -> RunRecord:
         run = self._get_run(run_id)
         draft = self._load_json(run, "draft.json", Draft)
@@ -1253,6 +1298,12 @@ def _rollback_hint(action: str, backup_artifact: str | None) -> str:
     if action == "unchanged":
         return "No rollback action needed."
     return "No backup artifact is available; inspect version control or deployment history."
+
+
+def _command_text(commands: object) -> str:
+    if not isinstance(commands, list):
+        return ""
+    return "\n".join(str(command) for command in commands) + ("\n" if commands else "")
 
 
 def _pass_rate(values: Iterable[bool]) -> float:

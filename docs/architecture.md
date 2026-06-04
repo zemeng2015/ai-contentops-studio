@@ -257,4 +257,6 @@ Publishing providers:
 - `static`: writes generated content to a local static site directory
 - `homepage`: writes posts into Zack's GitHub Pages homepage repository, updates the Writing grid,
   records git branch/dirty state in the publish plan, and emits suggested `git add`, `commit`, and
-  `push` commands for the homepage repo handoff
+  `push` commands for the homepage repo handoff. `contentops homepage-handoff` and
+  `/runs/{id}/homepage-handoff` package the plan, generated article, eval report, and command list
+  into a reviewable zip before the homepage repository is committed.

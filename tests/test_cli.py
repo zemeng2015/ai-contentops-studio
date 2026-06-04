@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from subprocess import run
 from zipfile import ZipFile
 
 import pytest
@@ -387,6 +388,44 @@ def test_cli_queue_and_manifest_commands(
         assert "artifacts/eval-report.json" in bundle.namelist()
 
 
+def test_cli_homepage_handoff_exports_zip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    homepage = tmp_path / "homepage"
+    (homepage / "posts").mkdir(parents=True)
+    _init_git_repo(homepage)
+    (homepage / "index.html").write_text(
+        '<html><body><section id="writing"><div class="post-grid"></div></section></body></html>',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_PUBLISHER_PROVIDER", "homepage")
+    monkeypatch.setenv("CONTENTOPS_HOMEPAGE_REPO_PATH", str(homepage))
+    monkeypatch.setenv("CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL", "https://example.com")
+    runner = CliRunner()
+
+    run_result = runner.invoke(app, ["run", "--topic", "CLI homepage handoff"])
+    run_id = next(
+        line.split(":", 1)[1].strip()
+        for line in run_result.output.splitlines()
+        if line.startswith("Run:")
+    )
+    output = tmp_path / "handoff.zip"
+    handoff_result = runner.invoke(
+        app,
+        ["homepage-handoff", run_id, "--output", str(output)],
+    )
+
+    assert handoff_result.exit_code == 0
+    assert output.exists()
+    with ZipFile(output) as bundle:
+        assert "handoff-manifest.json" in bundle.namelist()
+        assert "publish-plan.json" in bundle.namelist()
+        assert "suggested-git-commands.txt" in bundle.namelist()
+
+
 def test_cli_job_execution_commands(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -476,3 +515,7 @@ def _run_id(output: str) -> str:
         for line in output.splitlines()
         if line.startswith("Run:")
     )
+
+
+def _init_git_repo(path: Path) -> None:
+    run(["git", "-C", str(path), "init"], check=True, capture_output=True)

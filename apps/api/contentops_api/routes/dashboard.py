@@ -532,6 +532,11 @@ def build_dashboard_router(
                     </div>
                   </div>
                   <h3>Publish Plan</h3>
+                  <p>
+                    <a href="/runs/{escape(run_id)}/homepage-handoff">
+                      Download homepage handoff
+                    </a>
+                  </p>
                   {plan_html}
                   <h3>Workflow Context</h3>
                   {workflow_context_html}

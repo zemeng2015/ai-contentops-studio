@@ -124,6 +124,7 @@ contentops publish-plan <run_id>
 contentops approve <run_id> --reviewer "operator"
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops release-evidence --output-dir release-evidence
 ```
 
@@ -142,6 +143,7 @@ GET  /runs/{run_id}/source-audit
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
+GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /deployment-manifest
 GET  /release-readiness

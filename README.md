@@ -127,6 +127,7 @@ contentops publish-plan <run_id>
 contentops approve <run_id> --reviewer "operator"
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 contentops release-approve --decision approved --approver "operator"
@@ -161,6 +162,7 @@ GET  /runs/{run_id}/s3-mirror-log
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
+GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /ops-trends
 GET  /config-audit

@@ -850,6 +850,22 @@ def export_run(
     typer.echo(f"Bundle: {bundle_path}")
 
 
+@app.command("homepage-handoff")
+def homepage_handoff(
+    run_id: str,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Optional zip file path."),
+    ] = None,
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        bundle_path = service.create_homepage_handoff(run_id, output_path=output)
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(f"Homepage handoff: {bundle_path}")
+
+
 @app.command()
 def manifest(run_id: str) -> None:
     service = build_review_service(Settings())

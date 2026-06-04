@@ -28,6 +28,7 @@ The same data is available through API and CLI surfaces:
 docker compose exec api contentops runs
 docker compose exec api contentops ops-summary --json
 docker compose exec api contentops ops-trends --days 4 --json
+docker compose exec api contentops homepage-handoff <run_id> --output homepage-handoff.zip
 docker compose exec api contentops content --json
 docker compose exec api contentops release-readiness --json
 ```
@@ -73,4 +74,5 @@ http://127.0.0.1:8000/dashboard
 - Run detail pages with workflow context, source audit, evaluation report, timeline, publish plan,
   and artifacts.
 - `publish-receipt.json`, `publish-verification.json`, `audit-log.json`, and `generation-receipt.json`.
+- Homepage handoff zip for GitHub Pages deployments when `CONTENTOPS_PUBLISHER_PROVIDER=homepage`.
 - Static site output under the configured site directory.
