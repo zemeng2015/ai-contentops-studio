@@ -79,10 +79,10 @@ worker windows:
 
 If `alarm_actions` is configured, API error, worker failure, and RDS connection alarms page the
 configured SNS or incident-management targets. When an alarm fires, first inspect
-`/dashboard/release-evidence`, `/ops-summary`, `/job-executions`, and the relevant CloudWatch log
-table before rerunning or rolling back content. Use `/release-evidence` when an automation or
-deployment script needs the same evidence in JSON form, or `/release-evidence/bundle` when a
-reviewer needs a downloadable evidence package.
+`/dashboard/system-status`, `/dashboard/release-evidence`, `/ops-summary`, `/job-executions`, and
+the relevant CloudWatch log table before rerunning or rolling back content. Use `/release-evidence`
+when an automation or deployment script needs the same evidence in JSON form, or
+`/release-evidence/bundle` when a reviewer needs a downloadable evidence package.
 
 ## 4. Review Queue
 

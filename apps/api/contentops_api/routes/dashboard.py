@@ -6,6 +6,7 @@ from html import escape
 from pathlib import Path
 from typing import Annotated
 
+from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.jobs import (
     JobExecutionReport,
     get_job_execution_report,
@@ -54,6 +55,7 @@ from contentops_api.views import (
     _source_audit_html,
     _source_review_rows,
     _status_options,
+    _system_status_html,
     _timeline_rows,
     _worker_jobs_html,
     _workflow_context_html,
@@ -265,6 +267,30 @@ def build_dashboard_router(
                     article.
                   </p>
                   {_worker_jobs_html(worker_jobs.items)}
+                </section>
+                """,
+            )
+        )
+
+    @router.get(
+        "/dashboard/system-status",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_system_status(api_key: str = Query(default="")) -> HTMLResponse:
+        status = system_status(settings, repository)
+        manifest = deployment_manifest(settings, repository)
+        return HTMLResponse(
+            _page(
+                "System Status",
+                f"""
+                <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                <section class="hero">
+                  <p>
+                    Operator-facing readiness view for provider configuration, storage,
+                    database, security, and deployment capabilities.
+                  </p>
+                  {_system_status_html(status, manifest)}
                 </section>
                 """,
             )

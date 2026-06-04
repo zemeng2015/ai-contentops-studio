@@ -559,10 +559,25 @@ def test_dashboard_renders() -> None:
     assert "Token Budgets" in response.text
     assert "Incident Reports" in response.text
     assert "Operations Summary" in response.text
+    assert "System status dashboard" in response.text
     assert "Release evidence dashboard" in response.text
     assert "Audit Events" in response.text
     assert "Artifact Retention" in response.text
     assert "Worker Job Catalog" in response.text
+
+
+def test_dashboard_system_status_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/system-status")
+
+    assert response.status_code == 200
+    assert "System Status" in response.text
+    assert "Component Checks" in response.text
+    assert "Deployment Capabilities" in response.text
+    assert "provider_config" in response.text
+    assert "operator_security" in response.text
+    assert "System status JSON" in response.text
 
 
 def test_dashboard_release_evidence_renders() -> None:

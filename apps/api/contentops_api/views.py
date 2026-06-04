@@ -11,6 +11,7 @@ from contentops_core.models import (
     AuditEvent,
     AuditEventListResponse,
     CostReportListResponse,
+    DeploymentManifest,
     GenerationReceipt,
     IncidentReportListResponse,
     NotificationDelivery,
@@ -28,6 +29,7 @@ from contentops_core.models import (
     RunScorecard,
     ScorecardListResponse,
     SourceAuditReport,
+    SystemStatus,
 )
 
 
@@ -642,6 +644,7 @@ def _run_link(run_id: str | None) -> str:
 def _operations_summary_html(summary: OperationsSummary) -> str:
     return f"""
       <p>
+        <a href="/dashboard/system-status">System status dashboard</a> |
         <a href="/dashboard/release-evidence">Release evidence dashboard</a> |
         <a href="/ops-summary">Operations summary JSON</a> |
         <a href="/deployment-manifest">Deployment manifest JSON</a> |
@@ -663,6 +666,62 @@ def _operations_summary_html(summary: OperationsSummary) -> str:
         <div><strong>{_duration_label(summary.avg_duration_ms)}</strong><span>Avg run</span></div>
         <div><strong>{summary.estimated_total_tokens}</strong><span>Window tokens</span></div>
       </div>
+    """
+
+
+def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> str:
+    check_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(check.name)}</td>
+          <td><span class="pill">{escape(check.status)}</span></td>
+          <td>{escape(check.message)}</td>
+          <td><pre>{escape(json.dumps(check.fields, ensure_ascii=False, indent=2))}</pre></td>
+        </tr>
+        """
+        for check in status.checks
+    )
+    capability_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(capability.name)}</td>
+          <td><span class="pill">{escape(capability.status)}</span></td>
+          <td>{escape(", ".join(capability.evidence) or "none")}</td>
+        </tr>
+        """
+        for capability in manifest.capabilities
+    )
+    return f"""
+      <p>
+        <a href="/ready">System status JSON</a> |
+        <a href="/deployment-manifest">Deployment manifest JSON</a>
+      </p>
+      <div class="metrics">
+        <div><strong>{escape(status.status)}</strong><span>System status</span></div>
+        <div><strong>{escape(manifest.status)}</strong><span>Deployment status</span></div>
+        <div><strong>{len(status.checks)}</strong><span>Component checks</span></div>
+        <div><strong>{len(manifest.capabilities)}</strong><span>Capabilities</span></div>
+        <div>
+          <strong>{escape(str(manifest.runtime.get("database_engine", "n/a")))}</strong>
+          <span>Database</span>
+        </div>
+        <div>
+          <strong>{escape(str(manifest.operations.get("artifact_store_provider", "n/a")))}</strong>
+          <span>Artifact store</span>
+        </div>
+      </div>
+      <h2>Component Checks</h2>
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Status</th><th>Message</th><th>Fields</th></tr>
+        </thead>
+        <tbody>{check_rows}</tbody>
+      </table>
+      <h2>Deployment Capabilities</h2>
+      <table>
+        <thead><tr><th>Capability</th><th>Status</th><th>Evidence</th></tr></thead>
+        <tbody>{capability_rows}</tbody>
+      </table>
     """
 
 
