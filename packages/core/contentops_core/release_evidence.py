@@ -20,7 +20,11 @@ from contentops_core.diagnostics import (
     release_readiness,
     system_status,
 )
-from contentops_core.jobs import job_execution_dir, job_execution_trends
+from contentops_core.jobs import (
+    job_execution_alert_report,
+    job_execution_dir,
+    job_execution_trends,
+)
 from contentops_core.models import (
     ArtifactManifest,
     ArtifactMetadata,
@@ -53,6 +57,10 @@ def build_release_evidence(
         job_execution_dir(settings.artifact_root),
         days=14,
     )
+    worker_execution_alerts = job_execution_alert_report(
+        job_execution_dir(settings.artifact_root),
+        days=14,
+    )
     artifact_files = [
         "doctor.json",
         "deployment_check.json",
@@ -62,6 +70,7 @@ def build_release_evidence(
         "operations_summary.json",
         "release_readiness.json",
         "summary.json",
+        "worker_execution_alerts.json",
         "worker_execution_trends.json",
     ]
     if approval is not None:
@@ -81,6 +90,7 @@ def build_release_evidence(
         release_readiness=readiness,
         deployment_check=preflight,
         homepage_handoffs=homepage_handoffs,
+        worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
         worker_execution_trends=worker_execution_trends.model_dump(mode="json"),
         latest_release_approval=approval,
     )
@@ -100,6 +110,7 @@ def write_release_evidence(
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
+        "worker_execution_alerts": bundle.worker_execution_alerts,
         "worker_execution_trends": bundle.worker_execution_trends,
     }
     if bundle.latest_release_approval is not None:

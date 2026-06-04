@@ -5,6 +5,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from contentops_core.jobs import (
+    JobExecutionAlertReport,
     JobExecutionReport,
     JobExecutionTrendReport,
     WorkerJobCatalogItem,
@@ -846,6 +847,56 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     """
 
 
+def _job_execution_alerts_html(report: JobExecutionAlertReport) -> str:
+    signal_rows = "".join(
+        f"""
+        <tr>
+          <td><span class="pill">{escape(signal.severity.value)}</span></td>
+          <td>{escape(signal.category)}</td>
+          <td>{escape(signal.message)}</td>
+          <td>{escape(signal.latest_execution_id or "n/a")}</td>
+          <td>{escape(signal.latest_at.isoformat() if signal.latest_at else "n/a")}</td>
+        </tr>
+        """
+        for signal in report.signals
+    )
+    if not signal_rows:
+        signal_rows = """
+        <tr>
+          <td colspan="5"><span class="muted">No worker alert signals recorded.</span></td>
+        </tr>
+        """
+    actions = "".join(f"<li>{escape(action)}</li>" for action in report.recommended_actions)
+    return f"""
+      <p><a href="/job-executions/alerts">Worker execution alerts JSON</a></p>
+      <div class="metrics">
+        <div><strong>{escape(report.severity.value)}</strong><span>Alert severity</span></div>
+        <div>
+          <strong>{str(report.action_required).lower()}</strong>
+          <span>Action required</span>
+        </div>
+        <div>
+          <strong>{report.trend_summary.action_required}</strong>
+          <span>Executions to review</span>
+        </div>
+        <div><strong>{report.trend_summary.failed_jobs}</strong><span>Failed jobs</span></div>
+      </div>
+      <p>{escape(report.message)}</p>
+      <h2>Recommended Actions</h2>
+      <ul>{actions}</ul>
+      <h2>Alert Signals</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Severity</th><th>Category</th><th>Message</th>
+            <th>Latest execution</th><th>Latest at</th>
+          </tr>
+        </thead>
+        <tbody>{signal_rows}</tbody>
+      </table>
+    """
+
+
 def _system_status_html(status: SystemStatus, manifest: DeploymentManifest) -> str:
     recommendations = _system_status_recommendations(status, manifest)
     recommendation_rows = "".join(
@@ -1124,6 +1175,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     summary = bundle.summary
     deploy_status = escape(bundle.deployment_check.status)
     can_deploy = str(bundle.deployment_check.can_deploy).lower()
+    worker_alerts = bundle.worker_execution_alerts
     worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
     worker_buckets = bundle.worker_execution_trends.get("buckets", [])
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
@@ -1224,6 +1276,24 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="4"><span class="muted">No worker failure reasons recorded.</span></td>
         </tr>
         """
+    worker_alert_signal_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(str(signal.get("severity", "n/a")))}</td>
+          <td>{escape(str(signal.get("category", "n/a")))}</td>
+          <td>{escape(str(signal.get("message", "n/a")))}</td>
+          <td>{escape(str(signal.get("latest_execution_id") or "n/a"))}</td>
+        </tr>
+        """
+        for signal in worker_alerts.get("signals", [])
+        if isinstance(signal, dict)
+    )
+    if not worker_alert_signal_rows:
+        worker_alert_signal_rows = """
+        <tr>
+          <td colspan="4"><span class="muted">No worker alert signals recorded.</span></td>
+        </tr>
+        """
     return f"""
       <p>
         <a href="/release-evidence/bundle">Download evidence bundle</a> |
@@ -1282,6 +1352,23 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <tbody>{handoff_rows}</tbody>
       </table>
       <h2>Worker Execution Trends</h2>
+      <div class="metrics">
+        <div>
+          <strong>{escape(str(worker_alerts.get("severity", "info")))}</strong>
+          <span>Worker alert</span>
+        </div>
+        <div>
+          <strong>{escape(str(worker_alerts.get("action_required", False)).lower())}</strong>
+          <span>Worker action</span>
+        </div>
+      </div>
+      <p>{escape(str(worker_alerts.get("message", "Worker alert report unavailable.")))}</p>
+      <table>
+        <thead>
+          <tr><th>Severity</th><th>Category</th><th>Message</th><th>Latest execution</th></tr>
+        </thead>
+        <tbody>{worker_alert_signal_rows}</tbody>
+      </table>
       <table>
         <thead>
           <tr><th>Date</th><th>Executions</th><th>Generated</th><th>Published</th><th>Action</th></tr>

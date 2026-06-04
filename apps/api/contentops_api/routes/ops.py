@@ -11,6 +11,7 @@ from contentops_core.diagnostics import (
     system_status,
 )
 from contentops_core.jobs import (
+    JobExecutionAlertReport,
     JobExecutionListResponse,
     JobExecutionReport,
     JobExecutionSummary,
@@ -18,6 +19,7 @@ from contentops_core.jobs import (
     JobRecoveryPlan,
     WorkerJobCatalogResponse,
     get_job_execution_report,
+    job_execution_alert_report,
     job_execution_dir,
     job_execution_run_ids,
     job_execution_summary,
@@ -273,6 +275,16 @@ def build_ops_router(
         days: int = Query(default=14, ge=1, le=90),
     ) -> JobExecutionTrendReport:
         return job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
+
+    @router.get(
+        "/job-executions/alerts",
+        response_model=JobExecutionAlertReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_job_execution_alerts(
+        days: int = Query(default=14, ge=1, le=90),
+    ) -> JobExecutionAlertReport:
+        return job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
 
     @router.get(
         "/job-executions/{execution_id}",

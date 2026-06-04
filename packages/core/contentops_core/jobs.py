@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,7 @@ from uuid import uuid4
 import yaml
 from pydantic import BaseModel, Field
 
-from contentops_core.models import RunRequest, RunStatus
+from contentops_core.models import IncidentSeverity, RunRequest, RunStatus
 from contentops_core.pipeline import ContentOpsPipeline
 
 
@@ -149,6 +150,25 @@ class JobExecutionTrendReport(BaseModel):
     days: int = Field(ge=1)
     buckets: list[JobExecutionTrendBucket]
     summary: JobExecutionTrendSummary
+
+
+class JobExecutionAlertSignal(BaseModel):
+    severity: IncidentSeverity
+    category: str
+    message: str
+    latest_execution_id: str | None = None
+    latest_at: datetime | None = None
+
+
+class JobExecutionAlertReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    days: int = Field(ge=1)
+    severity: IncidentSeverity
+    action_required: bool
+    message: str
+    signals: list[JobExecutionAlertSignal] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+    trend_summary: JobExecutionTrendSummary
 
 
 class JobExecutionListResponse(BaseModel):
@@ -419,6 +439,55 @@ def job_execution_trends(receipt_dir: Path, days: int = 14) -> JobExecutionTrend
     )
 
 
+def job_execution_alert_report(receipt_dir: Path, days: int = 14) -> JobExecutionAlertReport:
+    trends = job_execution_trends(receipt_dir, days=days)
+    summary = trends.summary
+    signals: list[JobExecutionAlertSignal] = []
+    if summary.failed_jobs > 0:
+        signals.append(
+            JobExecutionAlertSignal(
+                severity=IncidentSeverity.CRITICAL,
+                category="worker_failure",
+                message=(
+                    f"{summary.failed_jobs} worker job(s) failed across "
+                    f"{summary.action_required} action-required execution(s)."
+                ),
+                latest_execution_id=_latest_failure_execution_id(summary),
+                latest_at=summary.latest_failure_at,
+            )
+        )
+    if summary.homepage_handoff_failed > 0:
+        signals.append(
+            JobExecutionAlertSignal(
+                severity=IncidentSeverity.WARNING,
+                category="homepage_handoff",
+                message=f"{summary.homepage_handoff_failed} homepage handoff(s) failed.",
+                latest_execution_id=_latest_failure_execution_id(summary),
+                latest_at=summary.latest_failure_at,
+            )
+        )
+    if summary.action_required > 0 and not signals:
+        signals.append(
+            JobExecutionAlertSignal(
+                severity=IncidentSeverity.WARNING,
+                category="worker_action_required",
+                message=f"{summary.action_required} worker execution(s) require review.",
+                latest_execution_id=_latest_failure_execution_id(summary),
+                latest_at=summary.latest_failure_at,
+            )
+        )
+    severity = _max_alert_severity(signal.severity for signal in signals)
+    return JobExecutionAlertReport(
+        days=days,
+        severity=severity,
+        action_required=severity != IncidentSeverity.INFO,
+        message=_worker_alert_message(summary, severity),
+        signals=signals,
+        recommended_actions=_worker_alert_recommended_actions(summary),
+        trend_summary=summary,
+    )
+
+
 def get_job_execution_report(receipt_dir: Path, execution_id: str) -> JobExecutionReport:
     normalized = execution_id.strip()
     if not normalized:
@@ -613,6 +682,56 @@ def _job_execution_failure_reasons(report: JobExecutionReport) -> list[str]:
 def _normalize_failure_reason(reason: str) -> str:
     normalized = " ".join(reason.strip().split())
     return normalized[:180] if normalized else "unknown failure"
+
+
+def _latest_failure_execution_id(summary: JobExecutionTrendSummary) -> str | None:
+    if not summary.top_failure_reasons:
+        return None
+    return summary.top_failure_reasons[0].latest_execution_id
+
+
+def _worker_alert_message(
+    summary: JobExecutionTrendSummary,
+    severity: IncidentSeverity,
+) -> str:
+    if severity == IncidentSeverity.INFO:
+        return "Worker automation is healthy for the selected window."
+    if summary.top_failure_reasons:
+        top_reason = summary.top_failure_reasons[0]
+        return (
+            f"Worker automation needs attention: {top_reason.reason} "
+            f"occurred {top_reason.count} time(s)."
+        )
+    return f"{summary.action_required} worker execution(s) require operator review."
+
+
+def _worker_alert_recommended_actions(summary: JobExecutionTrendSummary) -> list[str]:
+    if summary.action_required == 0:
+        return ["Keep the current worker schedule and monitor the next execution."]
+    actions = [
+        "Open /dashboard/job-execution-trends and inspect the latest action-required execution.",
+        "Run contentops job-recovery-plan <execution_id> for failed worker jobs.",
+    ]
+    if summary.homepage_handoff_failed > 0:
+        actions.append("Check CONTENTOPS_HOMEPAGE_REPO_PATH and homepage handoff artifacts.")
+    if summary.failed_jobs > 0:
+        actions.append(
+            "Review provider configuration, source reachability, and generated run logs."
+        )
+    return actions
+
+
+def _max_alert_severity(severities: Iterable[IncidentSeverity]) -> IncidentSeverity:
+    rank = {
+        IncidentSeverity.INFO: 0,
+        IncidentSeverity.WARNING: 1,
+        IncidentSeverity.CRITICAL: 2,
+    }
+    selected = IncidentSeverity.INFO
+    for severity in severities:
+        if rank[severity] > rank[selected]:
+            selected = severity
+    return selected
 
 
 def _date_range(start: date, end: date) -> list[date]:

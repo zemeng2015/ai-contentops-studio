@@ -11,6 +11,7 @@ from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.jobs import (
     JobExecutionReport,
     get_job_execution_report,
+    job_execution_alert_report,
     job_execution_dir,
     job_execution_run_ids,
     job_execution_trends,
@@ -50,6 +51,7 @@ from contentops_api.views import (
     _generation_receipt_html,
     _incident_report_html,
     _incident_reports_html,
+    _job_execution_alerts_html,
     _job_execution_detail_html,
     _job_execution_trends_html,
     _job_executions_html,
@@ -306,6 +308,7 @@ def build_dashboard_router(
         api_key: str = Query(default=""),
     ) -> HTMLResponse:
         report = job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
+        alerts = job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
         return HTMLResponse(
             _page(
                 "Worker Execution Trends",
@@ -317,6 +320,7 @@ def build_dashboard_router(
                     Daily automation execution health, generated runs, publishing,
                     handoff readiness, and action-required posture.
                   </p>
+                  {_job_execution_alerts_html(alerts)}
                   {_job_execution_trends_html(report)}
                 </section>
                 """,

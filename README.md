@@ -232,6 +232,7 @@ Run a worker job:
 contentops worker-jobs --json
 contentops job-execution-summary <execution_id>
 contentops job-execution-trends --days 14
+contentops job-execution-alerts --days 14
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
@@ -240,9 +241,9 @@ Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
 and file list in the job execution receipt. Use `--release-evidence-dir` to choose a specific
 evidence directory, or `--skip-release-evidence` for local smoke tests that should only write the
-worker receipt. Worker execution trends also report the latest successful execution, the latest
-action-required execution, and the most common failure reasons so recurring automation issues can be
-triaged from the dashboard or release evidence bundle.
+worker receipt. Worker execution trends and alerts also report the latest successful execution, the
+latest action-required execution, the most common failure reasons, severity, and recommended actions
+so recurring automation issues can be triaged from the dashboard or release evidence bundle.
 Set `homepage_handoff: true` on a job when the homepage publisher is configured and the scheduled
 run should prepare a reviewable GitHub Pages handoff zip after the draft is generated. The handoff
 path and any handoff error are stored on that job's execution result, and the post-run release

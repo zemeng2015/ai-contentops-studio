@@ -17,6 +17,7 @@ from contentops_core.diagnostics import (
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     get_job_execution_report,
+    job_execution_alert_report,
     job_execution_dir,
     job_execution_summary,
     job_execution_trends,
@@ -578,6 +579,15 @@ def job_execution_trends_command(
 ) -> None:
     settings = Settings()
     report = job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
+    typer.echo(report.model_dump_json(indent=2))
+
+
+@app.command("job-execution-alerts")
+def job_execution_alerts_command(
+    days: Annotated[int, typer.Option(help="Number of days to include.")] = 14,
+) -> None:
+    settings = Settings()
+    report = job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
     typer.echo(report.model_dump_json(indent=2))
 
 

@@ -44,6 +44,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "operations_summary.json",
         "release_readiness.json",
         "summary.json",
+        "worker_execution_alerts.json",
         "worker_execution_trends.json",
     }
     assert {path.name for path in output_dir.glob("*.json")} == expected_files
@@ -60,6 +61,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     worker_trends = json.loads(
         (output_dir / "worker_execution_trends.json").read_text(encoding="utf-8")
     )
+    worker_alerts = json.loads(
+        (output_dir / "worker_execution_alerts.json").read_text(encoding="utf-8")
+    )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
     assert deployment_check["profile"] == "production"
     assert "environment_template" in {check["name"] for check in deployment_check["checks"]}
@@ -70,6 +74,8 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert set(evidence_manifest["artifacts"]) == expected_files - {"evidence_manifest.json"}
     assert worker_trends["summary"]["execution_count"] == 0
     assert worker_trends["summary"]["top_failure_reasons"] == []
+    assert worker_alerts["severity"] == "info"
+    assert bundle.worker_execution_alerts["severity"] == "info"
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
@@ -149,7 +155,9 @@ def test_release_evidence_includes_worker_execution_trends(
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 1
     assert trends["summary"]["published_runs"] == 1
     assert trends["summary"]["top_failure_reasons"] == []
+    assert bundle.worker_execution_alerts["action_required"] is False
     assert "worker_execution_trends.json" in bundle.summary.artifact_files
+    assert "worker_execution_alerts.json" in bundle.summary.artifact_files
     assert evidence_manifest["artifacts"]["worker_execution_trends.json"]["media_type"] == (
         "application/json"
     )

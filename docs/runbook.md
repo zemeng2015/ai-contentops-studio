@@ -66,8 +66,11 @@ Use `contentops job-execution-trends --days 14`, `GET /job-executions/trends?day
 action-required rates before changing the EventBridge schedule. The trend view also lists the
 latest successful execution, latest action-required execution, and top failure reasons so operators
 can separate provider failures, homepage handoff failures, and release evidence failures quickly.
-The same trend payload is written to release evidence as `worker_execution_trends.json`, so compare
-the dashboard with the latest CI evidence bundle when investigating scheduled automation regressions.
+Use `contentops job-execution-alerts --days 14` or `GET /job-executions/alerts?days=14` when the
+scheduler should return a single severity, action-required flag, and recommended actions for
+on-call review. The same trend and alert payloads are written to release evidence as
+`worker_execution_trends.json` and `worker_execution_alerts.json`, so compare the dashboard with the
+latest CI evidence bundle when investigating scheduled automation regressions.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced

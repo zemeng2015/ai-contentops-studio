@@ -10,6 +10,7 @@ from contentops_core.jobs import (
     JobRunner,
     JobRunResult,
     get_job_execution_report,
+    job_execution_alert_report,
     job_execution_summary,
     job_execution_trends,
     job_recovery_plan,
@@ -300,6 +301,44 @@ def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
     ]
     assert report.buckets[-1].execution_count == 2
     assert report.buckets[-1].top_failure_reasons[0].latest_execution_id == second.execution_id
+
+
+def test_job_execution_alert_report_flags_actionable_worker_failures(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    failed = JobExecutionReport(
+        name="alerts",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="roundup",
+                topic="Roundup",
+                status="failed",
+                error="research provider timeout",
+            )
+        ],
+    )
+    write_job_execution_report(failed, receipt_dir)
+
+    report = job_execution_alert_report(receipt_dir, days=1)
+
+    assert report.severity.value == "critical"
+    assert report.action_required is True
+    assert "research provider timeout" in report.message
+    assert report.signals[0].category == "worker_failure"
+    assert "job-recovery-plan" in report.recommended_actions[1]
+
+
+def test_job_execution_alert_report_is_info_when_worker_window_is_clean(tmp_path: Path) -> None:
+    report = job_execution_alert_report(tmp_path / "missing", days=1)
+
+    assert report.severity.value == "info"
+    assert report.action_required is False
+    assert report.signals == []
+    assert report.recommended_actions == [
+        "Keep the current worker schedule and monitor the next execution."
+    ]
 
 
 def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:
