@@ -128,6 +128,7 @@ contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
+contentops release-gate --git-sha <commit_sha> --json
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, and
@@ -163,6 +164,7 @@ GET  /release-evidence
 GET  /release-evidence/bundle
 GET  /release-approvals
 POST /release-approvals
+GET  /release-gate
 GET  /worker-jobs
 GET  /job-executions
 ```
@@ -182,6 +184,8 @@ The release evidence dashboard also renders those preflight checks for human rev
 deployment is approved.
 Release approval records capture the approver, decision, notes, force flag, release/deployment
 status, evidence SHA, and evidence files in `artifacts/release-approvals`.
+`release-gate` combines readiness, deployment preflight, approval state, and git SHA matching into a
+single CI/CD pass/fail report.
 
 ## Scheduled Jobs
 

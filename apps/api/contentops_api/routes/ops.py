@@ -32,6 +32,7 @@ from contentops_core.models import (
     ReleaseApprovalRecord,
     ReleaseApprovalRequest,
     ReleaseEvidenceBundle,
+    ReleaseGateReport,
     ReleaseReadinessReport,
     RetentionReport,
     RunStatus,
@@ -43,6 +44,7 @@ from contentops_core.release_evidence import (
     build_release_evidence,
     create_release_evidence_archive,
 )
+from contentops_core.release_gate import release_gate
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -181,6 +183,29 @@ def build_ops_router(
             )
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @router.get(
+        "/release-gate",
+        response_model=ReleaseGateReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_release_gate(
+        response: Response,
+        git_sha: str | None = Query(default=None),
+        window_size: int = Query(default=100, ge=1, le=500),
+        require_approval: bool = Query(default=True),
+    ) -> ReleaseGateReport:
+        report = release_gate(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            window_size=window_size,
+            git_sha=git_sha,
+            require_approval=require_approval,
+        )
+        if not report.can_deploy:
+            response.status_code = 409
+        return report
 
     @router.get(
         "/worker-jobs",

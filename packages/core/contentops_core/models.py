@@ -526,6 +526,23 @@ class ReleaseApprovalListResponse(BaseModel):
     offset: int = Field(ge=0)
 
 
+class ReleaseGateItem(BaseModel):
+    name: str
+    status: str
+    message: str
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReleaseGateReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    can_deploy: bool
+    git_sha: str | None = None
+    checks: list[ReleaseGateItem]
+    release_evidence: ReleaseEvidenceSummary
+    latest_release_approval: ReleaseApprovalRecord | None = None
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

@@ -86,6 +86,7 @@ def test_cli_release_approval_records_decision(
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("CONTENTOPS_GIT_SHA", "cli-release-sha")
     runner = CliRunner()
 
     approval_result = runner.invoke(
@@ -109,6 +110,10 @@ def test_cli_release_approval_records_decision(
 
     assert approval_result.exit_code == 0
     approval_payload = json.loads(approval_result.output)
+    gate_result = runner.invoke(
+        app,
+        ["release-gate", "--git-sha", approval_payload["git_sha"], "--json"],
+    )
     assert approval_payload["decision"] == "approved"
     assert approval_payload["approver"] == "zack"
     assert "deployment_check.json" in approval_payload["evidence_files"]
@@ -122,6 +127,12 @@ def test_cli_release_approval_records_decision(
         approval_payload["approval_id"]
     )
     assert (evidence_dir / "release_approval.json").exists()
+    assert gate_result.exit_code == 0
+    gate_payload = json.loads(gate_result.output)
+    assert gate_payload["can_deploy"] is True
+    assert gate_payload["latest_release_approval"]["approval_id"] == (
+        approval_payload["approval_id"]
+    )
 
 
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:

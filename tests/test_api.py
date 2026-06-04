@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from contentops_api.main import app, settings
 from contentops_core.factory import build_pipeline
 from contentops_core.jobs import (
@@ -114,11 +115,16 @@ def test_ready_endpoint_reports_read_protection_without_key() -> None:
     assert security_check["fields"]["read_routes_protected"] is True
 
 
-def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
+def test_release_approval_api_and_dashboard(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     client = TestClient(app)
     original_artifact_root = settings.artifact_root
+    monkeypatch.setenv("CONTENTOPS_GIT_SHA", "api-release-sha")
     settings.artifact_root = tmp_path / "artifacts"
     try:
+        blocked_gate_response = client.get("/release-gate?git_sha=api-release-sha")
         create_response = client.post(
             "/release-approvals",
             json={
@@ -126,9 +132,11 @@ def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
                 "approver": "zack",
                 "notes": "API approval record.",
                 "force": True,
+                "window_size": 100,
             },
         )
         list_response = client.get("/release-approvals")
+        gate_response = client.get("/release-gate?git_sha=api-release-sha")
         dashboard_response = client.get("/dashboard/release-evidence")
         evidence_response = client.get("/release-evidence")
         evidence_bundle_response = client.get("/release-evidence/bundle")
@@ -144,6 +152,7 @@ def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
     finally:
         settings.artifact_root = original_artifact_root
 
+    assert blocked_gate_response.status_code == 409
     assert create_response.status_code == 200
     approval = create_response.json()
     assert approval["decision"] == "approved"
@@ -151,6 +160,10 @@ def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
     assert "deployment_check.json" in approval["evidence_files"]
     assert list_response.status_code == 200
     assert list_response.json()["total"] == 1
+    assert gate_response.status_code in {200, 409}
+    gate_payload = gate_response.json()
+    assert gate_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
+    assert gate_payload["git_sha"] == "api-release-sha"
     assert evidence_response.status_code == 200
     evidence_payload = evidence_response.json()
     assert evidence_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
@@ -660,6 +673,7 @@ def test_dashboard_release_evidence_renders() -> None:
 
     assert response.status_code == 200
     assert "Release Evidence" in response.text
+    assert "Deployment Gate" in response.text
     assert "Deployment Preflight" in response.text
     assert "Release Gate Checks" in response.text
     assert "Deployment Capabilities" in response.text

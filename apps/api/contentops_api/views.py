@@ -22,6 +22,7 @@ from contentops_core.models import (
     PublishVerificationReport,
     ReleaseApprovalListResponse,
     ReleaseEvidenceBundle,
+    ReleaseGateReport,
     RetentionReport,
     RunComparison,
     RunCostReport,
@@ -997,6 +998,34 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <table>
         <thead><tr><th>File</th></tr></thead>
         <tbody>{artifact_rows}</tbody>
+      </table>
+    """
+
+
+def _release_gate_html(report: ReleaseGateReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(check.name)}</td>
+          <td><span class="pill">{escape(check.status)}</span></td>
+          <td>{escape(check.message)}</td>
+          <td><pre>{escape(json.dumps(check.evidence, ensure_ascii=False, indent=2))}</pre></td>
+        </tr>
+        """
+        for check in report.checks
+    )
+    return f"""
+      <h2>Deployment Gate</h2>
+      <p>
+        <a href="/release-gate">Release gate JSON</a> |
+        Status: <strong>{escape(report.status)}</strong> |
+        Can deploy: <strong>{str(report.can_deploy).lower()}</strong>
+      </p>
+      <table>
+        <thead>
+          <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 

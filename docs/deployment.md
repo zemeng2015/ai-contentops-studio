@@ -171,6 +171,17 @@ notes, release/deployment gate status, force flag, evidence SHA, and evidence fi
 decisions require release readiness and deployment preflight to pass unless `--force` or
 `force=true` is used, which keeps emergency releases explicit and auditable.
 
+Use the release gate in deployment automation after the approval is recorded:
+
+```powershell
+contentops release-gate --git-sha $env:GITHUB_SHA --json
+Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
+```
+
+The gate fails when release readiness fails, deployment preflight fails, no approval exists, the
+latest approval rejects deployment, or the approval git SHA does not match the commit being
+released.
+
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:
 

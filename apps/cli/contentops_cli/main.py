@@ -30,6 +30,7 @@ from contentops_core.models import (
 )
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
+from contentops_core.release_gate import release_gate
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -297,6 +298,44 @@ def release_approvals(
     settings = Settings()
     approvals = list_release_approvals(settings.artifact_root, limit=limit, offset=offset)
     typer.echo(approvals.model_dump_json(indent=2))
+
+
+@app.command("release-gate")
+def show_release_gate(
+    git_sha: Annotated[
+        str | None,
+        typer.Option(help="Git SHA that the deployment pipeline is about to release."),
+    ] = None,
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to include in release gates."),
+    ] = 100,
+    require_approval: Annotated[
+        bool,
+        typer.Option(help="Require an approved release approval record."),
+    ] = True,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report = release_gate(
+        settings=settings,
+        repository=RunRepository(settings.database_url),
+        review_service=build_review_service(settings),
+        window_size=window_size,
+        git_sha=git_sha,
+        require_approval=require_approval,
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.can_deploy else 1)
+    typer.echo(f"Status: {report.status}")
+    typer.echo(f"Can deploy: {str(report.can_deploy).lower()}")
+    for check in report.checks:
+        typer.echo(f"- {check.name}: {check.status} - {check.message}")
+    raise typer.Exit(0 if report.can_deploy else 1)
 
 
 @app.command("ops-summary")
