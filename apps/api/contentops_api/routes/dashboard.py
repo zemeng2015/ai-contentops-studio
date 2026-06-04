@@ -13,6 +13,7 @@ from contentops_core.jobs import (
     get_job_execution_report,
     job_execution_dir,
     job_execution_run_ids,
+    job_execution_trends,
     list_job_execution_reports,
     list_worker_job_catalog,
 )
@@ -50,6 +51,7 @@ from contentops_api.views import (
     _incident_report_html,
     _incident_reports_html,
     _job_execution_detail_html,
+    _job_execution_trends_html,
     _job_executions_html,
     _notification_log_html,
     _operations_summary_html,
@@ -237,6 +239,7 @@ def build_dashboard_router(
                 <section class="hero compact">
                   <h2>Worker Executions</h2>
                   <p>Recent scheduled job receipts for automation audit and incident review.</p>
+                  <p><a href="/dashboard/job-execution-trends">Open worker execution trends</a></p>
                   {_job_executions_html(job_executions.items)}
                 </section>
                 <section class="hero compact">
@@ -287,6 +290,34 @@ def build_dashboard_router(
                     and incident posture.
                   </p>
                   {_ops_trends_html(report)}
+                </section>
+                """,
+            )
+        )
+
+
+    @router.get(
+        "/dashboard/job-execution-trends",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_job_execution_trends(
+        days: int = Query(default=14, ge=1, le=90),
+        api_key: str = Query(default=""),
+    ) -> HTMLResponse:
+        report = job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
+        return HTMLResponse(
+            _page(
+                "Worker Execution Trends",
+                f"""
+                <section class="hero compact">
+                  <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                  <h2>Worker Execution Trends</h2>
+                  <p>
+                    Daily automation execution health, generated runs, publishing,
+                    handoff readiness, and action-required posture.
+                  </p>
+                  {_job_execution_trends_html(report)}
                 </section>
                 """,
             )

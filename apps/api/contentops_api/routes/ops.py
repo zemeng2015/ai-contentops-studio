@@ -14,12 +14,14 @@ from contentops_core.jobs import (
     JobExecutionListResponse,
     JobExecutionReport,
     JobExecutionSummary,
+    JobExecutionTrendReport,
     JobRecoveryPlan,
     WorkerJobCatalogResponse,
     get_job_execution_report,
     job_execution_dir,
     job_execution_run_ids,
     job_execution_summary,
+    job_execution_trends,
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -261,6 +263,16 @@ def build_ops_router(
             limit=limit,
             offset=offset,
         )
+
+    @router.get(
+        "/job-executions/trends",
+        response_model=JobExecutionTrendReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_job_execution_trends(
+        days: int = Query(default=14, ge=1, le=90),
+    ) -> JobExecutionTrendReport:
+        return job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
 
     @router.get(
         "/job-executions/{execution_id}",

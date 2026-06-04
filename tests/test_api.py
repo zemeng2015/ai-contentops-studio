@@ -591,6 +591,7 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     )
 
     list_response = client.get("/job-executions?limit=5")
+    trends_response = client.get("/job-executions/trends?days=1")
     detail_response = client.get(f"/job-executions/{report.execution_id}")
     summary_response = client.get(f"/job-executions/{report.execution_id}/summary")
     recovery_response = client.get(f"/job-executions/{report.execution_id}/recovery-plan")
@@ -604,6 +605,8 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
         item["execution_id"] == report.execution_id
         for item in list_response.json()["items"]
     )
+    assert trends_response.status_code == 200
+    assert trends_response.json()["summary"]["execution_count"] >= 1
     assert detail_response.status_code == 200
     assert detail_response.json()["name"] == "api-job-history"
     assert summary_response.status_code == 200
@@ -869,6 +872,17 @@ def test_dashboard_ops_trends_renders() -> None:
     assert "Ops trends JSON" in response.text
     assert "Quality" in response.text
     assert "Budget" in response.text
+
+
+def test_dashboard_job_execution_trends_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/job-execution-trends?days=7")
+
+    assert response.status_code == 200
+    assert "Worker Execution Trends" in response.text
+    assert "Worker execution trends JSON" in response.text
+    assert "Handoff success" in response.text
 
 
 def test_dashboard_system_status_renders() -> None:

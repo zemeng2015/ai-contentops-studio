@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from contentops_core.factory import build_pipeline
 from contentops_core.jobs import (
     JobExecutionReport,
@@ -9,6 +10,7 @@ from contentops_core.jobs import (
     JobRunResult,
     get_job_execution_report,
     job_execution_summary,
+    job_execution_trends,
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -224,6 +226,67 @@ def test_job_execution_summary_counts_outcomes() -> None:
     assert summary.homepage_handoff_failed == 1
     assert summary.release_evidence_ready is True
     assert summary.action_required is True
+
+
+def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    first = JobExecutionReport(
+        name="first",
+        total=2,
+        succeeded=2,
+        failed=0,
+        release_evidence_path="release-evidence/first",
+        results=[
+            JobRunResult(
+                job_name="published",
+                topic="Published",
+                publish=True,
+                run_id="run-1",
+                status="published",
+                published_url="https://example.com/one",
+            ),
+            JobRunResult(
+                job_name="handoff",
+                topic="Handoff",
+                homepage_handoff=True,
+                run_id="run-2",
+                status="needs_review",
+                homepage_handoff_path="handoff.zip",
+            ),
+        ],
+    )
+    second = JobExecutionReport(
+        name="second",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="failed",
+                topic="Failed",
+                homepage_handoff=True,
+                status="failed",
+                homepage_handoff_error="missing homepage repo",
+                error="provider failed",
+            )
+        ],
+    )
+    write_job_execution_report(first, receipt_dir)
+    write_job_execution_report(second, receipt_dir)
+
+    report = job_execution_trends(receipt_dir, days=1)
+
+    assert report.summary.execution_count == 2
+    assert report.summary.total_jobs == 3
+    assert report.summary.succeeded_jobs == 2
+    assert report.summary.failed_jobs == 1
+    assert report.summary.generated_runs == 2
+    assert report.summary.published_runs == 1
+    assert report.summary.homepage_handoff_ready == 1
+    assert report.summary.homepage_handoff_failed == 1
+    assert report.summary.action_required == 1
+    assert report.summary.success_rate == pytest.approx(2 / 3)
+    assert report.buckets[-1].execution_count == 2
 
 
 def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -99,6 +99,44 @@ class JobExecutionSummary(BaseModel):
     homepage_handoff_failed: int
     release_evidence_ready: bool
     action_required: bool
+
+
+class JobExecutionTrendBucket(BaseModel):
+    date: str
+    execution_count: int = Field(ge=0)
+    total_jobs: int = Field(ge=0)
+    succeeded_jobs: int = Field(ge=0)
+    failed_jobs: int = Field(ge=0)
+    generated_runs: int = Field(ge=0)
+    published_runs: int = Field(ge=0)
+    homepage_handoff_ready: int = Field(ge=0)
+    homepage_handoff_failed: int = Field(ge=0)
+    action_required: int = Field(ge=0)
+    success_rate: float = Field(ge=0, le=1)
+    publish_rate: float = Field(ge=0, le=1)
+    handoff_success_rate: float = Field(ge=0, le=1)
+
+
+class JobExecutionTrendSummary(BaseModel):
+    execution_count: int = Field(ge=0)
+    total_jobs: int = Field(ge=0)
+    succeeded_jobs: int = Field(ge=0)
+    failed_jobs: int = Field(ge=0)
+    generated_runs: int = Field(ge=0)
+    published_runs: int = Field(ge=0)
+    homepage_handoff_ready: int = Field(ge=0)
+    homepage_handoff_failed: int = Field(ge=0)
+    action_required: int = Field(ge=0)
+    success_rate: float = Field(ge=0, le=1)
+    publish_rate: float = Field(ge=0, le=1)
+    handoff_success_rate: float = Field(ge=0, le=1)
+
+
+class JobExecutionTrendReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    days: int = Field(ge=1)
+    buckets: list[JobExecutionTrendBucket]
+    summary: JobExecutionTrendSummary
 
 
 class JobExecutionListResponse(BaseModel):
@@ -342,6 +380,33 @@ def list_job_execution_reports(
     )
 
 
+def job_execution_trends(receipt_dir: Path, days: int = 14) -> JobExecutionTrendReport:
+    if days < 1:
+        raise ValueError("days must be at least 1.")
+    today = datetime.now(UTC).date()
+    start = today - timedelta(days=days - 1)
+    reports = [
+        report
+        for report in (
+            _read_job_execution_report(path) for path in _job_execution_receipt_paths(receipt_dir)
+        )
+        if report.completed_at.date() >= start
+    ]
+    reports_by_date: dict[str, list[JobExecutionReport]] = {}
+    for report in reports:
+        key = report.completed_at.date().isoformat()
+        reports_by_date.setdefault(key, []).append(report)
+    buckets = [
+        _job_execution_trend_bucket(day, reports_by_date.get(day.isoformat(), []))
+        for day in _date_range(start, today)
+    ]
+    return JobExecutionTrendReport(
+        days=days,
+        buckets=buckets,
+        summary=_job_execution_trend_summary(reports),
+    )
+
+
 def get_job_execution_report(receipt_dir: Path, execution_id: str) -> JobExecutionReport:
     normalized = execution_id.strip()
     if not normalized:
@@ -422,6 +487,65 @@ def job_execution_summary(report: JobExecutionReport) -> JobExecutionSummary:
         and report.release_evidence_error is None,
         action_required=action_required,
     )
+
+
+def _job_execution_trend_bucket(
+    bucket_date: date,
+    reports: list[JobExecutionReport],
+) -> JobExecutionTrendBucket:
+    summary = _job_execution_trend_summary(reports)
+    return JobExecutionTrendBucket(
+        date=bucket_date.isoformat(),
+        execution_count=summary.execution_count,
+        total_jobs=summary.total_jobs,
+        succeeded_jobs=summary.succeeded_jobs,
+        failed_jobs=summary.failed_jobs,
+        generated_runs=summary.generated_runs,
+        published_runs=summary.published_runs,
+        homepage_handoff_ready=summary.homepage_handoff_ready,
+        homepage_handoff_failed=summary.homepage_handoff_failed,
+        action_required=summary.action_required,
+        success_rate=summary.success_rate,
+        publish_rate=summary.publish_rate,
+        handoff_success_rate=summary.handoff_success_rate,
+    )
+
+
+def _job_execution_trend_summary(
+    reports: list[JobExecutionReport],
+) -> JobExecutionTrendSummary:
+    summaries = [job_execution_summary(report) for report in reports]
+    total_jobs = sum(summary.total_jobs for summary in summaries)
+    succeeded_jobs = sum(summary.succeeded for summary in summaries)
+    generated_runs = sum(summary.generated_runs for summary in summaries)
+    published_runs = sum(summary.published_runs for summary in summaries)
+    handoff_ready = sum(summary.homepage_handoff_ready for summary in summaries)
+    handoff_failed = sum(summary.homepage_handoff_failed for summary in summaries)
+    handoff_total = handoff_ready + handoff_failed
+    return JobExecutionTrendSummary(
+        execution_count=len(reports),
+        total_jobs=total_jobs,
+        succeeded_jobs=succeeded_jobs,
+        failed_jobs=sum(summary.failed for summary in summaries),
+        generated_runs=generated_runs,
+        published_runs=published_runs,
+        homepage_handoff_ready=handoff_ready,
+        homepage_handoff_failed=handoff_failed,
+        action_required=sum(1 for summary in summaries if summary.action_required),
+        success_rate=_ratio(succeeded_jobs, total_jobs),
+        publish_rate=_ratio(published_runs, generated_runs),
+        handoff_success_rate=_ratio(handoff_ready, handoff_total),
+    )
+
+
+def _date_range(start: date, end: date) -> list[date]:
+    return [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
+
+
+def _ratio(numerator: int, denominator: int) -> float:
+    if denominator <= 0:
+        return 0.0
+    return numerator / denominator
 
 
 def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:

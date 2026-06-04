@@ -52,6 +52,7 @@ contentops worker-jobs --json
 contentops job-executions --json
 contentops job-execution <execution_id>
 contentops job-execution-summary <execution_id>
+contentops job-execution-trends --days 14
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 
@@ -60,6 +61,9 @@ run ids, artifact directories, publish URLs, duration, and the post-run release 
 Use `contentops job-execution-summary <execution_id>` or
 `GET /job-executions/{execution_id}/summary` to scan generated runs, published runs, handoff
 readiness, release evidence readiness, and whether operator action is required.
+Use `contentops job-execution-trends --days 14`, `GET /job-executions/trends?days=14`, or
+`/dashboard/job-execution-trends` to check recurring automation success, publish, handoff, and
+action-required rates before changing the EventBridge schedule.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced

@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 from contentops_core.jobs import (
     JobExecutionReport,
+    JobExecutionTrendReport,
     WorkerJobCatalogItem,
     job_execution_summary,
 )
@@ -752,6 +753,54 @@ def _ops_trends_html(report: OpsTrendReport) -> str:
             <th>Date</th><th>Runs</th><th>Published</th><th>Failed</th>
             <th>Review</th><th>Incidents</th><th>Quality</th>
             <th>Budget</th><th>Avg run</th><th>Tokens</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(bucket.date)}</td>
+          <td>{bucket.execution_count}</td>
+          <td>{bucket.total_jobs}</td>
+          <td>{bucket.generated_runs}</td>
+          <td>{bucket.published_runs}</td>
+          <td>{bucket.homepage_handoff_ready}</td>
+          <td>{bucket.homepage_handoff_failed}</td>
+          <td>{bucket.action_required}</td>
+          <td>{bucket.success_rate:.0%}</td>
+          <td>{bucket.publish_rate:.0%}</td>
+          <td>{bucket.handoff_success_rate:.0%}</td>
+        </tr>
+        """
+        for bucket in report.buckets
+    )
+    return f"""
+      <p><a href="/job-executions/trends">Worker execution trends JSON</a></p>
+      <div class="metrics">
+        <div><strong>{report.days}</strong><span>Days</span></div>
+        <div><strong>{report.summary.execution_count}</strong><span>Executions</span></div>
+        <div><strong>{report.summary.total_jobs}</strong><span>Jobs</span></div>
+        <div><strong>{report.summary.generated_runs}</strong><span>Generated runs</span></div>
+        <div><strong>{report.summary.published_runs}</strong><span>Published runs</span></div>
+        <div><strong>{report.summary.action_required}</strong><span>Action required</span></div>
+        <div><strong>{report.summary.success_rate:.0%}</strong><span>Job success</span></div>
+        <div><strong>{report.summary.publish_rate:.0%}</strong><span>Publish rate</span></div>
+        <div>
+          <strong>{report.summary.handoff_success_rate:.0%}</strong>
+          <span>Handoff success</span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Executions</th><th>Jobs</th><th>Generated</th>
+            <th>Published</th><th>Handoff ready</th><th>Handoff failed</th>
+            <th>Action</th><th>Job success</th><th>Publish rate</th><th>Handoff</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>

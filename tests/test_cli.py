@@ -443,6 +443,7 @@ def test_cli_job_execution_commands(
     text_list_result = runner.invoke(app, ["job-executions"])
     detail_result = runner.invoke(app, ["job-execution", report.execution_id])
     summary_result = runner.invoke(app, ["job-execution-summary", report.execution_id])
+    trends_result = runner.invoke(app, ["job-execution-trends", "--days", "1"])
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
 
     assert list_result.exit_code == 0
@@ -458,6 +459,9 @@ def test_cli_job_execution_commands(
     summary_payload = json.loads(summary_result.output)
     assert summary_payload["total_jobs"] == 1
     assert summary_payload["generated_runs"] == 0
+    assert trends_result.exit_code == 0
+    trends_payload = json.loads(trends_result.output)
+    assert trends_payload["summary"]["execution_count"] == 1
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

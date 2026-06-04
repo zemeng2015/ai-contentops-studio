@@ -194,6 +194,9 @@ source URLs, metadata, and recovery-plan JSON.
 `GET /job-executions/{id}/summary` and `contentops job-execution-summary` compute generated run,
 published run, handoff, release evidence, and action-required counts from the receipt so operators
 can scan a scheduled execution before opening individual runs.
+`GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
+dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
+handoff success rate, and action-required counts.
 Failed executions also expose a recovery plan through
 `GET /job-executions/{id}/recovery-plan` and `contentops job-recovery-plan`. The plan rebuilds the
 failed jobs as a YAML-compatible content calendar while preserving topic, source URLs, publish
