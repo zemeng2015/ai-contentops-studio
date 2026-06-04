@@ -75,6 +75,10 @@ class JobExecutionReport(BaseModel):
     completed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     duration_ms: int = 0
     receipt_path: str | None = None
+    release_evidence_path: str | None = None
+    release_evidence_status: str | None = None
+    release_evidence_files: list[str] = Field(default_factory=list)
+    release_evidence_error: str | None = None
 
 
 class JobExecutionListResponse(BaseModel):
@@ -237,6 +241,14 @@ def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) ->
         / f"{report.started_at:%Y%m%dT%H%M%SZ}-{report.name}-{report.execution_id}.json"
     )
     report.receipt_path = str(path)
+    path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    return path
+
+
+def rewrite_job_execution_report(report: JobExecutionReport) -> Path:
+    if report.receipt_path is None:
+        raise ValueError("Job execution receipt path is missing.")
+    path = Path(report.receipt_path)
     path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     return path
 

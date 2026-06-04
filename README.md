@@ -228,6 +228,12 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
 
+Executed worker jobs automatically write post-run release evidence under
+`artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
+and file list in the job execution receipt. Use `--release-evidence-dir` to choose a specific
+evidence directory, or `--skip-release-evidence` for local smoke tests that should only write the
+worker receipt.
+
 Generate review-ready posts from GitHub project repositories:
 
 ```powershell

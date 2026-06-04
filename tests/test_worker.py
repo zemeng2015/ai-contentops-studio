@@ -57,6 +57,75 @@ def test_worker_dry_run_can_emit_json(tmp_path: Path) -> None:
     assert len(list(receipt_dir.glob("*.json"))) == 1
 
 
+def test_worker_run_attaches_release_evidence_to_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    path = tmp_path / "jobs.yaml"
+    path.write_text("name: evidence-job\ntopic: Worker evidence automation\n", encoding="utf-8")
+    receipt_dir = tmp_path / "receipts"
+    evidence_dir = tmp_path / "release-evidence"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-pipeline",
+            str(path),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--release-evidence-dir",
+            str(evidence_dir),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    receipt = next(receipt_dir.glob("*.json"))
+    receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["release_evidence_path"] == str(evidence_dir)
+    assert receipt_payload["release_evidence_path"] == str(evidence_dir)
+    assert payload["release_evidence_status"] in {"pass", "warn", "fail"}
+    assert "homepage_handoffs.json" in payload["release_evidence_files"]
+    assert (evidence_dir / "summary.json").exists()
+    assert (evidence_dir / "evidence_manifest.json").exists()
+
+
+def test_worker_run_can_skip_release_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    path = tmp_path / "jobs.yaml"
+    path.write_text("name: skip-evidence\ntopic: Skip worker evidence\n", encoding="utf-8")
+    receipt_dir = tmp_path / "receipts"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-pipeline",
+            str(path),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--skip-release-evidence",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["release_evidence_path"] is None
+    assert payload["release_evidence_files"] == []
+    assert not (tmp_path / "artifacts" / "release-evidence").exists()
+
+
 def test_worker_dry_run_mirrors_receipt_to_s3(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

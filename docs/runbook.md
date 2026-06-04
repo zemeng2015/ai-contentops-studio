@@ -55,8 +55,11 @@ contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 
 Review the worker catalog before execution, then inspect the execution receipt for per-job failures,
-run ids, artifact directories, publish URLs, and duration. In AWS, mirror
-`artifacts/job-executions` to S3 with the rest of the artifact tree.
+run ids, artifact directories, publish URLs, duration, and the post-run release evidence path.
+In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
+For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
+deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced
+for CI/CD release reviews.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

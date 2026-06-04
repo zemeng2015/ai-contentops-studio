@@ -222,8 +222,13 @@ In Terraform deployments, pass `operator_api_key_secret_arn`, `read_api_key_secr
 configuration.
 
 Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-executions` unless
-`--receipt-dir` is provided. In ECS/EventBridge deployments, keep artifact mirroring enabled so
-these receipts are copied to S3 with the rest of the run artifacts and release evidence.
+`--receipt-dir` is provided. Non-dry-run executions also generate post-run release evidence under
+`CONTENTOPS_ARTIFACT_ROOT/release-evidence/job-executions/<execution_id>` unless
+`--release-evidence-dir` or `--skip-release-evidence` is provided. The worker receipt records the
+evidence path, release status, evidence files, and any evidence generation error so scheduled
+automation can be audited from a single JSON record.
+In ECS/EventBridge deployments, keep artifact mirroring enabled so these receipts are copied to S3
+with the rest of the run artifacts and release evidence.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.

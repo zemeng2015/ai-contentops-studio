@@ -565,6 +565,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     path = tmp_path / "job.yaml"
     path.write_text("name: api-job-history\ntopic: API job history\n", encoding="utf-8")
     report = JobRunner.dry_run_report(load_job_file(path))
+    report.release_evidence_path = str(tmp_path / "release-evidence")
+    report.release_evidence_status = "warn"
+    report.release_evidence_files = ["summary.json", "homepage_handoffs.json"]
     write_job_execution_report(report, job_execution_dir(settings.artifact_root))
     assert report.receipt_path is not None
     receipt_path = Path(report.receipt_path)
@@ -609,6 +612,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert dashboard_detail_response.status_code == 200
     assert "Execution JSON" in dashboard_detail_response.text
     assert "API job history" in dashboard_detail_response.text
+    assert "Evidence status" in dashboard_detail_response.text
+    assert "homepage_handoffs.json" in detail_response.text
+    assert str(tmp_path / "release-evidence") in dashboard_detail_response.text
     assert "S3 Mirror Log" in dashboard_detail_response.text
     assert "job-bucket" in dashboard_detail_response.text
 

@@ -409,6 +409,9 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
 
 
 def _job_execution_detail_html(report: JobExecutionReport) -> str:
+    release_evidence = report.release_evidence_path or "not recorded"
+    release_evidence_status = report.release_evidence_status or "n/a"
+    release_evidence_error = report.release_evidence_error or "none"
     rows = "".join(
         f"""
         <tr>
@@ -438,7 +441,13 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
         <div><strong>{str(report.dry_run).lower()}</strong><span>Dry run</span></div>
         <div><strong>{_duration_label(report.duration_ms)}</strong><span>Duration</span></div>
         <div><strong>{escape(report.started_at.isoformat())}</strong><span>Started</span></div>
+        <div><strong>{escape(release_evidence_status)}</strong><span>Evidence status</span></div>
+        <div><strong>{len(report.release_evidence_files)}</strong><span>Evidence files</span></div>
       </div>
+      <p>
+        Release evidence: <code>{escape(release_evidence)}</code><br>
+        Evidence error: {escape(release_evidence_error)}
+      </p>
       <table>
         <thead>
           <tr>
