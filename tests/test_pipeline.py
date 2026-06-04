@@ -186,6 +186,14 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert operations_summary.action_required_incidents == 0
     assert operations_summary.quality_pass_rate == 1
     assert operations_summary.budget_pass_rate == 1
+    operations_trends = review_service.operations_trends(days=7)
+    active_buckets = [bucket for bucket in operations_trends.buckets if bucket.run_count]
+    assert operations_trends.summary.total_runs == 1
+    assert len(active_buckets) == 1
+    assert active_buckets[0].published_count == 1
+    assert active_buckets[0].quality_pass_rate == 1
+    assert active_buckets[0].budget_pass_rate == 1
+    assert active_buckets[0].estimated_total_tokens > 0
     assert retention_report.total_runs_scanned == 1
     assert retention_report.total_size_bytes > 0
     assert retention_report.candidate_count == 0

@@ -29,6 +29,7 @@ from contentops_core.models import (
     DeploymentManifest,
     IncidentReportListResponse,
     OperationsSummary,
+    OpsTrendReport,
     PublishedContentListResponse,
     ReleaseApprovalListResponse,
     ReleaseApprovalRecord,
@@ -388,5 +389,16 @@ def build_ops_router(
         window_size: int = Query(default=100, ge=1, le=500),
     ) -> OperationsSummary:
         return review_service.operations_summary(window_size=window_size)
+
+    @router.get(
+        "/ops-trends",
+        response_model=OpsTrendReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_ops_trends(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=500, ge=1, le=1000),
+    ) -> OpsTrendReport:
+        return review_service.operations_trends(days=days, window_size=window_size)
 
     return router

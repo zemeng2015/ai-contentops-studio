@@ -17,6 +17,7 @@ from contentops_core.models import (
     IncidentReportListResponse,
     NotificationDelivery,
     OperationsSummary,
+    OpsTrendReport,
     PublishedContentListResponse,
     PublishPlan,
     PublishReceipt,
@@ -670,6 +671,50 @@ def _operations_summary_html(summary: OperationsSummary) -> str:
         <div><strong>{_duration_label(summary.avg_duration_ms)}</strong><span>Avg run</span></div>
         <div><strong>{summary.estimated_total_tokens}</strong><span>Window tokens</span></div>
       </div>
+    """
+
+
+def _ops_trends_html(report: OpsTrendReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(bucket.date)}</td>
+          <td>{bucket.run_count}</td>
+          <td>{bucket.published_count}</td>
+          <td>{bucket.failed_count}</td>
+          <td>{bucket.review_queue_count}</td>
+          <td>{bucket.action_required_incidents}</td>
+          <td>{bucket.quality_pass_rate:.0%}</td>
+          <td>{bucket.budget_pass_rate:.0%}</td>
+          <td>{_duration_label(bucket.avg_duration_ms)}</td>
+          <td>{bucket.estimated_total_tokens}</td>
+        </tr>
+        """
+        for bucket in report.buckets
+    )
+    return f"""
+      <p>
+        <a href="/ops-trends">Ops trends JSON</a> |
+        <a href="/ops-summary">Operations summary JSON</a>
+      </p>
+      <div class="metrics">
+        <div><strong>{report.days}</strong><span>Days</span></div>
+        <div><strong>{report.summary.total_runs}</strong><span>Total runs</span></div>
+        <div><strong>{report.summary.review_queue_depth}</strong><span>Needs review</span></div>
+        <div><strong>{report.summary.failed_count}</strong><span>Failed</span></div>
+        <div><strong>{report.summary.quality_pass_rate:.0%}</strong><span>Quality pass</span></div>
+        <div><strong>{report.summary.budget_pass_rate:.0%}</strong><span>Budget pass</span></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Runs</th><th>Published</th><th>Failed</th>
+            <th>Review</th><th>Incidents</th><th>Quality</th>
+            <th>Budget</th><th>Avg run</th><th>Tokens</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
     """
 
 

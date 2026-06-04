@@ -323,6 +323,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     incident_report_response = client.get(f"/runs/{run['id']}/incident-report")
     incident_reports_response = client.get("/incident-reports?limit=5")
     ops_summary_response = client.get("/ops-summary")
+    ops_trends_response = client.get("/ops-trends?days=7")
     release_readiness_response = client.get("/release-readiness")
     release_evidence_response = client.get("/release-evidence")
     retention_response = client.get("/retention-report?days=3650")
@@ -373,6 +374,10 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert ops_summary_response.status_code == 200
     assert ops_summary_response.json()["total_runs"] >= 1
     assert "needs_review" in ops_summary_response.json()["status_counts"]
+    assert ops_trends_response.status_code == 200
+    assert ops_trends_response.json()["days"] == 7
+    assert ops_trends_response.json()["summary"]["total_runs"] >= 1
+    assert any(bucket["run_count"] >= 1 for bucket in ops_trends_response.json()["buckets"])
     assert release_readiness_response.status_code == 200
     assert release_readiness_response.json()["operations"]["total_runs"] >= 1
     assert release_evidence_response.status_code == 200
@@ -667,11 +672,24 @@ def test_dashboard_renders() -> None:
     assert "Token Budgets" in response.text
     assert "Incident Reports" in response.text
     assert "Operations Summary" in response.text
+    assert "Open operations trends" in response.text
     assert "System status dashboard" in response.text
     assert "Release evidence dashboard" in response.text
     assert "Audit Events" in response.text
     assert "Artifact Retention" in response.text
     assert "Worker Job Catalog" in response.text
+
+
+def test_dashboard_ops_trends_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/ops-trends?days=7")
+
+    assert response.status_code == 200
+    assert "Operations Trends" in response.text
+    assert "Ops trends JSON" in response.text
+    assert "Quality" in response.text
+    assert "Budget" in response.text
 
 
 def test_dashboard_system_status_renders() -> None:

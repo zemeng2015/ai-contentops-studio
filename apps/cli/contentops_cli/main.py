@@ -417,6 +417,36 @@ def ops_summary(
     typer.echo(f"Estimated window tokens: {summary.estimated_total_tokens}")
 
 
+@app.command("ops-trends")
+def ops_trends(
+    days: Annotated[
+        int,
+        typer.Option(help="Number of recent calendar days to bucket."),
+    ] = 14,
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to scan."),
+    ] = 500,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    report = service.operations_trends(days=days, window_size=window_size)
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    typer.echo(f"Days: {report.days}")
+    typer.echo(f"Window size: {report.window_size}")
+    for bucket in report.buckets:
+        typer.echo(
+            f"{bucket.date} runs={bucket.run_count} published={bucket.published_count} "
+            f"failed={bucket.failed_count} quality={bucket.quality_pass_rate:.0%} "
+            f"budget={bucket.budget_pass_rate:.0%} tokens={bucket.estimated_total_tokens}"
+        )
+
+
 @app.command("queue")
 def review_queue(
     limit: Annotated[int, typer.Option(help="Number of queue items to show.")] = 20,

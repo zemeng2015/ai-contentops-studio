@@ -29,6 +29,8 @@ from contentops_core.models import (
     IncidentSeverity,
     NotificationDelivery,
     OperationsSummary,
+    OpsTrendBucket,
+    OpsTrendReport,
     PublishedContentItem,
     PublishedContentListResponse,
     PublishFileChange,
@@ -562,6 +564,28 @@ class ReviewService:
             ),
         )
 
+    def operations_trends(self, days: int = 14, window_size: int = 500) -> OpsTrendReport:
+        days = max(1, days)
+        window_size = max(1, window_size)
+        runs = self.repository.list(limit=window_size)
+        today = datetime.now(UTC).date()
+        bucket_keys = [(today - timedelta(days=offset)).isoformat() for offset in range(days)]
+        buckets_by_date: dict[str, list[RunRecord]] = {key: [] for key in bucket_keys}
+        for run in runs:
+            date_key = _ensure_utc(run.updated_at).date().isoformat()
+            if date_key in buckets_by_date:
+                buckets_by_date[date_key].append(run)
+        buckets = [
+            self._ops_trend_bucket(date_key, buckets_by_date[date_key])
+            for date_key in reversed(bucket_keys)
+        ]
+        return OpsTrendReport(
+            days=days,
+            window_size=window_size,
+            buckets=buckets,
+            summary=self.operations_summary(window_size=window_size),
+        )
+
     def retention_report(
         self,
         retention_days: int = 90,
@@ -597,6 +621,36 @@ class ReviewService:
             candidate_count=len(candidates),
             candidate_size_bytes=sum(item.size_bytes for item in candidates),
             candidates=candidates,
+        )
+
+    def _ops_trend_bucket(self, date_key: str, runs: list[RunRecord]) -> OpsTrendBucket:
+        scorecards = [self._scorecard_for_run(run) for run in runs]
+        cost_reports = [self._cost_report_for_run(run) for run in runs]
+        incident_reports = [self._incident_report_for_run(run) for run in runs]
+        durations = [
+            item.total_duration_ms
+            for item in scorecards
+            if item.total_duration_ms is not None
+        ]
+        return OpsTrendBucket(
+            date=date_key,
+            run_count=len(runs),
+            published_count=sum(1 for run in runs if run.status == RunStatus.PUBLISHED),
+            failed_count=sum(1 for run in runs if run.status == RunStatus.FAILED),
+            review_queue_count=sum(1 for run in runs if run.status == RunStatus.NEEDS_REVIEW),
+            action_required_incidents=sum(
+                1 for item in incident_reports if item.requires_action
+            ),
+            quality_pass_rate=_pass_rate(
+                item.overall_pass for item in scorecards if item.overall_pass is not None
+            ),
+            budget_pass_rate=_pass_rate(item.budget_pass for item in cost_reports),
+            avg_duration_ms=(
+                int(sum(durations) / len(durations)) if durations else None
+            ),
+            estimated_total_tokens=sum(
+                item.estimated_total_tokens for item in cost_reports
+            ),
         )
 
     def compare(self, base_run_id: str, candidate_run_id: str) -> RunComparison:

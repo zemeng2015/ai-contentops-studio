@@ -106,6 +106,10 @@ The operations summary composes repository status counts with scorecards, cost r
 incident reports over a recent-run window. This gives operators one API/CLI/dashboard view for
 queue depth, approved-but-unpublished work, failed runs, pass rates, average duration, incident
 severity, and estimated token usage.
+Operations trends bucket the same run, scorecard, cost, and incident evidence by calendar day.
+They are exposed through `/ops-trends`, `contentops ops-trends`, and `/dashboard/ops-trends` so
+operators can inspect publishing throughput, quality pass rate, budget posture, and incident
+pressure without manually stitching together individual reports.
 The deployment manifest reuses readiness checks and adds redacted runtime, security, operations,
 and capability evidence. It is intended for release reviews, interview walkthroughs, and
 automation that needs to understand deployment posture without exposing secrets.

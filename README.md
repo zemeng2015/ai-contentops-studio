@@ -131,6 +131,7 @@ contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record
 contentops release-gates --json
+contentops ops-trends --days 14 --json
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, and
@@ -147,6 +148,7 @@ Representative endpoints:
 POST /runs
 GET  /runs
 GET  /dashboard
+GET  /dashboard/ops-trends
 GET  /dashboard/system-status
 GET  /dashboard/release-evidence
 GET  /review-queue
@@ -158,6 +160,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /ops-summary
+GET  /ops-trends
 GET  /config-audit
 GET  /deployment-manifest
 GET  /deployment-check

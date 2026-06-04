@@ -294,6 +294,7 @@ def test_cli_queue_and_manifest_commands(
         ["incident-reports", "--query", "searchable", "--json"],
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
+    ops_trends_result = runner.invoke(app, ["ops-trends", "--days", "7", "--json"])
     release_readiness_result = runner.invoke(app, ["release-readiness", "--json"])
     release_evidence_dir = tmp_path / "release-evidence"
     release_evidence_result = runner.invoke(
@@ -340,6 +341,11 @@ def test_cli_queue_and_manifest_commands(
     ops_summary_payload = json.loads(ops_summary_result.output)
     assert ops_summary_payload["total_runs"] == 1
     assert ops_summary_payload["review_queue_depth"] == 1
+    assert ops_trends_result.exit_code == 0
+    ops_trends_payload = json.loads(ops_trends_result.output)
+    assert ops_trends_payload["days"] == 7
+    assert ops_trends_payload["summary"]["total_runs"] == 1
+    assert any(bucket["run_count"] == 1 for bucket in ops_trends_payload["buckets"])
     assert release_readiness_result.exit_code == 0
     release_readiness_payload = json.loads(release_readiness_result.output)
     assert release_readiness_payload["operations"]["total_runs"] == 1

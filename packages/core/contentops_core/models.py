@@ -388,6 +388,27 @@ class OperationsSummary(BaseModel):
     estimated_total_tokens: int = Field(ge=0)
 
 
+class OpsTrendBucket(BaseModel):
+    date: str
+    run_count: int = Field(ge=0)
+    published_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    review_queue_count: int = Field(ge=0)
+    action_required_incidents: int = Field(ge=0)
+    quality_pass_rate: float = Field(ge=0, le=1)
+    budget_pass_rate: float = Field(ge=0, le=1)
+    avg_duration_ms: int | None = None
+    estimated_total_tokens: int = Field(ge=0)
+
+
+class OpsTrendReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    days: int = Field(ge=1)
+    window_size: int = Field(ge=1)
+    buckets: list[OpsTrendBucket]
+    summary: OperationsSummary
+
+
 class RetentionCandidate(BaseModel):
     run_id: str
     status: RunStatus

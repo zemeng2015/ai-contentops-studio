@@ -52,6 +52,7 @@ from contentops_api.views import (
     _job_executions_html,
     _notification_log_html,
     _operations_summary_html,
+    _ops_trends_html,
     _page,
     _pagination_html,
     _publish_plan_html,
@@ -211,6 +212,7 @@ def build_dashboard_router(
                   <p>
                     Portfolio-wide run health, queue depth, incident severity, and cost posture.
                   </p>
+                  <p><a href="/dashboard/ops-trends">Open operations trends</a></p>
                   {_operations_summary_html(operations_summary)}
                 </section>
                 <section class="hero compact">
@@ -261,6 +263,35 @@ def build_dashboard_router(
         )
     
     
+    @router.get(
+        "/dashboard/ops-trends",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_ops_trends(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=500, ge=1, le=1000),
+        api_key: str = Query(default=""),
+    ) -> HTMLResponse:
+        report = review_service.operations_trends(days=days, window_size=window_size)
+        return HTMLResponse(
+            _page(
+                "Operations Trends",
+                f"""
+                <section class="hero compact">
+                  <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                  <h2>Operations Trends</h2>
+                  <p>
+                    Daily run health, publishing throughput, quality, budget,
+                    and incident posture.
+                  </p>
+                  {_ops_trends_html(report)}
+                </section>
+                """,
+            )
+        )
+
+
     @router.get(
         "/dashboard/worker-jobs",
         response_class=HTMLResponse,
