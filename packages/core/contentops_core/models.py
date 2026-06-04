@@ -488,6 +488,43 @@ class DeploymentCheckReport(BaseModel):
     release_readiness: ReleaseReadinessReport
 
 
+class ReleaseApprovalDecision(StrEnum):
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class ReleaseApprovalRequest(BaseModel):
+    decision: ReleaseApprovalDecision
+    approver: str = "operator"
+    notes: str = ""
+    force: bool = False
+    window_size: int = Field(ge=1, default=100)
+
+
+class ReleaseApprovalRecord(BaseModel):
+    approval_id: str
+    release_id: str
+    decision: ReleaseApprovalDecision
+    approver: str
+    notes: str = ""
+    force: bool = False
+    git_sha: str | None = None
+    release_status: str
+    deployment_status: str
+    can_release: bool
+    can_deploy: bool
+    evidence_sha256: str
+    evidence_files: list[str] = Field(default_factory=list)
+    approved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ReleaseApprovalListResponse(BaseModel):
+    items: list[ReleaseApprovalRecord]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 class SourceOverlap(BaseModel):
     base_count: int
     candidate_count: int

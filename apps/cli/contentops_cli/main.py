@@ -21,7 +21,14 @@ from contentops_core.jobs import (
     list_job_execution_reports,
     list_worker_job_catalog,
 )
-from contentops_core.models import RunRequest, RunStatus, SourceAuditReport
+from contentops_core.models import (
+    ReleaseApprovalDecision,
+    ReleaseApprovalRequest,
+    RunRequest,
+    RunStatus,
+    SourceAuditReport,
+)
+from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -241,6 +248,55 @@ def show_release_evidence(
         write_release_evidence(bundle, output_dir, settings=settings)
     typer.echo(bundle.model_dump_json(indent=2))
     raise typer.Exit(0 if bundle.release_readiness.can_release else 1)
+
+
+@app.command("release-approve")
+def release_approve(
+    decision: Annotated[
+        ReleaseApprovalDecision,
+        typer.Option(help="Release approval decision."),
+    ] = ReleaseApprovalDecision.APPROVED,
+    approver: Annotated[str, typer.Option(help="Approver name or automation identity.")] = (
+        "operator"
+    ),
+    notes: Annotated[str, typer.Option(help="Approval notes or rejection reason.")] = "",
+    force: Annotated[
+        bool,
+        typer.Option(help="Allow approval even when release or deployment gates fail."),
+    ] = False,
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to include in release gates."),
+    ] = 100,
+) -> None:
+    settings = Settings()
+    try:
+        record = approve_release(
+            settings=settings,
+            repository=RunRepository(settings.database_url),
+            review_service=build_review_service(settings),
+            request=ReleaseApprovalRequest(
+                decision=decision,
+                approver=approver,
+                notes=notes,
+                force=force,
+                window_size=window_size,
+            ),
+        )
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(record.model_dump_json(indent=2))
+
+
+@app.command("release-approvals")
+def release_approvals(
+    limit: Annotated[int, typer.Option(help="Maximum approvals to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of approvals to skip.")] = 0,
+) -> None:
+    settings = Settings()
+    approvals = list_release_approvals(settings.artifact_root, limit=limit, offset=offset)
+    typer.echo(approvals.model_dump_json(indent=2))
 
 
 @app.command("ops-summary")

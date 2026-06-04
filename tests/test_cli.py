@@ -79,6 +79,40 @@ def test_cli_doctor_reports_system_status(
     assert release_payload["can_release"] is True
 
 
+def test_cli_release_approval_records_decision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+
+    approval_result = runner.invoke(
+        app,
+        [
+            "release-approve",
+            "--decision",
+            "approved",
+            "--approver",
+            "zack",
+            "--notes",
+            "CLI approval record.",
+        ],
+    )
+    list_result = runner.invoke(app, ["release-approvals"])
+
+    assert approval_result.exit_code == 0
+    approval_payload = json.loads(approval_result.output)
+    assert approval_payload["decision"] == "approved"
+    assert approval_payload["approver"] == "zack"
+    assert "deployment_check.json" in approval_payload["evidence_files"]
+    assert list_result.exit_code == 0
+    list_payload = json.loads(list_result.output)
+    assert list_payload["total"] == 1
+    assert list_payload["items"][0]["notes"] == "CLI approval record."
+
+
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:
     runner = CliRunner()
     path = tmp_path / ".env.production"

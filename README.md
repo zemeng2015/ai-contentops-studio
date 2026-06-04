@@ -110,7 +110,7 @@ Each run writes inspectable artifacts such as:
 | Publishing | Static site and homepage publishers, receipts, verification, rollback |
 | Observability | Trace artifacts, scorecards, token budgets, incidents, operations summary |
 | Scheduling | YAML worker jobs, dry runs, receipts, recovery plans |
-| Release Evidence | Deployment manifest, release readiness gate, hashed CI evidence manifest |
+| Release Evidence | Deployment manifest, release readiness gate, release approvals, hashed CI evidence manifest |
 | Deployment | Docker image, Alembic migrations, S3 mirroring, RDS, EventBridge, CloudWatch |
 
 ## CLI Examples
@@ -126,6 +126,8 @@ contentops publish <run_id>
 contentops publish-receipt <run_id>
 contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
+contentops release-approve --decision approved --approver "operator"
+contentops release-approvals
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, and
@@ -157,6 +159,8 @@ GET  /deployment-env-template
 GET  /release-readiness
 GET  /release-evidence
 GET  /release-evidence/bundle
+GET  /release-approvals
+POST /release-approvals
 GET  /worker-jobs
 GET  /job-executions
 ```
@@ -174,6 +178,8 @@ CI includes `deployment_check.json` inside release evidence and also uploads the
 gate output without rerunning local commands.
 The release evidence dashboard also renders those preflight checks for human review before a
 deployment is approved.
+Release approval records capture the approver, decision, notes, force flag, release/deployment
+status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 
 ## Scheduled Jobs
 

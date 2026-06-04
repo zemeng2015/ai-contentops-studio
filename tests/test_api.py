@@ -25,6 +25,7 @@ def test_health_endpoint() -> None:
     env_template_response = client.get("/deployment-env-template")
     release_response = client.get("/release-readiness")
     release_bundle_response = client.get("/release-evidence/bundle")
+    release_approvals_response = client.get("/release-approvals")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -59,6 +60,8 @@ def test_health_endpoint() -> None:
     assert release_response.status_code == 200
     assert release_bundle_response.status_code == 200
     assert release_bundle_response.content.startswith(b"PK")
+    assert release_approvals_response.status_code == 200
+    assert "items" in release_approvals_response.json()
     release_payload = release_response.json()
     assert release_payload["status"] in {"pass", "warn", "fail"}
     assert isinstance(release_payload["can_release"], bool)
@@ -109,6 +112,48 @@ def test_ready_endpoint_reports_read_protection_without_key() -> None:
     )
     assert security_check["status"] == "fail"
     assert security_check["fields"]["read_routes_protected"] is True
+
+
+def test_release_approval_api_and_dashboard(tmp_path: Path) -> None:
+    client = TestClient(app)
+    original_artifact_root = settings.artifact_root
+    settings.artifact_root = tmp_path / "artifacts"
+    try:
+        create_response = client.post(
+            "/release-approvals",
+            json={
+                "decision": "approved",
+                "approver": "zack",
+                "notes": "API approval record.",
+                "force": True,
+            },
+        )
+        list_response = client.get("/release-approvals")
+        dashboard_response = client.get("/dashboard/release-evidence")
+        dashboard_post_response = client.post(
+            "/dashboard/release-approval",
+            data={
+                "decision": "rejected",
+                "approver": "zack",
+                "notes": "Hold deployment.",
+            },
+            follow_redirects=False,
+        )
+    finally:
+        settings.artifact_root = original_artifact_root
+
+    assert create_response.status_code == 200
+    approval = create_response.json()
+    assert approval["decision"] == "approved"
+    assert approval["approver"] == "zack"
+    assert "deployment_check.json" in approval["evidence_files"]
+    assert list_response.status_code == 200
+    assert list_response.json()["total"] == 1
+    assert dashboard_response.status_code == 200
+    assert "Release Approval" in dashboard_response.text
+    assert "Recent Release Approvals" in dashboard_response.text
+    assert "API approval record." in dashboard_response.text
+    assert dashboard_post_response.status_code == 303
 
 
 def test_read_routes_can_require_operator_key() -> None:

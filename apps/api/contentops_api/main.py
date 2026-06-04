@@ -121,6 +121,7 @@ app.include_router(
         repository=repository,
         review_service=review_service,
         require_read_access=require_read_access,
+        require_operator=require_operator,
         parse_status_filter=_parse_status_filter,
     )
 )

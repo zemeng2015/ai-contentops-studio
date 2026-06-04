@@ -28,6 +28,9 @@ from contentops_core.models import (
     IncidentReportListResponse,
     OperationsSummary,
     PublishedContentListResponse,
+    ReleaseApprovalListResponse,
+    ReleaseApprovalRecord,
+    ReleaseApprovalRequest,
     ReleaseEvidenceBundle,
     ReleaseReadinessReport,
     RetentionReport,
@@ -35,6 +38,7 @@ from contentops_core.models import (
     ScorecardListResponse,
     SystemStatus,
 )
+from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import (
     build_release_evidence,
     create_release_evidence_archive,
@@ -46,6 +50,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 
 ReadAccessDependency = Callable[[Request], Awaitable[None]]
+OperatorDependency = Callable[[Request], Awaitable[None]]
 StatusParser = Callable[[str], RunStatus | None]
 
 
@@ -55,6 +60,7 @@ def build_ops_router(
     repository: RunRepository,
     review_service: ReviewService,
     require_read_access: ReadAccessDependency,
+    require_operator: OperatorDependency,
     parse_status_filter: StatusParser,
 ) -> APIRouter:
     router = APIRouter()
@@ -148,6 +154,33 @@ def build_ops_router(
             media_type="application/zip",
             filename=archive_path.name,
         )
+
+    @router.get(
+        "/release-approvals",
+        response_model=ReleaseApprovalListResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_release_approvals(
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> ReleaseApprovalListResponse:
+        return list_release_approvals(settings.artifact_root, limit=limit, offset=offset)
+
+    @router.post(
+        "/release-approvals",
+        response_model=ReleaseApprovalRecord,
+        dependencies=[Depends(require_operator)],
+    )
+    def create_release_approval(request: ReleaseApprovalRequest) -> ReleaseApprovalRecord:
+        try:
+            return approve_release(
+                settings=settings,
+                repository=repository,
+                review_service=review_service,
+                request=request,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @router.get(
         "/worker-jobs",

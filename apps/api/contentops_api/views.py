@@ -20,6 +20,7 @@ from contentops_core.models import (
     PublishPlan,
     PublishReceipt,
     PublishVerificationReport,
+    ReleaseApprovalListResponse,
     ReleaseEvidenceBundle,
     RetentionReport,
     RunComparison,
@@ -996,6 +997,56 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <table>
         <thead><tr><th>File</th></tr></thead>
         <tbody>{artifact_rows}</tbody>
+      </table>
+    """
+
+
+def _release_approvals_html(approvals: ReleaseApprovalListResponse, api_key: str) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(record.decision.value)}</td>
+          <td>{escape(record.approver)}</td>
+          <td>{escape(record.release_status)}</td>
+          <td>{escape(record.deployment_status)}</td>
+          <td>{escape(record.git_sha or "n/a")}</td>
+          <td>{escape(record.approved_at.isoformat())}</td>
+          <td>{escape(record.notes or "")}</td>
+        </tr>
+        """
+        for record in approvals.items
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="7"><span class="muted">No release approvals recorded.</span></td>
+        </tr>
+        """
+    return f"""
+      <h2>Release Approval</h2>
+      <form method="post" action="/dashboard/release-approval{_api_key_query(api_key)}">
+        {_api_key_hidden(api_key)}
+        <label>
+          Decision
+          <select name="decision">
+            <option value="approved">Approve release</option>
+            <option value="rejected">Reject release</option>
+          </select>
+        </label>
+        <label>Approver <input name="approver" value="operator"></label>
+        <label>Notes <input name="notes" placeholder="Approval context or rejection reason"></label>
+        <label><input type="checkbox" name="force" value="true"> Force approval</label>
+        <button type="submit">Record Decision</button>
+      </form>
+      <h2>Recent Release Approvals</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Decision</th><th>Approver</th><th>Release</th><th>Deploy</th>
+            <th>Git SHA</th><th>Time</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 

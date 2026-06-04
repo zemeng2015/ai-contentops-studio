@@ -14,8 +14,16 @@ from contentops_core.jobs import (
     list_job_execution_reports,
     list_worker_job_catalog,
 )
-from contentops_core.models import ArtifactMirrorRecord, RunMetrics, RunRequest, RunStatus
+from contentops_core.models import (
+    ArtifactMirrorRecord,
+    ReleaseApprovalDecision,
+    ReleaseApprovalRequest,
+    RunMetrics,
+    RunRequest,
+    RunStatus,
+)
 from contentops_core.pipeline import ContentOpsPipeline
+from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
@@ -47,6 +55,7 @@ from contentops_api.views import (
     _publish_receipt_html,
     _publish_verification_html,
     _published_content_html,
+    _release_approvals_html,
     _release_evidence_html,
     _retention_report_html,
     _s3_mirror_log_html,
@@ -311,6 +320,7 @@ def build_dashboard_router(
             review_service=review_service,
             window_size=window_size,
         )
+        approvals = list_release_approvals(settings.artifact_root, limit=10)
         return HTMLResponse(
             _page(
                 "Release Evidence",
@@ -321,6 +331,7 @@ def build_dashboard_router(
                     Human-readable release evidence for deployment review and audit handoff.
                   </p>
                   {_release_evidence_html(bundle)}
+                  {_release_approvals_html(approvals, api_key)}
                 </section>
                 """,
             )
@@ -644,6 +655,34 @@ def build_dashboard_router(
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
+
+
+    @router.post("/dashboard/release-approval", dependencies=[Depends(require_operator)])
+    def dashboard_release_approval(
+        decision: Annotated[ReleaseApprovalDecision, Form()],
+        api_key: str = Query(default=""),
+        approver: Annotated[str, Form()] = "operator",
+        notes: Annotated[str, Form()] = "",
+        force: Annotated[bool, Form()] = False,
+    ) -> RedirectResponse:
+        try:
+            approve_release(
+                settings=settings,
+                repository=repository,
+                review_service=review_service,
+                request=ReleaseApprovalRequest(
+                    decision=decision,
+                    approver=approver,
+                    notes=notes,
+                    force=force,
+                ),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return RedirectResponse(
+            f"/dashboard/release-evidence{_api_key_query(api_key)}",
+            status_code=303,
+        )
     
     
     @router.post("/dashboard/runs/batch-approve", dependencies=[Depends(require_operator)])

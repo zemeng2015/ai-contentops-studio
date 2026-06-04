@@ -157,6 +157,18 @@ contentops release-evidence --output-dir release-evidence
 Invoke-RestMethod http://127.0.0.1:8000/release-evidence
 ```
 
+Record a deployment approval or rejection after reviewing the evidence:
+
+```powershell
+contentops release-approve --decision approved --approver "operator" --notes "Ready to deploy"
+Invoke-RestMethod http://127.0.0.1:8000/release-approvals
+```
+
+Approvals are stored as JSON under `artifacts/release-approvals` with the approver, decision,
+notes, release/deployment gate status, force flag, evidence SHA, and evidence file list. Approved
+decisions require release readiness and deployment preflight to pass unless `--force` or
+`force=true` is used, which keeps emergency releases explicit and auditable.
+
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:
 
