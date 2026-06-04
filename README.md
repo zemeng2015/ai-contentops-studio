@@ -178,6 +178,7 @@ GET  /release-gate
 GET  /release-gates
 GET  /worker-jobs
 GET  /job-executions
+GET  /job-executions/{execution_id}/summary
 POST /job-executions/{execution_id}/approve-runs
 POST /job-executions/{execution_id}/publish-runs
 ```
@@ -227,6 +228,7 @@ Run a worker job:
 
 ```powershell
 contentops worker-jobs --json
+contentops job-execution-summary <execution_id>
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```

@@ -191,6 +191,9 @@ The same receipt history is exposed through `GET /job-executions`, `GET /job-exe
 does not depend on cloud log retention. The dashboard includes a content calendar view for
 planned jobs plus a job execution detail view that links completed jobs back to generated runs,
 source URLs, metadata, and recovery-plan JSON.
+`GET /job-executions/{id}/summary` and `contentops job-execution-summary` compute generated run,
+published run, handoff, release evidence, and action-required counts from the receipt so operators
+can scan a scheduled execution before opening individual runs.
 Failed executions also expose a recovery plan through
 `GET /job-executions/{id}/recovery-plan` and `contentops job-recovery-plan`. The plan rebuilds the
 failed jobs as a YAML-compatible content calendar while preserving topic, source URLs, publish

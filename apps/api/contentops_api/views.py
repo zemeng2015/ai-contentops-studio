@@ -4,7 +4,11 @@ import json
 from html import escape
 from urllib.parse import urlencode
 
-from contentops_core.jobs import JobExecutionReport, WorkerJobCatalogItem
+from contentops_core.jobs import (
+    JobExecutionReport,
+    WorkerJobCatalogItem,
+    job_execution_summary,
+)
 from contentops_core.models import (
     ApprovalRecord,
     ArtifactMirrorRecord,
@@ -412,6 +416,7 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
     release_evidence = report.release_evidence_path or "not recorded"
     release_evidence_status = report.release_evidence_status or "n/a"
     release_evidence_error = report.release_evidence_error or "none"
+    summary = job_execution_summary(report)
     rows = "".join(
         f"""
         <tr>
@@ -439,11 +444,19 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
         <div><strong>{report.total}</strong><span>Total jobs</span></div>
         <div><strong>{report.succeeded}</strong><span>Succeeded</span></div>
         <div><strong>{report.failed}</strong><span>Failed</span></div>
+        <div><strong>{summary.generated_runs}</strong><span>Generated runs</span></div>
+        <div><strong>{summary.published_runs}</strong><span>Published runs</span></div>
+        <div><strong>{summary.homepage_handoff_ready}</strong><span>Handoffs ready</span></div>
+        <div><strong>{summary.homepage_handoff_failed}</strong><span>Handoffs failed</span></div>
         <div><strong>{str(report.dry_run).lower()}</strong><span>Dry run</span></div>
         <div><strong>{_duration_label(report.duration_ms)}</strong><span>Duration</span></div>
         <div><strong>{escape(report.started_at.isoformat())}</strong><span>Started</span></div>
         <div><strong>{escape(release_evidence_status)}</strong><span>Evidence status</span></div>
         <div><strong>{len(report.release_evidence_files)}</strong><span>Evidence files</span></div>
+        <div>
+          <strong>{str(summary.action_required).lower()}</strong>
+          <span>Action required</span>
+        </div>
       </div>
       <p>
         Release evidence: <code>{escape(release_evidence)}</code><br>

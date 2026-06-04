@@ -8,6 +8,7 @@ from contentops_core.jobs import (
     JobRunner,
     JobRunResult,
     get_job_execution_report,
+    job_execution_summary,
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -175,6 +176,54 @@ def test_job_execution_receipts_can_be_listed_and_loaded(tmp_path: Path) -> None
     assert report_list.items[0].receipt_path is not None
     assert loaded.name == "queryable"
     assert loaded.results[0].topic == "Queryable job history"
+
+
+def test_job_execution_summary_counts_outcomes() -> None:
+    report = JobExecutionReport(
+        name="summary",
+        total=3,
+        succeeded=2,
+        failed=1,
+        release_evidence_path="release-evidence",
+        results=[
+            JobRunResult(
+                job_name="published",
+                topic="Published",
+                publish=True,
+                run_id="run-published",
+                status="published",
+                published_url="https://example.com/published",
+            ),
+            JobRunResult(
+                job_name="handoff",
+                topic="Handoff",
+                homepage_handoff=True,
+                run_id="run-handoff",
+                status="needs_review",
+                homepage_handoff_path="artifacts/run-handoff.zip",
+            ),
+            JobRunResult(
+                job_name="failed",
+                topic="Failed",
+                homepage_handoff=True,
+                status="failed",
+                homepage_handoff_error="homepage repo missing",
+                error="provider failed",
+            ),
+        ],
+    )
+
+    summary = job_execution_summary(report)
+
+    assert summary.generated_runs == 2
+    assert summary.publish_intent == 1
+    assert summary.review_intent == 2
+    assert summary.published_runs == 1
+    assert summary.homepage_handoff_requested == 2
+    assert summary.homepage_handoff_ready == 1
+    assert summary.homepage_handoff_failed == 1
+    assert summary.release_evidence_ready is True
+    assert summary.action_required is True
 
 
 def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:

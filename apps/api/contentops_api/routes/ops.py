@@ -13,11 +13,13 @@ from contentops_core.diagnostics import (
 from contentops_core.jobs import (
     JobExecutionListResponse,
     JobExecutionReport,
+    JobExecutionSummary,
     JobRecoveryPlan,
     WorkerJobCatalogResponse,
     get_job_execution_report,
     job_execution_dir,
     job_execution_run_ids,
+    job_execution_summary,
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -273,6 +275,21 @@ def build_ops_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.get(
+        "/job-executions/{execution_id}/summary",
+        response_model=JobExecutionSummary,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_job_execution_summary(execution_id: str) -> JobExecutionSummary:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return job_execution_summary(report)
 
     @router.get(
         "/job-executions/{execution_id}/recovery-plan",

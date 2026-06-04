@@ -440,16 +440,24 @@ def test_cli_job_execution_commands(
     runner = CliRunner()
 
     list_result = runner.invoke(app, ["job-executions", "--json"])
+    text_list_result = runner.invoke(app, ["job-executions"])
     detail_result = runner.invoke(app, ["job-execution", report.execution_id])
+    summary_result = runner.invoke(app, ["job-execution-summary", report.execution_id])
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
 
     assert list_result.exit_code == 0
     list_payload = json.loads(list_result.output)
     assert list_payload["total"] == 1
     assert list_payload["items"][0]["execution_id"] == report.execution_id
+    assert text_list_result.exit_code == 0
+    assert "action_required=" in text_list_result.output
     assert detail_result.exit_code == 0
     detail_payload = json.loads(detail_result.output)
     assert detail_payload["name"] == "cli-job-history"
+    assert summary_result.exit_code == 0
+    summary_payload = json.loads(summary_result.output)
+    assert summary_payload["total_jobs"] == 1
+    assert summary_payload["generated_runs"] == 0
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

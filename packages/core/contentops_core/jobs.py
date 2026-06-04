@@ -86,6 +86,21 @@ class JobExecutionReport(BaseModel):
     release_evidence_error: str | None = None
 
 
+class JobExecutionSummary(BaseModel):
+    total_jobs: int
+    succeeded: int
+    failed: int
+    generated_runs: int
+    publish_intent: int
+    review_intent: int
+    published_runs: int
+    homepage_handoff_requested: int
+    homepage_handoff_ready: int
+    homepage_handoff_failed: int
+    release_evidence_ready: bool
+    action_required: bool
+
+
 class JobExecutionListResponse(BaseModel):
     items: list[JobExecutionReport]
     total: int
@@ -373,6 +388,40 @@ def job_execution_run_ids(report: JobExecutionReport) -> list[str]:
         seen.add(result.run_id)
         run_ids.append(result.run_id)
     return run_ids
+
+
+def job_execution_summary(report: JobExecutionReport) -> JobExecutionSummary:
+    generated_runs = sum(1 for result in report.results if result.run_id is not None)
+    publish_intent = sum(1 for result in report.results if result.publish)
+    handoff_requested = sum(1 for result in report.results if result.homepage_handoff)
+    handoff_ready = sum(1 for result in report.results if result.homepage_handoff_path)
+    handoff_failed = sum(1 for result in report.results if result.homepage_handoff_error)
+    published_runs = sum(
+        1
+        for result in report.results
+        if str(result.status) == RunStatus.PUBLISHED.value or bool(result.published_url)
+    )
+    action_required = (
+        report.failed > 0
+        or handoff_failed > 0
+        or report.release_evidence_error is not None
+        or generated_runs < report.total
+    )
+    return JobExecutionSummary(
+        total_jobs=report.total,
+        succeeded=report.succeeded,
+        failed=report.failed,
+        generated_runs=generated_runs,
+        publish_intent=publish_intent,
+        review_intent=report.total - publish_intent,
+        published_runs=published_runs,
+        homepage_handoff_requested=handoff_requested,
+        homepage_handoff_ready=handoff_ready,
+        homepage_handoff_failed=handoff_failed,
+        release_evidence_ready=report.release_evidence_path is not None
+        and report.release_evidence_error is None,
+        action_required=action_required,
+    )
 
 
 def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:

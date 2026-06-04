@@ -18,6 +18,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     get_job_execution_report,
     job_execution_dir,
+    job_execution_summary,
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
@@ -506,9 +507,12 @@ def job_executions(
         return
     typer.echo(f"Showing {len(report_list.items)} of {report_list.total} job executions")
     for report in report_list.items:
+        summary = job_execution_summary(report)
         typer.echo(
             f"{report.execution_id}  {report.name:24}  "
-            f"{report.succeeded}/{report.total} ok  failed={report.failed}"
+            f"{report.succeeded}/{report.total} ok  failed={report.failed}  "
+            f"runs={summary.generated_runs} published={summary.published_runs} "
+            f"action_required={str(summary.action_required).lower()}"
         )
 
 
@@ -552,6 +556,19 @@ def job_execution(execution_id: str) -> None:
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from exc
     typer.echo(report.model_dump_json(indent=2))
+
+
+@app.command("job-execution-summary")
+def job_execution_summary_command(execution_id: str) -> None:
+    settings = Settings()
+    try:
+        report = get_job_execution_report(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(job_execution_summary(report).model_dump_json(indent=2))
 
 
 @app.command("job-recovery-plan")

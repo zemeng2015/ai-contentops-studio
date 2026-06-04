@@ -592,6 +592,7 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
 
     list_response = client.get("/job-executions?limit=5")
     detail_response = client.get(f"/job-executions/{report.execution_id}")
+    summary_response = client.get(f"/job-executions/{report.execution_id}/summary")
     recovery_response = client.get(f"/job-executions/{report.execution_id}/recovery-plan")
     dashboard_response = client.get("/dashboard")
     dashboard_detail_response = client.get(
@@ -605,6 +606,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     )
     assert detail_response.status_code == 200
     assert detail_response.json()["name"] == "api-job-history"
+    assert summary_response.status_code == 200
+    assert summary_response.json()["total_jobs"] == 1
+    assert summary_response.json()["generated_runs"] == 0
     assert recovery_response.status_code == 200
     assert recovery_response.json()["failed_count"] == 0
     assert dashboard_response.status_code == 200
@@ -615,6 +619,8 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert "Execution JSON" in dashboard_detail_response.text
     assert "API job history" in dashboard_detail_response.text
     assert "Evidence status" in dashboard_detail_response.text
+    assert "Generated runs" in dashboard_detail_response.text
+    assert "Action required" in dashboard_detail_response.text
     assert "homepage_handoffs.json" in detail_response.text
     assert str(tmp_path / "release-evidence") in dashboard_detail_response.text
     assert "S3 Mirror Log" in dashboard_detail_response.text
