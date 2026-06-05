@@ -30,6 +30,7 @@ from contentops_core.jobs import (
     write_job_execution_delivery_summary,
     write_job_execution_report,
     write_scheduled_workflow_pr_metadata,
+    write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import RunStatus
@@ -344,9 +345,17 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
         review,
         tmp_path / "scheduled-pr-metadata.json",
     )
+    manifest_path = write_scheduled_workflow_review_manifest(
+        review,
+        tmp_path / "scheduled-review-manifest.json",
+        review_markdown_path=markdown_path,
+        pr_metadata_path=metadata_path,
+        operations_console_path=tmp_path / "operations-console.json",
+    )
 
     markdown = markdown_path.read_text(encoding="utf-8")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert review.total == 1
     assert review.published_count == 1
     assert review.handoff_count == 1
@@ -384,6 +393,15 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     ]
     assert "Resolve Operations Console action-required signals." in metadata["body"]
     assert metadata["checklist"]
+    assert manifest["manifest_type"] == "scheduled_workflow_review"
+    assert manifest["review_markdown_path"] == str(markdown_path)
+    assert manifest["pr_metadata_path"] == str(metadata_path)
+    assert manifest["operations_console_path"] == str(tmp_path / "operations-console.json")
+    assert manifest["source_execution_ids"] == [report.execution_id]
+    assert manifest["worker_receipt_paths"] == [report.receipt_path]
+    assert manifest["release_evidence_paths"] == [str(tmp_path / "release-evidence")]
+    assert manifest["content_assets_paths"] == [str(tmp_path / "site")]
+    assert manifest["published_urls"] == ["https://example.com/posts/scheduled.html"]
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

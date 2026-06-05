@@ -33,6 +33,7 @@ from contentops_core.jobs import (
     worker_delivery_summary_notification_log,
     worker_job_readiness,
     write_scheduled_workflow_pr_metadata,
+    write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import (
@@ -766,6 +767,14 @@ def scheduled_workflow_summary_command(
         Path | None,
         typer.Option(help="Optional JSON file with draft PR title, body, and checklist."),
     ] = None,
+    manifest_output: Annotated[
+        Path | None,
+        typer.Option(help="Optional JSON manifest for the scheduled review package."),
+    ] = None,
+    operations_console_path: Annotated[
+        Path | None,
+        typer.Option(help="Optional path to an archived Operations Console JSON snapshot."),
+    ] = None,
     json_output: Annotated[
         bool,
         typer.Option("--json", help="Print structured JSON instead of Markdown."),
@@ -787,6 +796,14 @@ def scheduled_workflow_summary_command(
     )
     if pr_metadata_output is not None:
         write_scheduled_workflow_pr_metadata(report, pr_metadata_output)
+    if manifest_output is not None:
+        write_scheduled_workflow_review_manifest(
+            report,
+            manifest_output,
+            review_markdown_path=output,
+            pr_metadata_path=pr_metadata_output,
+            operations_console_path=operations_console_path,
+        )
     if output is not None:
         write_scheduled_workflow_review_markdown(report, output)
         typer.echo(str(output))

@@ -279,9 +279,11 @@ open a review issue containing the scheduled summary and the Actions run URL. Ke
 for unattended schedules unless the team wants every run to become a tracked review item.
 Dispatch with `create_draft_pr=true` when the scheduled review should become a draft PR. The
 workflow uses `contents: write` and `pull-requests: write` to create a `contentops/scheduled-*`
-branch, commit the review Markdown plus PR metadata JSON under `scheduled-reviews/`, and open a
-draft PR using the generated PR title and body. Keep this manual until the team is comfortable with
-automatic publishing review branches.
+branch, commit the review Markdown, PR metadata JSON, and review manifest under
+`scheduled-reviews/`, and open a draft PR using the generated PR title and body. The manifest
+indexes worker receipts, delivery summaries, release evidence, content asset paths, homepage
+handoffs, published URLs, and the Operations Console snapshot. Keep this manual until the team is
+comfortable with automatic publishing review branches.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes

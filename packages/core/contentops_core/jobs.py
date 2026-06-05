@@ -247,6 +247,7 @@ class ScheduledWorkflowReviewItem(BaseModel):
     content_assets_status: str | None = None
     content_assets_files: list[str] = Field(default_factory=list)
     content_assets_error: str | None = None
+    worker_receipt_path: str | None = None
     release_evidence_path: str | None = None
     delivery_summary_markdown_path: str | None = None
     failure_reasons: list[str] = Field(default_factory=list)
@@ -275,6 +276,23 @@ class ScheduledWorkflowPrMetadata(BaseModel):
     action_required: bool = False
     operations_console_summary: dict[str, Any] = Field(default_factory=dict)
     checklist: list[str] = Field(default_factory=list)
+
+
+class ScheduledWorkflowReviewManifest(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    manifest_type: str = "scheduled_workflow_review"
+    review_markdown_path: str | None = None
+    pr_metadata_path: str | None = None
+    operations_console_path: str | None = None
+    source_execution_ids: list[str] = Field(default_factory=list)
+    worker_receipt_paths: list[str] = Field(default_factory=list)
+    delivery_summary_paths: list[str] = Field(default_factory=list)
+    release_evidence_paths: list[str] = Field(default_factory=list)
+    content_assets_paths: list[str] = Field(default_factory=list)
+    homepage_handoff_paths: list[str] = Field(default_factory=list)
+    published_urls: list[str] = Field(default_factory=list)
+    action_required: bool = False
+    operations_console_summary: dict[str, Any] = Field(default_factory=dict)
 
 
 class JobExecutionListResponse(BaseModel):
@@ -935,6 +953,69 @@ def write_scheduled_workflow_pr_metadata(
     return output_path
 
 
+def scheduled_workflow_review_manifest(
+    report: ScheduledWorkflowReviewReport,
+    *,
+    review_markdown_path: Path | None = None,
+    pr_metadata_path: Path | None = None,
+    operations_console_path: Path | None = None,
+) -> ScheduledWorkflowReviewManifest:
+    return ScheduledWorkflowReviewManifest(
+        review_markdown_path=_optional_path(review_markdown_path),
+        pr_metadata_path=_optional_path(pr_metadata_path),
+        operations_console_path=_optional_path(operations_console_path),
+        source_execution_ids=[item.execution_id for item in report.items],
+        worker_receipt_paths=[
+            item.worker_receipt_path
+            for item in report.items
+            if item.worker_receipt_path is not None
+        ],
+        delivery_summary_paths=[
+            item.delivery_summary_markdown_path
+            for item in report.items
+            if item.delivery_summary_markdown_path is not None
+        ],
+        release_evidence_paths=[
+            item.release_evidence_path for item in report.items if item.release_evidence_path
+        ],
+        content_assets_paths=[
+            item.content_assets_path for item in report.items if item.content_assets_path
+        ],
+        homepage_handoff_paths=[
+            path for item in report.items for path in item.homepage_handoff_paths
+        ],
+        published_urls=[url for item in report.items for url in item.published_urls],
+        action_required=(
+            report.action_required_count > 0
+            or bool(report.operations_console_summary.get("action_required"))
+        ),
+        operations_console_summary=report.operations_console_summary,
+    )
+
+
+def write_scheduled_workflow_review_manifest(
+    report: ScheduledWorkflowReviewReport,
+    output_path: Path,
+    *,
+    review_markdown_path: Path | None = None,
+    pr_metadata_path: Path | None = None,
+    operations_console_path: Path | None = None,
+) -> Path:
+    manifest = scheduled_workflow_review_manifest(
+        report,
+        review_markdown_path=review_markdown_path,
+        pr_metadata_path=pr_metadata_path,
+        operations_console_path=operations_console_path,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+    return output_path
+
+
+def _optional_path(path: Path | None) -> str | None:
+    return None if path is None else str(path)
+
+
 def _operations_console_summary(
     operations_console: dict[str, Any] | None,
 ) -> dict[str, Any]:
@@ -1229,6 +1310,7 @@ def _scheduled_workflow_review_item(report: JobExecutionReport) -> ScheduledWork
         content_assets_status=report.content_assets_status,
         content_assets_files=report.content_assets_files,
         content_assets_error=report.content_assets_error,
+        worker_receipt_path=report.receipt_path,
         release_evidence_path=report.release_evidence_path,
         delivery_summary_markdown_path=report.delivery_summary_markdown_path,
         failure_reasons=failure_reasons,

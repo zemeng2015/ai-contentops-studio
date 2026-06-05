@@ -740,6 +740,9 @@ def test_cli_job_execution_commands(
     scheduled_summary_result = runner.invoke(app, ["scheduled-workflow-summary", "--json"])
     scheduled_summary_markdown = tmp_path / "scheduled-review.md"
     scheduled_pr_metadata = tmp_path / "scheduled-pr-metadata.json"
+    scheduled_review_manifest = tmp_path / "scheduled-review-manifest.json"
+    scheduled_operations_console = tmp_path / "scheduled-operations-console.json"
+    scheduled_operations_console.write_text("{}", encoding="utf-8")
     scheduled_summary_output_result = runner.invoke(
         app,
         [
@@ -748,6 +751,10 @@ def test_cli_job_execution_commands(
             str(scheduled_summary_markdown),
             "--pr-metadata-output",
             str(scheduled_pr_metadata),
+            "--manifest-output",
+            str(scheduled_review_manifest),
+            "--operations-console-path",
+            str(scheduled_operations_console),
         ],
     )
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
@@ -827,6 +834,7 @@ def test_cli_job_execution_commands(
     assert "Distribution Assets" in scheduled_summary_markdown.read_text(encoding="utf-8")
     assert "PR Handoff" in scheduled_summary_markdown.read_text(encoding="utf-8")
     pr_metadata_payload = json.loads(scheduled_pr_metadata.read_text(encoding="utf-8"))
+    review_manifest_payload = json.loads(scheduled_review_manifest.read_text(encoding="utf-8"))
     assert pr_metadata_payload["title"].startswith("Review scheduled ContentOps output")
     assert pr_metadata_payload["operations_console_summary"]["status"] in {
         "pass",
@@ -837,6 +845,12 @@ def test_cli_job_execution_commands(
         pr_metadata_payload["body"]
     )
     assert pr_metadata_payload["checklist"]
+    assert review_manifest_payload["manifest_type"] == "scheduled_workflow_review"
+    assert review_manifest_payload["operations_console_path"] == str(
+        scheduled_operations_console
+    )
+    assert review_manifest_payload["content_assets_paths"] == [str(tmp_path / "site")]
+    assert review_manifest_payload["worker_receipt_paths"]
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

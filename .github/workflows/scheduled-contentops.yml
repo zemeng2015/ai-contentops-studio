@@ -99,7 +99,9 @@ jobs:
           contentops scheduled-workflow-summary \
             --limit 5 \
             --output scheduled-worker/daily-review.md \
-            --pr-metadata-output scheduled-worker/daily-pr-metadata.json
+            --pr-metadata-output scheduled-worker/daily-pr-metadata.json \
+            --manifest-output scheduled-worker/daily-review-manifest.json \
+            --operations-console-path scheduled-worker/daily-operations-console.json
           cat scheduled-worker/daily-review.md >> "$GITHUB_STEP_SUMMARY"
       - name: Create review issue
         if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
@@ -123,6 +125,7 @@ jobs:
           mkdir -p scheduled-reviews
           cp scheduled-worker/daily-review.md "scheduled-reviews/daily-${GITHUB_RUN_ID}.md"
           cp scheduled-worker/daily-pr-metadata.json "scheduled-reviews/daily-${GITHUB_RUN_ID}.json"
+          cp scheduled-worker/daily-review-manifest.json "scheduled-reviews/daily-${GITHUB_RUN_ID}-manifest.json"
           python - <<'PY'
           import json
           from pathlib import Path
@@ -203,7 +206,9 @@ jobs:
           contentops scheduled-workflow-summary \
             --limit 5 \
             --output scheduled-worker/project-updates-review.md \
-            --pr-metadata-output scheduled-worker/project-updates-pr-metadata.json
+            --pr-metadata-output scheduled-worker/project-updates-pr-metadata.json \
+            --manifest-output scheduled-worker/project-updates-review-manifest.json \
+            --operations-console-path scheduled-worker/project-updates-operations-console.json
           cat scheduled-worker/project-updates-review.md >> "$GITHUB_STEP_SUMMARY"
       - name: Create review issue
         if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
@@ -227,6 +232,7 @@ jobs:
           mkdir -p scheduled-reviews
           cp scheduled-worker/project-updates-review.md "scheduled-reviews/project-updates-${GITHUB_RUN_ID}.md"
           cp scheduled-worker/project-updates-pr-metadata.json "scheduled-reviews/project-updates-${GITHUB_RUN_ID}.json"
+          cp scheduled-worker/project-updates-review-manifest.json "scheduled-reviews/project-updates-${GITHUB_RUN_ID}-manifest.json"
           python - <<'PY'
           import json
           from pathlib import Path

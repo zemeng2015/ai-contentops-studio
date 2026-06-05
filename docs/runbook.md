@@ -57,9 +57,11 @@ For a manual review loop, set `create_review_issue=true` on the workflow dispatc
 creates a GitHub issue with the same review packet shown in the Actions step summary plus a link to
 the run, giving reviewers a durable place to approve follow-up work or request changes.
 Set `create_draft_pr=true` only when the run should open a draft PR. The workflow commits
-`scheduled-reviews/*.md` and `scheduled-reviews/*.json` on a `contentops/scheduled-*` branch and
-uses the generated PR metadata as the draft PR title and body. Leave this disabled for unattended
-cron runs unless every scheduled execution should create a review branch.
+`scheduled-reviews/*.md`, PR metadata JSON, and a `*-manifest.json` review package index on a
+`contentops/scheduled-*` branch. The manifest lists worker receipts, delivery summaries, release
+evidence paths, content asset paths, homepage handoffs, published URLs, and the Operations Console
+snapshot. The workflow uses the generated PR metadata as the draft PR title and body. Leave this
+disabled for unattended cron runs unless every scheduled execution should create a review branch.
 
 For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
 durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs

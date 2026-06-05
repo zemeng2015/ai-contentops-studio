@@ -108,6 +108,13 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "contentops scheduled-workflow-summary" in workflow
     assert "--pr-metadata-output scheduled-worker/daily-pr-metadata.json" in workflow
     assert "--pr-metadata-output scheduled-worker/project-updates-pr-metadata.json" in workflow
+    assert "--manifest-output scheduled-worker/daily-review-manifest.json" in workflow
+    assert "--manifest-output scheduled-worker/project-updates-review-manifest.json" in workflow
+    assert "--operations-console-path scheduled-worker/daily-operations-console.json" in workflow
+    assert (
+        "--operations-console-path scheduled-worker/project-updates-operations-console.json"
+        in workflow
+    )
     assert "GITHUB_STEP_SUMMARY" in workflow
     assert "scheduled-worker/daily-review.md" in workflow
     assert "gh issue create" in workflow
@@ -116,6 +123,8 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "contentops/scheduled-daily-${GITHUB_RUN_ID}" in workflow
     assert "contentops/scheduled-project-updates-${GITHUB_RUN_ID}" in workflow
     assert "scheduled-reviews/daily-${GITHUB_RUN_ID}.json" in workflow
+    assert "scheduled-reviews/daily-${GITHUB_RUN_ID}-manifest.json" in workflow
+    assert "scheduled-reviews/project-updates-${GITHUB_RUN_ID}-manifest.json" in workflow
     assert "daily-review-issue.md" in workflow
     assert "project-updates-review-issue.md" in workflow
     assert "actions/upload-artifact@v7" in workflow
