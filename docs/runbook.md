@@ -108,6 +108,9 @@ Review `promotion-brief.md` before posting externally, and deploy `feed.xml` wit
 the published content should be discoverable by feed readers, search crawlers, or automation.
 Inspect `content-distribution-manifest.json` for the generated file hashes and suggested git
 commands before committing the distribution assets.
+Operators can also generate the same files from the dashboard Published Content section or by
+calling `POST /content-assets`, then download them from `/content-assets/feed`,
+`/content-assets/promotion-brief`, and `/content-assets/manifest`.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

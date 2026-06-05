@@ -108,6 +108,9 @@ search discovery matters, and archive the promotion brief with release evidence 
 needs to approve external distribution copy.
 The command also writes `content-distribution-manifest.json`, which records file hashes, git
 status, and suggested commit commands for the generated distribution assets.
+The API exposes the same workflow through `POST /content-assets` and read endpoints under
+`/content-assets/*`, so deployed operators can generate and download distribution files without
+shell access to the container.
 
 For ECS or Lambda workers, set `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` so each local artifact
 write is mirrored to S3 under:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from contentops_core.config_audit import config_audit
 from contentops_core.config_templates import render_env_template
@@ -67,6 +68,7 @@ from contentops_core.release_gate import list_release_gate_reports, release_gate
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
+from contentops_publishing.publish_index import write_distribution_assets
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 
@@ -441,6 +443,55 @@ def build_ops_router(
     ) -> PublishedContentListResponse:
         return review_service.published_content(limit=limit, offset=offset)
 
+    @router.post(
+        "/content-assets",
+        dependencies=[Depends(require_operator)],
+    )
+    def generate_content_assets(
+        title: str = Query(default="AI ContentOps Studio", min_length=1, max_length=120),
+        description: str = Query(
+            default="Reviewed AI and technical content.",
+            min_length=1,
+            max_length=240,
+        ),
+        limit: int = Query(default=20, ge=1, le=100),
+    ) -> dict[str, str]:
+        try:
+            assets = _write_content_assets(
+                settings,
+                title=title,
+                description=description,
+                limit=limit,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return {name: str(path) for name, path in assets.items()}
+
+    @router.get(
+        "/content-assets/feed",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_content_feed() -> FileResponse:
+        return _content_asset_response(settings, "feed.xml", "application/rss+xml")
+
+    @router.get(
+        "/content-assets/promotion-brief",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_content_promotion_brief() -> FileResponse:
+        return _content_asset_response(settings, "promotion-brief.md", "text/markdown")
+
+    @router.get(
+        "/content-assets/manifest",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_content_distribution_manifest() -> FileResponse:
+        return _content_asset_response(
+            settings,
+            "content-distribution-manifest.json",
+            "application/json",
+        )
+
     @router.get(
         "/scorecards",
         response_model=ScorecardListResponse,
@@ -548,3 +599,51 @@ def build_ops_router(
         return review_service.operations_trends(days=days, window_size=window_size)
 
     return router
+
+
+def _write_content_assets(
+    settings: Settings,
+    *,
+    title: str,
+    description: str,
+    limit: int,
+) -> dict[str, Path]:
+    target_dir = _publisher_target_dir(settings)
+    index_path = target_dir / "contentops-publish-index.json"
+    if not index_path.exists():
+        raise FileNotFoundError(f"Publish index not found: {index_path}")
+    return write_distribution_assets(
+        index_path,
+        target_dir,
+        channel_title=title,
+        channel_description=description,
+        channel_url=_publisher_public_url(settings),
+        limit=limit,
+    )
+
+
+def _content_asset_response(settings: Settings, file_name: str, media_type: str) -> FileResponse:
+    path = _publisher_target_dir(settings) / file_name
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Content asset not found: {path}. Generate it with POST /content-assets.",
+        )
+    return FileResponse(path, media_type=media_type, filename=path.name)
+
+
+def _publisher_target_dir(settings: Settings) -> Path:
+    if settings.publisher_provider == "homepage":
+        if settings.homepage_repo_path is None:
+            raise HTTPException(
+                status_code=409,
+                detail="CONTENTOPS_HOMEPAGE_REPO_PATH is required for homepage content assets.",
+            )
+        return settings.homepage_repo_path
+    return settings.site_output_dir
+
+
+def _publisher_public_url(settings: Settings) -> str:
+    if settings.publisher_provider == "homepage":
+        return settings.homepage_public_base_url
+    return settings.public_base_url

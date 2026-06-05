@@ -175,6 +175,11 @@ GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /ops-trends
+GET  /content
+POST /content-assets
+GET  /content-assets/feed
+GET  /content-assets/promotion-brief
+GET  /content-assets/manifest
 GET  /config-audit
 GET  /deployment-manifest
 GET  /deployment-check

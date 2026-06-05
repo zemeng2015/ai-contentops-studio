@@ -367,6 +367,11 @@ def test_run_artifact_and_publish_endpoints() -> None:
     verification_response = client.get(f"/runs/{run['id']}/publish-verification")
     notifications_response = client.get(f"/runs/{run['id']}/notifications")
     content_response = client.get("/content?limit=5")
+    content_assets_response = client.post("/content-assets?title=API%20Feed")
+    feed_response = client.get("/content-assets/feed")
+    promotion_brief_response = client.get("/content-assets/promotion-brief")
+    distribution_manifest_response = client.get("/content-assets/manifest")
+    dashboard_response = client.get("/dashboard")
     audit_response = client.get(f"/runs/{run['id']}/audit-log")
     audit_events_response = client.get("/audit-events?action=publish")
 
@@ -468,6 +473,21 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "publish" in notification_actions
     assert content_response.status_code == 200
     assert any(item["run_id"] == run["id"] for item in content_response.json()["items"])
+    assert content_assets_response.status_code == 200
+    assert content_assets_response.json()["feed"].endswith("feed.xml")
+    assert content_assets_response.json()["promotion_brief"].endswith("promotion-brief.md")
+    assert content_assets_response.json()["manifest"].endswith(
+        "content-distribution-manifest.json"
+    )
+    assert feed_response.status_code == 200
+    assert b"API Feed" in feed_response.content
+    assert promotion_brief_response.status_code == 200
+    assert b"Promotion Brief" in promotion_brief_response.content
+    assert distribution_manifest_response.status_code == 200
+    assert distribution_manifest_response.json()["manifest_type"] == "content_distribution"
+    assert dashboard_response.status_code == 200
+    assert "Generate distribution assets" in dashboard_response.text
+    assert "Distribution manifest" in dashboard_response.text
     assert audit_response.status_code == 200
     audit_actions = [event["action"] for event in audit_response.json()]
     assert "source_review" in audit_actions

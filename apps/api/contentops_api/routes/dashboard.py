@@ -39,6 +39,7 @@ from contentops_core.release_gate import list_release_gate_reports, release_gate
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
+from contentops_publishing.publish_index import write_distribution_assets
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -255,6 +256,16 @@ def build_dashboard_router(
                 <section class="hero compact">
                   <h2>Published Content</h2>
                   <p>Operational catalog of shipped articles and their evaluation scores.</p>
+                  <form method="post" action="/dashboard/content-assets{_api_key_query(api_key)}">
+                    {_api_key_hidden(api_key)}
+                    <input name="title" value="AI ContentOps Studio" placeholder="Feed title">
+                    <input
+                      name="description"
+                      value="Reviewed AI and technical content."
+                      placeholder="Feed description"
+                    >
+                    <button type="submit">Generate distribution assets</button>
+                  </form>
                   {_published_content_html(published_content)}
                 </section>
                 <section class="hero compact">
@@ -275,8 +286,31 @@ def build_dashboard_router(
                 """,
             )
         )
-    
-    
+
+
+    @router.post(
+        "/dashboard/content-assets",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_generate_content_assets(
+        title: Annotated[str, Form()] = "AI ContentOps Studio",
+        description: Annotated[str, Form()] = "Reviewed AI and technical content.",
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        target_dir = _publisher_target_dir(settings)
+        index_path = target_dir / "contentops-publish-index.json"
+        if not index_path.exists():
+            raise HTTPException(status_code=404, detail=f"Publish index not found: {index_path}")
+        write_distribution_assets(
+            index_path,
+            target_dir,
+            channel_title=title,
+            channel_description=description,
+            channel_url=_publisher_public_url(settings),
+        )
+        return RedirectResponse(f"/dashboard{_api_key_query(api_key)}", status_code=303)
+
+
     @router.get(
         "/dashboard/ops-trends",
         response_class=HTMLResponse,
@@ -1008,6 +1042,23 @@ def build_dashboard_router(
 
 
     return router
+
+
+def _publisher_target_dir(settings: Settings) -> Path:
+    if settings.publisher_provider == "homepage":
+        if settings.homepage_repo_path is None:
+            raise HTTPException(
+                status_code=409,
+                detail="CONTENTOPS_HOMEPAGE_REPO_PATH is required for homepage content assets.",
+            )
+        return settings.homepage_repo_path
+    return settings.site_output_dir
+
+
+def _publisher_public_url(settings: Settings) -> str:
+    if settings.publisher_provider == "homepage":
+        return settings.homepage_public_base_url
+    return settings.public_base_url
 
 
 def _job_execution_s3_mirror_log(report: JobExecutionReport) -> list[ArtifactMirrorRecord]:

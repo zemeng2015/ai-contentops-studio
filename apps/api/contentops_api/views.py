@@ -1787,7 +1787,12 @@ def _published_content_html(catalog: PublishedContentListResponse) -> str:
         for item in catalog.items
     )
     return f"""
-      <p><a href="/content">Content catalog JSON</a></p>
+      <p>
+        <a href="/content">Content catalog JSON</a> |
+        <a href="/content-assets/feed">RSS feed</a> |
+        <a href="/content-assets/promotion-brief">Promotion brief</a> |
+        <a href="/content-assets/manifest">Distribution manifest</a>
+      </p>
       <table>
         <thead>
           <tr>
