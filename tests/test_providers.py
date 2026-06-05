@@ -89,6 +89,11 @@ def test_hybrid_research_includes_url_and_local_context(monkeypatch: pytest.Monk
     assert len(packet.sources) == 4
     assert any(source.title == "Portfolio project map" for source in packet.sources)
     assert any("Fetched source" in claim.source_title for claim in packet.claims)
+    assert packet.provider_metadata["provider"] == "hybrid"
+    assert packet.provider_metadata["components"] == ["url", "local"]
+    assert packet.provider_metadata["url"]["requested_urls"] == ["https://example.com/article"]
+    assert packet.provider_metadata["source_count"] == len(packet.sources)
+    assert packet.provider_metadata["url"]["failed_count"] == 0
 
 
 def test_homepage_publisher_updates_post_grid(tmp_path: Path) -> None:
@@ -994,6 +999,11 @@ def test_feed_research_discovers_and_ranks_sources(monkeypatch: pytest.MonkeyPat
     assert packet.sources[0].title == "LLM evaluation workflow patterns"
     assert packet.sources[0].extraction_status == "feed"
     assert packet.sources[0].canonical_url == "https://example.com/evals"
+    assert packet.provider_metadata["provider"] == "feed"
+    assert packet.provider_metadata["feeds"] == ["https://example.com/rss.xml"]
+    assert packet.provider_metadata["discovered_count"] == 2
+    assert packet.provider_metadata["selected_count"] == 1
+    assert packet.provider_metadata["selected_urls"] == ["https://example.com/evals"]
 
 
 def test_discovery_research_combines_feed_url_and_local_context(
@@ -1034,6 +1044,13 @@ def test_discovery_research_combines_feed_url_and_local_context(
                 engineering_signals=["Feed discovery works."],
                 risks=["Feeds require curation."],
                 project_implications=["Automate daily research jobs."],
+                provider_metadata={
+                    "provider": "feed",
+                    "feeds": ["https://example.com/rss.xml"],
+                    "discovered_count": 1,
+                    "selected_count": 1,
+                    "selected_urls": ["https://example.com/agent"],
+                },
             )
 
     monkeypatch.setattr(URLResearchProvider, "_fetch_source", fake_fetch)
@@ -1050,6 +1067,11 @@ def test_discovery_research_combines_feed_url_and_local_context(
     assert "Discovered agent source" in titles
     assert "Operator source" in titles
     assert "Portfolio project map" in titles
+    assert packet.provider_metadata["provider"] == "discovery"
+    assert packet.provider_metadata["components"] == ["feed", "url", "local"]
+    assert packet.provider_metadata["feed"]["selected_urls"] == ["https://example.com/agent"]
+    assert packet.provider_metadata["url"]["requested_urls"] == ["https://example.com/operator"]
+    assert packet.provider_metadata["source_count"] == len(packet.sources)
 
 
 def _sample_research_packet() -> ResearchPacket:

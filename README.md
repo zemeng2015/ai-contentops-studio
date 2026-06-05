@@ -541,6 +541,9 @@ search indexing, or social promotion. The manifest includes asset hashes, git st
 `git add`, `commit`, and `push` commands for the site repository.
 The search provider records its planned query variants, selected URLs, result counts, and
 enrichment mode in `research.json`, which makes recurring web research easier to audit.
+Feed, URL, local, and discovery research record configured feed URLs, requested URLs, discovered
+item counts, selected URLs, and component providers so scheduled AI trend monitoring can be
+reviewed after each run.
 
 Use S3 artifact mirroring:
 

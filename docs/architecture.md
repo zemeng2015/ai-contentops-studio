@@ -376,10 +376,12 @@ operator URLs. These providers let the worker start from a topic, retrieve curre
 repository activity, rank or normalize the evidence, deduplicate canonical URLs, and persist the
 discovered sources into `research.json`.
 Research packets also include provider metadata. The search provider records planned query
-variants, selected URLs, result counts, and enrichment settings. The GitHub provider records
-requested repositories plus per-repository project intelligence such as README evidence, activity
-signals, source count, and failed fetch state. This keeps scheduled research explainable without
-requiring operators to reconstruct provider behavior from logs.
+variants, selected URLs, result counts, and enrichment settings. Feed, URL, local, and discovery
+providers record configured feed URLs, requested URLs, discovered item counts, selected URLs, and
+component provider metadata. The GitHub provider records requested repositories plus per-repository project
+intelligence such as README evidence, activity signals, source count, and failed fetch state. This
+keeps scheduled research explainable without requiring operators to reconstruct provider behavior
+from logs.
 Each normalized source includes source type, authority score, topic relevance score, canonical URL,
 and duplicate count. `source-audit.json` uses those fields to explain whether the evidence is
 strong enough for publication or needs human review.

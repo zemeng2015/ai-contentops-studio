@@ -116,6 +116,12 @@ class LocalResearchProvider:
                 "Use the homepage as a publishing target, not as the generation engine.",
                 "Design adapters so future AWS, search, and model providers can be swapped in.",
             ],
+            provider_metadata={
+                "provider": "local",
+                "operator_source_count": len(provided_sources),
+                "default_source_count": len(default_sources),
+                "source_count": len(sources),
+            },
         )
 
 
@@ -167,6 +173,20 @@ class URLResearchProvider:
                 "Add source credibility and extraction quality to evaluation reports.",
                 "Keep raw source metadata in artifacts for auditability.",
             ],
+            provider_metadata={
+                "provider": "url",
+                "requested_urls": request.source_urls,
+                "requested_count": len(request.source_urls),
+                "source_count": len(sources),
+                "failed_count": sum(
+                    1 for source in sources if source.extraction_status == "failed"
+                ),
+                "source_urls": [source.url for source in sources if source.url],
+                "cache_enabled": self.cache_dir is not None,
+                "cache_ttl_seconds": self.cache_ttl_seconds,
+                "retry_attempts": self.retry_attempts,
+                "retry_backoff_seconds": self.retry_backoff_seconds,
+            },
         )
 
     def fetch_source(self, url: str) -> Source:
@@ -365,6 +385,17 @@ class FeedResearchProvider:
                 "Use worker YAML jobs to turn recurring AI research into a content calendar.",
                 "Compare reruns to measure whether newly discovered sources improved coverage.",
             ],
+            provider_metadata={
+                "provider": "feed",
+                "feeds": self.feeds,
+                "feed_count": len(self.feeds),
+                "discovered_count": len(entries),
+                "selected_count": len(selected),
+                "selected_urls": [entry.url for entry in selected if entry.url],
+                "max_sources": self.max_sources,
+                "retry_attempts": self.retry_attempts,
+                "retry_backoff_seconds": self.retry_backoff_seconds,
+            },
         )
 
     def _discover_entries(self) -> list[FeedEntry]:
@@ -1019,7 +1050,21 @@ class DiscoveryResearchProvider:
             project_implications=[
                 implication for packet in packets for implication in packet.project_implications
             ],
+            provider_metadata={
+                "provider": "discovery",
+                "components": [self._packet_provider(packet) for packet in packets],
+                "feed": feed_packet.provider_metadata,
+                "url": url_packet.provider_metadata if url_packet is not None else {},
+                "local_source_count": len(local_packet.sources),
+                "source_count": len(sources),
+                "claim_count": len(claims),
+            },
         )
+
+    @staticmethod
+    def _packet_provider(packet: ResearchPacket) -> str:
+        provider = packet.provider_metadata.get("provider")
+        return str(provider) if provider else "local"
 
 
 class HybridResearchProvider:
@@ -1041,7 +1086,17 @@ class HybridResearchProvider:
     def collect(self, request: RunRequest) -> ResearchPacket:
         local_packet = self.local.collect(request)
         if not request.source_urls:
-            return local_packet
+            return local_packet.model_copy(
+                update={
+                    "provider_metadata": {
+                        "provider": "hybrid",
+                        "components": ["local"],
+                        "local": local_packet.provider_metadata,
+                        "url": {},
+                        "source_count": len(local_packet.sources),
+                    }
+                }
+            )
         url_packet = self.url.collect(request)
         sources = dedupe_sources(url_packet.sources + local_packet.sources, topic=request.topic)
         source_titles = {source.title for source in sources}
@@ -1059,6 +1114,14 @@ class HybridResearchProvider:
             project_implications=(
                 url_packet.project_implications + local_packet.project_implications
             ),
+            provider_metadata={
+                "provider": "hybrid",
+                "components": ["url", "local"],
+                "url": url_packet.provider_metadata,
+                "local": local_packet.provider_metadata,
+                "source_count": len(sources),
+                "claim_count": len(claims),
+            },
         )
 
 
