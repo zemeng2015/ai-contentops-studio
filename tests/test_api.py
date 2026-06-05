@@ -1225,6 +1225,8 @@ jobs:
         data={"workflow_name": "api-calendar", "job_name": "api-launch"},
         follow_redirects=False,
     )
+    lineage_response = client.get("/content-calendar/lineage")
+    calendar_page_response = client.get("/dashboard/worker-jobs")
 
     assert response.status_code == 200
     payload = response.json()
@@ -1237,6 +1239,14 @@ jobs:
     )
     assert dashboard_response.status_code == 303
     assert "/dashboard/runs/" in dashboard_response.headers["location"]
+    assert lineage_response.status_code == 200
+    lineage_payload = lineage_response.json()
+    assert lineage_payload["tracked_run_count"] == 2
+    assert lineage_payload["items"][0]["latest_run_status"] == "needs_review"
+    assert lineage_payload["items"][0]["latest_run_id"]
+    assert calendar_page_response.status_code == 200
+    assert "Calendar Lineage" in calendar_page_response.text
+    assert "api-calendar/api-launch" in calendar_page_response.text
 
 
 def test_dashboard_worker_jobs_shows_content_calendar(tmp_path: Path) -> None:

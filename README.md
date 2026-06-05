@@ -141,6 +141,7 @@ contentops operations-console --days 14 --json
 contentops provider-health --json
 contentops content-calendar --json
 contentops content-calendar-run --workflow daily-ai-roundup --job production-llm-systems
+contentops content-calendar-lineage --json
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
@@ -237,6 +238,7 @@ GET  /release-gates
 GET  /worker-jobs
 GET  /content-calendar
 POST /content-calendar/runs
+GET  /content-calendar/lineage
 GET  /job-executions
 GET  /job-executions/trends
 GET  /job-executions/recovery-lineage
@@ -259,6 +261,9 @@ Operators can turn a planned item into a real run through
 `contentops content-calendar-run --workflow <name> --job <name>`, `POST /content-calendar/runs`,
 or the dashboard Content Calendar page. The created run keeps workflow, job, tag, publish intent,
 and calendar item metadata in `request.json` and `workflow-context.json`.
+`contentops content-calendar-lineage --json` and `GET /content-calendar/lineage` connect planned
+calendar items back to recent runs, showing which items have not started, which need review, which
+published, and what the next operator action should be.
 `config-audit` exposes a redacted runtime and secret posture report, so production operators can
 verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or

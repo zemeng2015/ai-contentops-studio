@@ -16,6 +16,7 @@ from contentops_core.jobs import (
     JobRunner,
     JobRunResult,
     content_calendar_brief,
+    content_calendar_lineage,
     content_calendar_run_request,
     create_scheduled_workflow_review_archive,
     get_job_execution_report,
@@ -41,7 +42,7 @@ from contentops_core.jobs import (
     write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
-from contentops_core.models import RunStatus
+from contentops_core.models import RunRecord, RunStatus
 from contentops_core.settings import Settings
 
 
@@ -298,6 +299,52 @@ jobs:
     assert request.metadata["contentops_calendar_item_key"] == "launch-calendar/launch-post"
     assert request.metadata["contentops_calendar_workflow_path"] == "calendar.yaml"
     assert request.metadata["contentops_calendar_publish_override"] == "true"
+
+
+def test_content_calendar_lineage_links_runs_to_plan_items(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: launch-calendar
+jobs:
+  - name: launch-post
+    topic: Launch post from calendar
+    publish: true
+    tags: [launch]
+  - name: backlog-note
+    topic: Backlog note
+    publish: false
+""",
+        encoding="utf-8",
+    )
+    request = content_calendar_run_request(
+        pipeline_dir,
+        workflow_name="launch-calendar",
+        job_name="launch-post",
+    )
+    run = RunRecord.create(request, tmp_path / "artifacts")
+    run.artifact_dir.mkdir(parents=True)
+    (run.artifact_dir / "request.json").write_text(
+        request.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    run.touch(RunStatus.NEEDS_REVIEW)
+
+    report = content_calendar_lineage(pipeline_dir, [run])
+
+    assert report.total_items == 2
+    assert report.tracked_run_count == 1
+    assert report.untouched_count == 1
+    assert report.needs_review_count == 1
+    assert report.action_required_count == 2
+    launch_item = next(item for item in report.items if item.job_name == "launch-post")
+    backlog_item = next(item for item in report.items if item.job_name == "backlog-note")
+    assert launch_item.latest_run_id == run.id
+    assert launch_item.latest_run_status == RunStatus.NEEDS_REVIEW
+    assert launch_item.status == "needs_review"
+    assert "Review the latest" in launch_item.recommendation
+    assert backlog_item.status == "not_started"
 
 
 def test_job_execution_receipts_can_be_listed_and_loaded(tmp_path: Path) -> None:

@@ -251,6 +251,48 @@ jobs:
     )
 
 
+def test_cli_content_calendar_lineage_reports_latest_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: cli-calendar
+jobs:
+  - name: ai-launch
+    topic: AI launch content operations
+    publish: false
+    tags: [launch]
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(pipeline_dir))
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    runner = CliRunner()
+
+    create_result = runner.invoke(
+        app,
+        [
+            "content-calendar-run",
+            "--workflow",
+            "cli-calendar",
+            "--job",
+            "ai-launch",
+        ],
+    )
+    lineage_result = runner.invoke(app, ["content-calendar-lineage", "--json"])
+
+    assert create_result.exit_code == 0
+    assert lineage_result.exit_code == 1
+    payload = json.loads(lineage_result.output)
+    assert payload["tracked_run_count"] == 1
+    assert payload["items"][0]["item_key"] == "cli-calendar/ai-launch"
+    assert payload["items"][0]["latest_run_status"] == "needs_review"
+
+
 def test_cli_release_approval_records_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

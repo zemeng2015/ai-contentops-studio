@@ -20,7 +20,13 @@ from contentops_core.artifacts import (
     mirror_files_to_s3,
     write_s3_mirror_log,
 )
-from contentops_core.models import ArtifactMirrorRecord, IncidentSeverity, RunRequest, RunStatus
+from contentops_core.models import (
+    ArtifactMirrorRecord,
+    IncidentSeverity,
+    RunRecord,
+    RunRequest,
+    RunStatus,
+)
 from contentops_core.pipeline import ContentOpsPipeline
 
 
@@ -491,6 +497,35 @@ class ContentCalendarBrief(BaseModel):
     recommended_actions: list[str] = Field(default_factory=list)
 
 
+class ContentCalendarLineageItem(BaseModel):
+    item_key: str
+    workflow_name: str
+    job_name: str
+    topic: str
+    intent: str
+    status: str
+    run_count: int = Field(ge=0)
+    latest_run_id: str | None = None
+    latest_run_status: RunStatus | None = None
+    latest_run_updated_at: datetime | None = None
+    latest_published_url: str | None = None
+    latest_artifact_dir: str | None = None
+    action_required: bool = False
+    recommendation: str
+
+
+class ContentCalendarLineageReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total_items: int = Field(ge=0)
+    tracked_run_count: int = Field(ge=0)
+    untouched_count: int = Field(ge=0)
+    needs_review_count: int = Field(ge=0)
+    published_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    action_required_count: int = Field(ge=0)
+    items: list[ContentCalendarLineageItem] = Field(default_factory=list)
+
+
 class JobRecoveryPlan(BaseModel):
     execution_id: str
     source_execution_name: str
@@ -763,6 +798,34 @@ def content_calendar_run_request(
     raise ValueError(f"Content calendar item not found: {workflow_name}/{job_name}")
 
 
+def content_calendar_lineage(
+    pipeline_dir: Path,
+    runs: Iterable[RunRecord],
+) -> ContentCalendarLineageReport:
+    plan_items = _calendar_plan_items(list_worker_job_catalog(pipeline_dir).items)
+    runs_by_item = _calendar_runs_by_item(runs)
+    lineage_items = [
+        _calendar_lineage_item(plan_item, runs_by_item.get(plan_item.item_key, []))
+        for plan_item in plan_items
+    ]
+    return ContentCalendarLineageReport(
+        total_items=len(lineage_items),
+        tracked_run_count=sum(item.run_count for item in lineage_items),
+        untouched_count=sum(1 for item in lineage_items if item.run_count == 0),
+        needs_review_count=sum(
+            1 for item in lineage_items if item.latest_run_status == RunStatus.NEEDS_REVIEW
+        ),
+        published_count=sum(
+            1 for item in lineage_items if item.latest_run_status == RunStatus.PUBLISHED
+        ),
+        failed_count=sum(
+            1 for item in lineage_items if item.latest_run_status == RunStatus.FAILED
+        ),
+        action_required_count=sum(1 for item in lineage_items if item.action_required),
+        items=lineage_items,
+    )
+
+
 def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) -> Path:
     receipt_dir.mkdir(parents=True, exist_ok=True)
     path = (
@@ -987,6 +1050,104 @@ def _calendar_item_rationale(item: WorkerJobCatalogItem, job: ContentJob) -> str
     if job.source_urls:
         return "Seeded source URLs make this item suitable for reviewer-backed drafting."
     return "Backlog topic for research, drafting, and human review."
+
+
+def _calendar_runs_by_item(runs: Iterable[RunRecord]) -> dict[str, list[RunRecord]]:
+    grouped: dict[str, list[RunRecord]] = {}
+    for run in runs:
+        metadata = _calendar_run_metadata(run)
+        item_key = metadata.get("contentops_calendar_item_key")
+        if not item_key:
+            continue
+        grouped.setdefault(item_key, []).append(run)
+    for item_runs in grouped.values():
+        item_runs.sort(key=lambda run: run.updated_at, reverse=True)
+    return grouped
+
+
+def _calendar_run_metadata(run: RunRecord) -> dict[str, str]:
+    request_path = run.artifact_dir / "request.json"
+    if not request_path.exists():
+        return {}
+    try:
+        data = json.loads(request_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        return {}
+    return {str(key): str(value) for key, value in metadata.items()}
+
+
+def _calendar_lineage_item(
+    plan_item: ContentCalendarPlanItem,
+    runs: list[RunRecord],
+) -> ContentCalendarLineageItem:
+    latest = runs[0] if runs else None
+    action_required = _calendar_lineage_action_required(plan_item, latest)
+    return ContentCalendarLineageItem(
+        item_key=plan_item.item_key,
+        workflow_name=plan_item.workflow_name,
+        job_name=plan_item.job_name,
+        topic=plan_item.topic,
+        intent=plan_item.intent,
+        status=_calendar_lineage_status(plan_item, latest),
+        run_count=len(runs),
+        latest_run_id=latest.id if latest else None,
+        latest_run_status=latest.status if latest else None,
+        latest_run_updated_at=latest.updated_at if latest else None,
+        latest_published_url=latest.published_url if latest else None,
+        latest_artifact_dir=str(latest.artifact_dir) if latest else None,
+        action_required=action_required,
+        recommendation=_calendar_lineage_recommendation(plan_item, latest),
+    )
+
+
+def _calendar_lineage_status(
+    plan_item: ContentCalendarPlanItem,
+    latest: RunRecord | None,
+) -> str:
+    if latest is None:
+        return "not_started"
+    if latest.status == RunStatus.PUBLISHED:
+        return "published"
+    if latest.status == RunStatus.NEEDS_REVIEW:
+        return "needs_review"
+    if latest.status == RunStatus.APPROVED:
+        return "approved"
+    if latest.status == RunStatus.FAILED:
+        return "failed"
+    if plan_item.publish:
+        return "publish_pending"
+    return latest.status.value
+
+
+def _calendar_lineage_action_required(
+    plan_item: ContentCalendarPlanItem,
+    latest: RunRecord | None,
+) -> bool:
+    if latest is None:
+        return True
+    if latest.status in {RunStatus.NEEDS_REVIEW, RunStatus.FAILED}:
+        return True
+    return plan_item.publish and latest.status != RunStatus.PUBLISHED
+
+
+def _calendar_lineage_recommendation(
+    plan_item: ContentCalendarPlanItem,
+    latest: RunRecord | None,
+) -> str:
+    if latest is None:
+        return "Create a run from this calendar item."
+    if latest.status == RunStatus.NEEDS_REVIEW:
+        return "Review the latest generated run and approve or reject it."
+    if latest.status == RunStatus.APPROVED and plan_item.publish:
+        return "Publish the approved run or keep it staged for release review."
+    if latest.status == RunStatus.FAILED:
+        return "Inspect the failed run artifacts and rerun the calendar item."
+    if latest.status == RunStatus.PUBLISHED:
+        return "Verify publish receipt, distribution assets, and homepage handoff."
+    return "Monitor the latest run until it reaches review, approval, or publication."
 
 
 def _calendar_success_rate(executions: list[JobExecutionReport]) -> float:

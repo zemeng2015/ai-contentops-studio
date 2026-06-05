@@ -16,6 +16,7 @@ from contentops_core.diagnostics import (
 )
 from contentops_core.jobs import (
     ContentCalendarBrief,
+    ContentCalendarLineageReport,
     JobExecutionAlertDelivery,
     JobExecutionAlertReport,
     JobExecutionListResponse,
@@ -32,6 +33,7 @@ from contentops_core.jobs import (
     WorkerJobReadinessResponse,
     archive_scheduled_workflow_review_package,
     content_calendar_brief,
+    content_calendar_lineage,
     content_calendar_run_request,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
@@ -381,6 +383,19 @@ def build_ops_router(
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         result = pipeline.run(request)
         return result.run
+
+    @router.get(
+        "/content-calendar/lineage",
+        response_model=ContentCalendarLineageReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_content_calendar_lineage(
+        limit: int = Query(default=200, ge=1, le=1000),
+    ) -> ContentCalendarLineageReport:
+        return content_calendar_lineage(
+            settings.pipeline_dir,
+            repository.list(limit=limit),
+        )
 
     @router.get(
         "/job-executions",

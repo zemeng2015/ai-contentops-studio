@@ -24,6 +24,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobRunner,
     content_calendar_brief,
+    content_calendar_lineage,
     content_calendar_run_request,
     create_scheduled_workflow_review_archive,
     get_job_execution_report,
@@ -959,6 +960,45 @@ def content_calendar_run_command(
     typer.echo(f"Topic: {result.run.topic}")
     typer.echo(f"Calendar: {workflow}/{job}")
     typer.echo(f"Artifacts: {result.run.artifact_dir}")
+
+
+@app.command("content-calendar-lineage")
+def content_calendar_lineage_command(
+    pipeline_dir: Annotated[
+        Path | None,
+        typer.Option(help="Directory or YAML file containing worker job definitions."),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to inspect for calendar lineage."),
+    ] = 200,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    repo = RunRepository(settings.database_url)
+    report = content_calendar_lineage(
+        pipeline_dir or settings.pipeline_dir,
+        repo.list(limit=limit),
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.action_required_count == 0 else 1)
+    typer.echo(
+        f"Content calendar lineage: items={report.total_items} "
+        f"tracked_runs={report.tracked_run_count} "
+        f"action_required={report.action_required_count}"
+    )
+    for item in report.items:
+        latest = item.latest_run_id or "none"
+        status = item.latest_run_status.value if item.latest_run_status else item.status
+        typer.echo(
+            f"- {item.item_key}: runs={item.run_count} latest={latest} "
+            f"status={status} next={item.recommendation}"
+        )
+    raise typer.Exit(0 if report.action_required_count == 0 else 1)
 
 
 @app.command("scheduled-workflow-summary")

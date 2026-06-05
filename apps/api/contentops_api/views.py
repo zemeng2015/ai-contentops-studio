@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 
 from contentops_core.jobs import (
     ContentCalendarBrief,
+    ContentCalendarLineageReport,
     JobExecutionAlertDelivery,
     JobExecutionAlertReport,
     JobExecutionReport,
@@ -914,6 +915,60 @@ def _content_calendar_brief_html(
         <tbody>{tag_rows}</tbody>
       </table>
     """
+
+
+def _content_calendar_lineage_html(report: ContentCalendarLineageReport) -> str:
+    if not report.items:
+        return """
+          <h3>Calendar Lineage</h3>
+          <p>No planned content calendar items were found.</p>
+        """
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.item_key)}</td>
+          <td>{escape(item.intent)}</td>
+          <td>{escape(item.status)}</td>
+          <td>{item.run_count}</td>
+          <td>{_calendar_latest_run_link(item)}</td>
+          <td>{escape(item.latest_run_status.value if item.latest_run_status else "none")}</td>
+          <td>{escape(item.latest_published_url or "not published")}</td>
+          <td>{str(item.action_required).lower()}</td>
+          <td>{escape(item.recommendation)}</td>
+        </tr>
+        """
+        for item in report.items
+    )
+    return f"""
+      <h3>Calendar Lineage</h3>
+      <p><a href="/content-calendar/lineage">Content calendar lineage JSON</a></p>
+      <div class="metrics">
+        <div><strong>{report.total_items}</strong><span>Items</span></div>
+        <div><strong>{report.tracked_run_count}</strong><span>Tracked runs</span></div>
+        <div><strong>{report.untouched_count}</strong><span>Not started</span></div>
+        <div><strong>{report.needs_review_count}</strong><span>Needs review</span></div>
+        <div><strong>{report.published_count}</strong><span>Published</span></div>
+        <div><strong>{report.failed_count}</strong><span>Failed</span></div>
+        <div><strong>{report.action_required_count}</strong><span>Action required</span></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th><th>Intent</th><th>Status</th><th>Runs</th><th>Latest run</th>
+            <th>Latest status</th><th>Published URL</th><th>Action required</th><th>Next</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _calendar_latest_run_link(item: object) -> str:
+    latest_run_id = getattr(item, "latest_run_id", None)
+    if not latest_run_id:
+        return "none"
+    escaped = escape(str(latest_run_id))
+    return f'<a href="/dashboard/runs/{escaped}">{escaped}</a>'
 
 
 def _worker_job_readiness_html(report: WorkerJobReadinessResponse) -> str:

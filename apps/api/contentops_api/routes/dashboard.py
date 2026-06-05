@@ -19,6 +19,7 @@ from contentops_core.jobs import (
     JobRunner,
     archive_scheduled_workflow_review_package,
     content_calendar_brief,
+    content_calendar_lineage,
     content_calendar_run_request,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
@@ -75,6 +76,7 @@ from contentops_api.views import (
     _comparison_html,
     _config_audit_html,
     _content_calendar_brief_html,
+    _content_calendar_lineage_html,
     _cost_report_html,
     _cost_reports_html,
     _duration_label,
@@ -863,6 +865,10 @@ def build_dashboard_router(
             job_execution_dir(settings.artifact_root),
             limit=10,
         )
+        calendar_lineage = content_calendar_lineage(
+            settings.pipeline_dir,
+            repository.list(limit=200),
+        )
         return HTMLResponse(
             _page(
                 "Content Calendar",
@@ -876,6 +882,7 @@ def build_dashboard_router(
                     article.
                   </p>
                   {_content_calendar_brief_html(calendar_brief, api_key)}
+                  {_content_calendar_lineage_html(calendar_lineage)}
                   {_worker_job_readiness_html(readiness)}
                   {_worker_jobs_html(worker_jobs.items)}
                 </section>

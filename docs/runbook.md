@@ -15,6 +15,7 @@ contentops release-readiness --json
 contentops worker-jobs --json
 contentops worker-job-readiness --json
 contentops content-calendar --json
+contentops content-calendar-lineage --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
 ```
@@ -35,6 +36,8 @@ Expected result:
 - Use `contentops content-calendar-run --workflow <name> --job <name>` or the dashboard Content
   Calendar action when an operator wants to create a reviewable run from a planned item outside the
   normal schedule.
+- `content-calendar-lineage` shows which calendar items have no runs yet, which latest runs need
+  review, and which planned publish items still need a publish action.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 

@@ -250,6 +250,9 @@ Operators can promote a planned item into an actual run with
 or the dashboard. The resulting `RunRequest` keeps `contentops_calendar_source`,
 `contentops_calendar_item_key`, workflow name, job name, tags, and publish intent metadata, so the
 run detail page and artifacts retain lineage back to the content calendar.
+`contentops content-calendar-lineage` and `GET /content-calendar/lineage` read those persisted run
+artifacts and enrich every planned item with run count, latest run id, latest status, published URL,
+action-required state, and the next recommended operator action.
 
 Every worker invocation writes a job execution receipt under `artifact_root/job-executions` by
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,
