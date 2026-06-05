@@ -475,6 +475,10 @@ def build_dashboard_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        recovery_plan = job_recovery_plan(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
         execution_run_ids = job_execution_run_ids(report)
         execution_review_forms = ""
         if execution_run_ids:
@@ -521,7 +525,7 @@ def build_dashboard_router(
                 f"""
                 <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
                 <section class="hero">
-                  {_job_execution_detail_html(report)}
+                  {_job_execution_detail_html(report, recovery_plan)}
                   {execution_review_forms}
                   {recovery_form}
                   <h3>S3 Mirror Log</h3>
@@ -551,10 +555,10 @@ def build_dashboard_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        if plan.failed_count == 0:
+        if not plan.runnable:
             raise HTTPException(
                 status_code=409,
-                detail="Recovery plan has no failed jobs to rerun.",
+                detail=plan.blocked_reason or "Recovery plan has no failed jobs to rerun.",
             )
         recovery_report = JobRunner(pipeline).run(
             plan.to_job_file(),

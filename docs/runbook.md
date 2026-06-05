@@ -102,7 +102,10 @@ When failures occur, inspect the recovery plan before rerunning it with
 `contentops job-recovery-plan <execution_id> --run --actor <name> --notes <reason>`,
 `POST /job-executions/{execution_id}/recovery-runs`, or the dashboard job execution detail page to
 run only failed jobs and write a new audited worker receipt. Recovery job metadata records
-`recovery_source_execution_id`, `recovery_actor`, and `recovery_notes`.
+`recovery_source_execution_id`, `recovery_actor`, and `recovery_notes`. Recovery plans expose
+`runnable`, `blocked_reason`, and `source_dry_run`; use the dashboard preview to confirm which jobs
+will rerun. Dry-run receipts are schedule previews and are intentionally blocked from recovery
+execution.
 
 ## 3. CloudWatch Operations
 

@@ -667,6 +667,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert dashboard_detail_response.status_code == 200
     assert "Execution JSON" in dashboard_detail_response.text
     assert "API job history" in dashboard_detail_response.text
+    assert "Recovery Preview" in dashboard_detail_response.text
+    assert "Source dry run" in dashboard_detail_response.text
+    assert "Dry-run worker receipts are schedule previews" in dashboard_detail_response.text
     assert "Evidence status" in dashboard_detail_response.text
     assert "Generated runs" in dashboard_detail_response.text
     assert "Action required" in dashboard_detail_response.text
@@ -735,6 +738,30 @@ def test_job_execution_recovery_can_be_run_from_api_and_dashboard(
     dashboard_metadata = dashboard_detail.json()["results"][0]["metadata"]
     assert dashboard_metadata["recovery_actor"] == "dashboard-operator"
     assert dashboard_metadata["recovery_notes"] == "Retry from dashboard."
+
+
+def test_dry_run_job_execution_recovery_is_blocked(tmp_path: Path) -> None:
+    client = TestClient(app)
+    original_artifact_root = settings.artifact_root
+    settings.artifact_root = tmp_path / "artifacts"
+    path = tmp_path / "job.yaml"
+    path.write_text("name: dry-run-recovery\ntopic: Dry run recovery\n", encoding="utf-8")
+    report = JobRunner.dry_run_report(load_job_file(path))
+    try:
+        write_job_execution_report(report, job_execution_dir(settings.artifact_root))
+
+        plan_response = client.get(f"/job-executions/{report.execution_id}/recovery-plan")
+        run_response = client.post(f"/job-executions/{report.execution_id}/recovery-runs")
+    finally:
+        settings.artifact_root = original_artifact_root
+
+    assert plan_response.status_code == 200
+    plan_payload = plan_response.json()
+    assert plan_payload["source_dry_run"] is True
+    assert plan_payload["runnable"] is False
+    assert "Dry-run" in plan_payload["blocked_reason"]
+    assert run_response.status_code == 409
+    assert "Dry-run" in run_response.text
 
 
 def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:

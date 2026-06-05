@@ -377,10 +377,10 @@ def build_ops_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
-        if plan.failed_count == 0:
+        if not plan.runnable:
             raise HTTPException(
                 status_code=409,
-                detail="Recovery plan has no failed jobs to rerun.",
+                detail=plan.blocked_reason or "Recovery plan has no failed jobs to rerun.",
             )
         return JobRunner(pipeline).run(
             plan.to_job_file(),

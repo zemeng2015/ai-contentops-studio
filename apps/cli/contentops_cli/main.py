@@ -661,8 +661,11 @@ def job_recovery_plan_command(
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from exc
     if run_recovery:
-        if plan.failed_count == 0:
-            typer.echo("Recovery plan has no failed jobs to rerun.", err=True)
+        if not plan.runnable:
+            typer.echo(
+                plan.blocked_reason or "Recovery plan has no failed jobs to rerun.",
+                err=True,
+            )
             raise typer.Exit(1)
         report = JobRunner(build_pipeline(settings)).run(
             plan.to_job_file(),

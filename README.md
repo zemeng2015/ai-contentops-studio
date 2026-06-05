@@ -291,7 +291,9 @@ contentops job-recovery-plan <execution_id> --run --actor zack --notes "Retry pr
 The API and dashboard can also run the recovery plan directly with
 `POST /job-executions/{execution_id}/recovery-runs` or the job execution detail page. Recovery
 executions write normal worker receipts and preserve `recovery_source_execution_id`,
-`recovery_actor`, and `recovery_notes` metadata so reruns remain auditable.
+`recovery_actor`, and `recovery_notes` metadata so reruns remain auditable. Recovery plans expose
+`runnable`, `blocked_reason`, and `source_dry_run`; dashboard previews show the jobs that will be
+retried, and dry-run receipts are blocked from recovery execution.
 
 ## Configuration
 

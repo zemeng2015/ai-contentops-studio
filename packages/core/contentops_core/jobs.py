@@ -223,7 +223,10 @@ class WorkerJobCatalogResponse(BaseModel):
 class JobRecoveryPlan(BaseModel):
     execution_id: str
     source_execution_name: str
+    source_dry_run: bool = False
     failed_count: int
+    runnable: bool = True
+    blocked_reason: str | None = None
     jobs: list[ContentJob]
 
     def to_job_file(self) -> ContentJobFile:
@@ -585,7 +588,12 @@ def job_recovery_plan(
     notes: str | None = None,
 ) -> JobRecoveryPlan:
     report = get_job_execution_report(receipt_dir, execution_id)
-    failed_jobs = [
+    blocked_reason = (
+        "Dry-run worker receipts are schedule previews and cannot be recovered."
+        if report.dry_run
+        else None
+    )
+    failed_jobs = [] if report.dry_run else [
         ContentJob(
             name=result.job_name,
             topic=result.topic,
@@ -605,7 +613,10 @@ def job_recovery_plan(
     return JobRecoveryPlan(
         execution_id=report.execution_id,
         source_execution_name=report.name,
+        source_dry_run=report.dry_run,
         failed_count=len(failed_jobs),
+        runnable=blocked_reason is None and bool(failed_jobs),
+        blocked_reason=blocked_reason,
         jobs=failed_jobs,
     )
 

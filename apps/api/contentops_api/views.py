@@ -9,6 +9,7 @@ from contentops_core.jobs import (
     JobExecutionAlertReport,
     JobExecutionReport,
     JobExecutionTrendReport,
+    JobRecoveryPlan,
     WorkerJobCatalogItem,
     job_execution_summary,
 )
@@ -416,7 +417,10 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
     """
 
 
-def _job_execution_detail_html(report: JobExecutionReport) -> str:
+def _job_execution_detail_html(
+    report: JobExecutionReport,
+    recovery_plan: JobRecoveryPlan | None = None,
+) -> str:
     release_evidence = report.release_evidence_path or "not recorded"
     release_evidence_status = report.release_evidence_status or "n/a"
     release_evidence_error = report.release_evidence_error or "none"
@@ -472,6 +476,46 @@ def _job_execution_detail_html(report: JobExecutionReport) -> str:
             <th>Job</th><th>Intent</th><th>Status</th><th>Run</th><th>Handoff</th><th>Topic</th>
             <th>Sources</th><th>Tags</th><th>Metadata</th><th>Error</th>
           </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+      {_job_recovery_preview_html(recovery_plan)}
+    """
+
+
+def _job_recovery_preview_html(plan: JobRecoveryPlan | None) -> str:
+    if plan is None:
+        return ""
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(job.name)}</td>
+          <td>{_job_intent_label(job.publish)}</td>
+          <td>{escape(job.topic)}</td>
+          <td>{escape(", ".join(job.tags) or "none")}</td>
+          <td>{escape(_metadata_label(job.metadata))}</td>
+        </tr>
+        """
+        for job in plan.jobs
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="5"><span class="muted">No failed jobs are eligible for recovery.</span></td>
+        </tr>
+        """
+    blocked = plan.blocked_reason or "none"
+    return f"""
+      <h3>Recovery Preview</h3>
+      <p>
+        Runnable: <strong>{str(plan.runnable).lower()}</strong> |
+        Failed jobs: <strong>{plan.failed_count}</strong> |
+        Source dry run: <strong>{str(plan.source_dry_run).lower()}</strong> |
+        Blocked: <strong>{escape(blocked)}</strong>
+      </p>
+      <table>
+        <thead>
+          <tr><th>Job</th><th>Intent</th><th>Topic</th><th>Tags</th><th>Metadata</th></tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>

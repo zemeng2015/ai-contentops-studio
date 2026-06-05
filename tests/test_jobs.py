@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from contentops_core.factory import build_pipeline
 from contentops_core.jobs import (
+    ContentJob,
+    ContentJobFile,
     JobExecutionReport,
     JobRunner,
     JobRunResult,
@@ -409,6 +411,9 @@ def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:
     job_file = plan.to_job_file()
 
     assert plan.failed_count == 1
+    assert plan.runnable is True
+    assert plan.source_dry_run is False
+    assert plan.blocked_reason is None
     assert job_file.name == "daily-calendar-recovery"
     assert len(job_file.jobs) == 1
     assert job_file.jobs[0].name == "failed"
@@ -416,6 +421,24 @@ def test_job_recovery_plan_rebuilds_failed_jobs(tmp_path: Path) -> None:
     assert job_file.jobs[0].publish is True
     assert job_file.jobs[0].homepage_handoff is True
     assert job_file.jobs[0].metadata["recovery_source_execution_id"] == report.execution_id
+
+
+def test_job_recovery_plan_blocks_dry_run_receipts(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    job_file = ContentJobFile(
+        name="dry-run-calendar",
+        jobs=[ContentJob(name="preview", topic="Preview only")],
+    )
+    report = JobRunner.dry_run_report(job_file)
+    write_job_execution_report(report, receipt_dir)
+
+    plan = job_recovery_plan(receipt_dir, report.execution_id)
+
+    assert plan.source_dry_run is True
+    assert plan.runnable is False
+    assert plan.failed_count == 0
+    assert plan.jobs == []
+    assert "Dry-run" in (plan.blocked_reason or "")
 
 
 def test_missing_job_execution_history_is_empty(tmp_path: Path) -> None:

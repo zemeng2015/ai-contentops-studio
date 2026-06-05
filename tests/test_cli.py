@@ -509,6 +509,7 @@ def test_cli_job_execution_commands(
     notify_result = runner.invoke(app, ["job-execution-alert-notify", "--days", "1"])
     notifications_result = runner.invoke(app, ["job-execution-alert-notifications"])
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
+    recovery_run_result = runner.invoke(app, ["job-recovery-plan", report.execution_id, "--run"])
 
     assert list_result.exit_code == 0
     list_payload = json.loads(list_result.output)
@@ -555,6 +556,10 @@ def test_cli_job_execution_commands(
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0
+    assert recovery_payload["source_dry_run"] is True
+    assert recovery_payload["runnable"] is False
+    assert recovery_run_result.exit_code != 0
+    assert "Dry-run" in recovery_run_result.output
 
 
 def test_cli_job_recovery_plan_can_run_failed_jobs(
