@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from contentops_core.factory import build_pipeline
@@ -447,7 +448,7 @@ def test_notify_worker_delivery_summary_posts_webhook(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     receipt_dir = tmp_path / "receipts"
-    requests: list[dict[str, object]] = []
+    requests: list[dict[str, Any]] = []
 
     class Response:
         is_success = True
@@ -489,7 +490,7 @@ def test_notify_worker_delivery_summary_posts_webhook(
     assert delivery.status_code == 202
     assert requests[0]["url"] == "https://hooks.example.com/contentops"
     assert requests[0]["timeout"] == 2.5
-    payload = requests[0]["json"]
+    payload = cast(dict[str, Any], requests[0]["json"])
     assert "worker_delivery_summary" in payload
     assert "markdown" in payload
     assert payload["worker_delivery_summary"]["execution_id"] == report.execution_id
