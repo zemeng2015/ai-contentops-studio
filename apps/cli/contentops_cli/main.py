@@ -370,6 +370,8 @@ def show_release_gate(
     typer.echo(f"Can deploy: {str(report.can_deploy).lower()}")
     for check in report.checks:
         typer.echo(f"- {check.name}: {check.status} - {check.message}")
+        for step in check.remediation_steps:
+            typer.echo(f"  fix: {step}")
     raise typer.Exit(0 if report.can_deploy else 1)
 
 

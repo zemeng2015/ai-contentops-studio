@@ -195,6 +195,9 @@ Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 The gate fails when release readiness fails, deployment preflight fails, required configuration
 audit items are missing, no approval exists, the latest approval rejects deployment, or the approval
 git SHA does not match the commit being released.
+Every release gate check also includes `remediation_steps`, so failed API, CLI, and dashboard
+reports can point operators to the next command or review action instead of only exposing raw
+status.
 CI also uploads a non-blocking `release-gate/release-gate.json` report with
 `--no-require-approval`, so reviewers can inspect the gate shape before a human approval exists.
 Use `--strict` in an actual deployment job once approval is required.

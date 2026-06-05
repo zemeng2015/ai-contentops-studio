@@ -1502,6 +1502,7 @@ def _release_gate_html(report: ReleaseGateReport) -> str:
           <td>{escape(check.name)}</td>
           <td><span class="pill">{escape(check.status)}</span></td>
           <td>{escape(check.message)}</td>
+          <td>{_release_gate_remediation_html(check.remediation_steps)}</td>
           <td><pre>{escape(json.dumps(check.evidence, ensure_ascii=False, indent=2))}</pre></td>
         </tr>
         """
@@ -1516,11 +1517,20 @@ def _release_gate_html(report: ReleaseGateReport) -> str:
       </p>
       <table>
         <thead>
-          <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
+          <tr>
+            <th>Check</th><th>Status</th><th>Message</th><th>Remediation</th><th>Evidence</th>
+          </tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>
     """
+
+
+def _release_gate_remediation_html(steps: list[str]) -> str:
+    if not steps:
+        return '<span class="muted">No action required.</span>'
+    items = "".join(f"<li>{escape(step)}</li>" for step in steps)
+    return f"<ul>{items}</ul>"
 
 
 def _release_gate_history_html(reports: ReleaseGateListResponse) -> str:

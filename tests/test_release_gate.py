@@ -32,9 +32,10 @@ def test_release_gate_requires_approval_by_default(tmp_path: Path) -> None:
 
     assert report.status == "fail"
     assert report.can_deploy is False
-    assert "release_approval" in {
-        check.name for check in report.checks if check.status == "fail"
-    }
+    approval_check = next(check for check in report.checks if check.name == "release_approval")
+    assert approval_check.status == "fail"
+    assert approval_check.remediation_steps
+    assert "release-approve" in approval_check.remediation_steps[1]
 
 
 def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
@@ -134,6 +135,8 @@ def test_release_gate_fails_when_required_config_is_missing(tmp_path: Path) -> N
     assert report.can_deploy is False
     assert "configuration_audit" in failed_checks
     assert config_check.evidence["failed_items"] == ["openai_api_key"]
+    assert config_check.remediation_steps
+    assert "config-audit" in config_check.remediation_steps[0]
     assert report.config_audit is not None
     assert report.config_audit.status == "fail"
 
@@ -166,6 +169,7 @@ def test_release_gate_fails_with_pending_source_reviews(tmp_path: Path) -> None:
     assert report.can_deploy is False
     assert source_review_check.status == "fail"
     assert source_review_check.evidence["needs_review_count"] == 1
+    assert "source review dashboard" in source_review_check.remediation_steps[0]
     assert report.release_evidence.can_release is False
 
 

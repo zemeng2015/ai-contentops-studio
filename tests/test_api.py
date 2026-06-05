@@ -199,6 +199,7 @@ def test_release_approval_api_and_dashboard(
     assert gate_payload["git_sha"] == "api-release-sha"
     assert gate_payload["config_audit"]["redacted"] is True
     assert "configuration_audit" in {check["name"] for check in gate_payload["checks"]}
+    assert all("remediation_steps" in check for check in gate_payload["checks"])
     assert evidence_response.status_code == 200
     evidence_payload = evidence_response.json()
     assert evidence_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
@@ -209,6 +210,7 @@ def test_release_approval_api_and_dashboard(
     assert b"release_approval.json" in evidence_bundle_response.content
     assert dashboard_response.status_code == 200
     assert "Release Approval" in dashboard_response.text
+    assert "Remediation" in dashboard_response.text
     assert "Recent Release Gates" in dashboard_response.text
     assert "Pass rate:" in dashboard_response.text
     assert "Most common failed checks:" in dashboard_response.text

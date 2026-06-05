@@ -648,6 +648,7 @@ class ReleaseGateItem(BaseModel):
     status: str
     message: str
     evidence: dict[str, Any] = Field(default_factory=dict)
+    remediation_steps: list[str] = Field(default_factory=list)
 
 
 class ReleaseGateReport(BaseModel):

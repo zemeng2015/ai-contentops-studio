@@ -148,6 +148,23 @@ def test_cli_release_approval_records_decision(
     assert gate_history_payload["summary"]["pass_count"] == 1
 
 
+def test_cli_release_gate_prints_remediation_steps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["release-gate", "--git-sha", "missing-approval-sha"])
+
+    assert result.exit_code != 0
+    assert "fix:" in result.output
+    assert "release-approve" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:
     runner = CliRunner()
     path = tmp_path / ".env.production"

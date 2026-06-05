@@ -105,6 +105,15 @@ def _release_readiness_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
             "release_status": bundle.summary.release_status,
             "can_release": bundle.summary.can_release,
         },
+        remediation_steps=(
+            []
+            if status == "pass"
+            else [
+                "Open the release evidence dashboard and review failing readiness checks.",
+                "Resolve quality, budget, incident, source review, or operator security blockers.",
+                "Regenerate release evidence after fixes are applied.",
+            ]
+        ),
     )
 
 
@@ -122,6 +131,15 @@ def _deployment_preflight_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
             "deployment_status": bundle.deployment_check.status,
             "can_deploy": bundle.deployment_check.can_deploy,
         },
+        remediation_steps=(
+            []
+            if status == "pass"
+            else [
+                "Run `contentops deployment-check --json` to inspect failing preflight checks.",
+                "Fix missing deployment capabilities, environment values, or infrastructure.",
+                "Rerun the release gate after the deployment preflight is pass or warn.",
+            ]
+        ),
     )
 
 
@@ -138,6 +156,11 @@ def _source_review_governance_check(bundle: ReleaseEvidenceBundle) -> ReleaseGat
                 "exclude_count": source_reviews.exclude_count,
                 "needs_review_count": source_reviews.needs_review_count,
             },
+            remediation_steps=[
+                "Open the source review dashboard for affected runs.",
+                "Resolve each `needs_review` source as `include` or `exclude` with notes.",
+                "Regenerate release evidence so source governance reflects the decisions.",
+            ],
         )
     if source_reviews.exclude_count:
         return ReleaseGateItem(
@@ -178,6 +201,15 @@ def _configuration_audit_check(audit: ConfigAuditReport) -> ReleaseGateItem:
             "summary": audit.summary,
             "failed_items": failed_items,
         },
+        remediation_steps=(
+            []
+            if not blocking
+            else [
+                "Run `contentops config-audit --json` to inspect missing required settings.",
+                "Populate required environment variables or secret references.",
+                "Rerun the release gate after the configuration audit no longer reports failures.",
+            ]
+        ),
     )
 
 
@@ -194,6 +226,18 @@ def _approval_check(bundle: ReleaseEvidenceBundle, require_approval: bool) -> Re
                 else "No release approval recorded; approval requirement disabled."
             ),
             evidence={"required": require_approval},
+            remediation_steps=(
+                [
+                    "Review the release evidence and deployment preflight output.",
+                    "Record approval with `contentops release-approve --decision approved`.",
+                    "Rerun `contentops release-gate --git-sha <sha> --record` after approval.",
+                ]
+                if require_approval
+                else [
+                    "Record release approval before using this report for production deployment.",
+                    "Enable approval enforcement by omitting `--no-require-approval`.",
+                ]
+            ),
         )
     approved = approval.decision == ReleaseApprovalDecision.APPROVED
     status = "pass" if approved else "fail"
@@ -212,6 +256,15 @@ def _approval_check(bundle: ReleaseEvidenceBundle, require_approval: bool) -> Re
             "force": approval.force,
             "approved_at": approval.approved_at.isoformat(),
         },
+        remediation_steps=(
+            []
+            if approved
+            else [
+                "Review the rejection notes on the latest release approval.",
+                "Fix the release blockers and record a new approved release decision.",
+                "Rerun the release gate against the commit being deployed.",
+            ]
+        ),
     )
 
 
@@ -228,6 +281,17 @@ def _approval_git_sha_check(
             status=status,
             message="No release approval exists to compare with the current git SHA.",
             evidence={"git_sha": git_sha, "required": require_approval},
+            remediation_steps=(
+                [
+                    "Record a release approval for the commit being deployed.",
+                    "Pass the deployment commit with `--git-sha` or set `CONTENTOPS_GIT_SHA`.",
+                ]
+                if require_approval
+                else [
+                    "Pass a git SHA when generating advisory release gate reports.",
+                    "Record a matching approval before enforcing deployment.",
+                ]
+            ),
         )
     if git_sha is None:
         return ReleaseGateItem(
@@ -235,6 +299,10 @@ def _approval_git_sha_check(
             status="warn",
             message="No git SHA provided; approval commit cannot be compared.",
             evidence={"approval_git_sha": approval.git_sha},
+            remediation_steps=[
+                "Pass `--git-sha <sha>` in CI/CD or set `CONTENTOPS_GIT_SHA`.",
+                "Confirm the recorded approval was created for the same commit being deployed.",
+            ],
         )
     matches = approval.git_sha == git_sha
     return ReleaseGateItem(
@@ -246,6 +314,15 @@ def _approval_git_sha_check(
             else "Release approval does not match the current git SHA."
         ),
         evidence={"approval_git_sha": approval.git_sha, "git_sha": git_sha},
+        remediation_steps=(
+            []
+            if matches
+            else [
+                "Deploy the approved commit or record a new approval for the current git SHA.",
+                "Confirm CI passes the reviewed SHA to `contentops release-gate --git-sha`.",
+                "Avoid reusing approvals after new commits are pushed.",
+            ]
+        ),
     )
 
 
