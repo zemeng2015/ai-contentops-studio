@@ -21,10 +21,12 @@ from contentops_core.jobs import (
     JobExecutionTrendReport,
     JobRecoveryPlan,
     JobRunner,
+    ScheduledWorkflowReviewPackageItem,
     ScheduledWorkflowReviewPackageListResponse,
     WorkerDeliverySummaryDelivery,
     WorkerJobCatalogResponse,
     WorkerJobReadinessResponse,
+    archive_scheduled_workflow_review_package,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
@@ -352,6 +354,38 @@ def build_ops_router(
             media_type="application/zip",
             filename=archive_path.name,
         )
+
+    @router.post(
+        "/scheduled-reviews/{package_id}/archive",
+        response_model=ScheduledWorkflowReviewPackageItem,
+        dependencies=[Depends(require_operator)],
+    )
+    def create_scheduled_review_archive(package_id: str) -> ScheduledWorkflowReviewPackageItem:
+        try:
+            item = get_scheduled_workflow_review_package(settings.artifact_root, package_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        s3_bucket: str | None = None
+        if settings.artifact_store_provider == "s3":
+            if not settings.artifact_s3_bucket:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "CONTENTOPS_ARTIFACT_S3_BUCKET is required for S3 scheduled "
+                        "review mirroring."
+                    ),
+                )
+            s3_bucket = settings.artifact_s3_bucket
+        try:
+            return archive_scheduled_workflow_review_package(
+                Path(item.manifest_path),
+                s3_bucket=s3_bucket,
+                s3_prefix=settings.artifact_s3_prefix,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.get(
         "/job-executions/trends",

@@ -1221,6 +1221,28 @@ def write_scheduled_workflow_review_archive_report(
     return path
 
 
+def archive_scheduled_workflow_review_package(
+    manifest_path: Path,
+    output_path: Path | None = None,
+    *,
+    s3_bucket: str | None = None,
+    s3_prefix: str = "",
+) -> ScheduledWorkflowReviewPackageItem:
+    paths = _scheduled_review_package_paths(manifest_path)
+    report = create_scheduled_workflow_review_archive(
+        manifest_path,
+        output_path or paths["archive"],
+    )
+    write_scheduled_workflow_review_archive_report(report)
+    if s3_bucket:
+        return mirror_scheduled_workflow_review_package_to_s3(
+            manifest_path,
+            bucket=s3_bucket,
+            prefix=s3_prefix,
+        )
+    return _scheduled_review_package_item(manifest_path)
+
+
 def mirror_scheduled_workflow_review_package_to_s3(
     manifest_path: Path,
     *,

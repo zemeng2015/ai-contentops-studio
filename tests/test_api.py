@@ -897,14 +897,24 @@ def test_scheduled_review_package_endpoints_and_dashboard(tmp_path: Path) -> Non
         assert item["archive_exists"] is True
         assert item["archive_sha256"] == archive_report.archive_sha256
         archive_response = client.get(f"/scheduled-reviews/{item['id']}/archive")
+        rebuild_response = client.post(f"/scheduled-reviews/{item['id']}/archive")
+        dashboard_rebuild_response = client.post(
+            f"/dashboard/scheduled-reviews/{item['id']}/archive",
+            follow_redirects=False,
+        )
         assert archive_response.status_code == 200
         assert archive_response.headers["content-type"] == "application/zip"
+        assert rebuild_response.status_code == 200
+        assert rebuild_response.json()["status"] == "archived"
+        assert dashboard_rebuild_response.status_code == 303
+        assert dashboard_rebuild_response.headers["location"] == "/dashboard/scheduled-reviews"
         assert dashboard_response.status_code == 200
         assert "Scheduled Review Packages" in dashboard_response.text
         assert item["id"] in dashboard_response.text
         assert dashboard_packages_response.status_code == 200
         assert "Archives ready" in dashboard_packages_response.text
         assert "daily-review-package.zip" in dashboard_packages_response.text
+        assert "Rebuild archive" in dashboard_packages_response.text
     finally:
         settings.artifact_root = original_artifact_root
 

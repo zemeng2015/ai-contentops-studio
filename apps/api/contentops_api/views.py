@@ -434,6 +434,7 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
 
 def _scheduled_review_packages_html(
     items: list[ScheduledWorkflowReviewPackageItem],
+    api_key: str = "",
 ) -> str:
     if not items:
         return "<p>No scheduled review packages recorded.</p>"
@@ -449,6 +450,7 @@ def _scheduled_review_packages_html(
           <td>{escape(str(item.archive_size_bytes))}</td>
           <td>{escape(item.s3_mirror_status)}</td>
           <td>{_scheduled_review_archive_link(item)}</td>
+          <td>{_scheduled_review_archive_action(item, api_key)}</td>
           <td>{escape(item.updated_at.isoformat() if item.updated_at else "n/a")}</td>
         </tr>
         """
@@ -461,7 +463,7 @@ def _scheduled_review_packages_html(
           <tr>
             <th>Package</th><th>Status</th><th>Verification</th><th>Failed</th>
             <th>Artifacts</th><th>Action required</th><th>Zip bytes</th><th>S3 mirror</th>
-            <th>Archive</th><th>Updated</th>
+            <th>Archive</th><th>Action</th><th>Updated</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>
@@ -476,6 +478,25 @@ def _scheduled_review_archive_link(item: ScheduledWorkflowReviewPackageItem) -> 
         f'<a href="/scheduled-reviews/{escape(item.id)}/archive">'
         f"{escape(item.archive_path or 'download zip')}</a>"
     )
+
+
+def _scheduled_review_archive_action(
+    item: ScheduledWorkflowReviewPackageItem,
+    api_key: str,
+) -> str:
+    label = "Retry S3 mirror" if item.s3_mirror_status == "failed" else "Rebuild archive"
+    if not item.archive_exists:
+        label = "Create archive"
+    action = (
+        f"/dashboard/scheduled-reviews/{escape(item.id)}/archive"
+        f"{_api_key_query(api_key)}"
+    )
+    return f"""
+      <form method="post" action="{action}">
+        {_api_key_hidden(api_key)}
+        <button type="submit">{label}</button>
+      </form>
+    """
 
 
 def _job_execution_detail_html(

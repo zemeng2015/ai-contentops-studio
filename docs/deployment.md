@@ -301,6 +301,8 @@ When those scheduled artifacts are retained under the configured artifact root, 
 `GET /scheduled-reviews` or `/dashboard/scheduled-reviews` to inspect verification status and
 download the archive ZIP without opening the raw Actions artifact browser. Release evidence copies
 the same package inventory, including S3 mirror status, into `scheduled_review_packages.json`.
+Operators can trigger `POST /scheduled-reviews/{package_id}/archive` or the dashboard archive
+action to rebuild the ZIP and retry S3 mirroring from the API layer.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes

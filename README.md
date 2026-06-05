@@ -234,6 +234,7 @@ GET  /job-executions/{execution_id}/summary
 POST /job-executions/{execution_id}/approve-runs
 POST /job-executions/{execution_id}/publish-runs
 GET  /scheduled-reviews
+POST /scheduled-reviews/{package_id}/archive
 GET  /scheduled-reviews/{package_id}/archive
 ```
 
@@ -364,7 +365,9 @@ mode, the same archive command mirrors the manifest, verification report, packag
 the configured bucket and records the result in `s3-mirror-log.json`.
 `GET /scheduled-reviews` and `/dashboard/scheduled-reviews` expose recent review packages from the
 artifact root, including verification status, failed counts, ZIP size, ZIP hash, and archive
-download links, plus S3 mirror health when package archives are mirrored.
+download links, plus S3 mirror health when package archives are mirrored. Operators can also call
+`POST /scheduled-reviews/{package_id}/archive` or use the dashboard action to rebuild the archive
+and retry package mirroring without shell access.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,

@@ -13,7 +13,9 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobExecutionTrendReport,
     JobRunner,
+    archive_scheduled_workflow_review_package,
     get_job_execution_report,
+    get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
@@ -301,7 +303,7 @@ def build_dashboard_router(
                     Recent review manifests, verification results, and downloadable evidence ZIPs.
                   </p>
                   <p><a href="/dashboard/scheduled-reviews">Open scheduled review packages</a></p>
-                  {_scheduled_review_packages_html(scheduled_review_packages.items)}
+                  {_scheduled_review_packages_html(scheduled_review_packages.items, api_key)}
                 </section>
                 <section class="hero compact">
                   <h2>Published Content</h2>
@@ -373,10 +375,48 @@ def build_dashboard_router(
                     <div><strong>{archive_ready_count}</strong><span>Archives ready</span></div>
                     <div><strong>{verified_count}</strong><span>Verified</span></div>
                   </div>
-                  {_scheduled_review_packages_html(packages.items)}
+                  {_scheduled_review_packages_html(packages.items, api_key)}
                 </section>
                 """,
             )
+        )
+
+    @router.post(
+        "/dashboard/scheduled-reviews/{package_id}/archive",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_archive_scheduled_review(
+        package_id: str,
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        try:
+            item = get_scheduled_workflow_review_package(settings.artifact_root, package_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        s3_bucket: str | None = None
+        if settings.artifact_store_provider == "s3":
+            if not settings.artifact_s3_bucket:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "CONTENTOPS_ARTIFACT_S3_BUCKET is required for S3 scheduled "
+                        "review mirroring."
+                    ),
+                )
+            s3_bucket = settings.artifact_s3_bucket
+        try:
+            archive_scheduled_workflow_review_package(
+                Path(item.manifest_path),
+                s3_bucket=s3_bucket,
+                s3_prefix=settings.artifact_s3_prefix,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return RedirectResponse(
+            f"/dashboard/scheduled-reviews{_api_key_query(api_key)}",
+            status_code=303,
         )
 
 

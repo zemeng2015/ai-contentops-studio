@@ -134,7 +134,9 @@ and action-required state for audit handoff.
 The release gate fails when any package verification status is `fail`, and warns when verified
 manifests do not yet have an archive ZIP. It also fails when package S3 mirroring failed. Use
 `/dashboard/scheduled-reviews` to inspect the package and rerun
-`contentops scheduled-workflow-archive` before promotion.
+`contentops scheduled-workflow-archive` before promotion. API operators can use
+`POST /scheduled-reviews/{package_id}/archive` or the dashboard archive action for the same rebuild
+and mirror retry when shell access is not available.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced
