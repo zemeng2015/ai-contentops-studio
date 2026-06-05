@@ -1155,6 +1155,7 @@ def test_dashboard_renders() -> None:
     assert "Ops Brief" in response.text
     assert "Open ops brief" in response.text
     assert "Operations Summary" in response.text
+    assert "Open operations console" in response.text
     assert "Open operations trends" in response.text
     assert "System status dashboard" in response.text
     assert "Release evidence dashboard" in response.text
@@ -1163,6 +1164,24 @@ def test_dashboard_renders() -> None:
     assert "Open retention lifecycle" in response.text
     assert "Create archive" in response.text
     assert "Worker Job Catalog" in response.text
+
+
+def test_dashboard_operations_console_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/operations?days=7&window_size=100")
+
+    assert response.status_code == 200
+    assert "Operations Console" in response.text
+    assert "Brief status" in response.text
+    assert "Review queue" in response.text
+    assert "Release gate" in response.text
+    assert "Retention gate" in response.text
+    assert "Worker success" in response.text
+    assert "Daily Brief" in response.text
+    assert "Worker Automation" in response.text
+    assert "Retention Governance" in response.text
+    assert "Retention lifecycle" in response.text
 
 
 def test_dashboard_retention_lifecycle_renders() -> None:

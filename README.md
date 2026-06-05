@@ -176,6 +176,7 @@ Representative endpoints:
 POST /runs
 GET  /runs
 GET  /dashboard
+GET  /dashboard/operations
 GET  /dashboard/retention
 GET  /dashboard/ops-brief
 GET  /dashboard/ops-trends

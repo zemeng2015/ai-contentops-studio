@@ -251,6 +251,7 @@ def build_dashboard_router(
                   <p>
                     Portfolio-wide run health, queue depth, incident severity, and cost posture.
                   </p>
+                  <p><a href="/dashboard/operations">Open operations console</a></p>
                   <p><a href="/dashboard/ops-trends">Open operations trends</a></p>
                   {_operations_summary_html(operations_summary)}
                 </section>
@@ -353,6 +354,112 @@ def build_dashboard_router(
     ) -> RedirectResponse:
         review_service.retention_archive(retention_days=days, limit=limit)
         return RedirectResponse(f"/dashboard{_api_key_query(api_key)}", status_code=303)
+
+
+    @router.get(
+        "/dashboard/operations",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_operations(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=100, ge=1, le=500),
+        api_key: str = Query(default=""),
+    ) -> HTMLResponse:
+        operations_summary = review_service.operations_summary(window_size=window_size)
+        ops_brief = build_ops_brief(
+            settings=settings,
+            review_service=review_service,
+            days=days,
+            window_size=window_size,
+        )
+        worker_trends = job_execution_trends(
+            job_execution_dir(settings.artifact_root),
+            days=days,
+        )
+        worker_alerts = job_execution_alert_report(
+            job_execution_dir(settings.artifact_root),
+            days=days,
+        )
+        retention_report = review_service.retention_report()
+        retention_archives = review_service.retention_archives(limit=5)
+        gate = release_gate(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            require_approval=False,
+        )
+        retention_gate = next(
+            check for check in gate.checks if check.name == "retention_archive_governance"
+        )
+        return HTMLResponse(
+            _page(
+                "Operations Console",
+                f"""
+                <section class="hero compact">
+                  <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                  <h2>Operations Console</h2>
+                  <p>
+                    One operator view for daily risk, worker automation, release gates,
+                    artifact retention, and portfolio health.
+                  </p>
+                  <div class="metrics">
+                    <div>
+                      <strong>{escape(ops_brief.status)}</strong><span>Brief status</span>
+                    </div>
+                    <div>
+                      <strong>{operations_summary.review_queue_depth}</strong>
+                      <span>Review queue</span>
+                    </div>
+                    <div>
+                      <strong>{operations_summary.action_required_incidents}</strong>
+                      <span>Incidents</span>
+                    </div>
+                    <div>
+                      <strong>{escape(gate.status)}</strong><span>Release gate</span>
+                    </div>
+                    <div>
+                      <strong>{escape(retention_gate.status)}</strong><span>Retention gate</span>
+                    </div>
+                    <div>
+                      <strong>{worker_trends.summary.success_rate:.0%}</strong>
+                      <span>Worker success</span>
+                    </div>
+                  </div>
+                  <p>
+                    <a href="/dashboard/ops-brief">Ops brief</a> |
+                    <a href="/dashboard/ops-trends">Operations trends</a> |
+                    <a href="/dashboard/job-execution-trends">Worker health</a> |
+                    <a href="/dashboard/retention">Retention lifecycle</a> |
+                    <a href="/dashboard/release-evidence">Release evidence</a> |
+                    <a href="/dashboard/system-status">System status</a>
+                  </p>
+                </section>
+                <section class="hero compact">
+                  <h2>Operations Summary</h2>
+                  {_operations_summary_html(operations_summary)}
+                </section>
+                <section class="hero compact">
+                  <h2>Daily Brief</h2>
+                  {_ops_brief_html(ops_brief)}
+                </section>
+                <section class="hero compact">
+                  <h2>Worker Automation</h2>
+                  {_job_execution_trends_html(worker_trends)}
+                  <h2>Worker Alerts</h2>
+                  {_job_execution_alerts_html(worker_alerts)}
+                </section>
+                <section class="hero compact">
+                  <h2>Release Gate</h2>
+                  {_release_gate_html(gate)}
+                </section>
+                <section class="hero compact">
+                  <h2>Retention Governance</h2>
+                  {_retention_report_html(retention_report, retention_archives)}
+                </section>
+                """,
+            )
+        )
 
 
     @router.get(
