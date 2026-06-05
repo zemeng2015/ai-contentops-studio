@@ -26,6 +26,7 @@ from contentops_core.jobs import (
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     scheduled_workflow_review_report,
+    verify_scheduled_workflow_review_manifest,
     worker_delivery_summary_notification_log,
     worker_job_readiness,
     write_job_execution_delivery_summary,
@@ -429,6 +430,19 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert manifest["artifacts"][str(handoff_path)]["sha256"] == hashlib.sha256(
         handoff_path.read_bytes()
     ).hexdigest()
+    verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    assert verification.status == "pass"
+    assert verification.checked_count == manifest["metadata"]["artifact_count"]
+    markdown_path.write_text("drift", encoding="utf-8")
+    drift_verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    assert drift_verification.status == "fail"
+    assert drift_verification.failed_count == 1
+    assert any(
+        item.path == str(markdown_path)
+        and item.status == "fail"
+        and "sha256" in item.message
+        for item in drift_verification.items
+    )
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

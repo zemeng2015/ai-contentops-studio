@@ -30,6 +30,7 @@ from contentops_core.jobs import (
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     scheduled_workflow_review_report,
+    verify_scheduled_workflow_review_manifest,
     worker_delivery_summary_notification_log,
     worker_job_readiness,
     write_scheduled_workflow_pr_metadata,
@@ -815,6 +816,30 @@ def scheduled_workflow_summary_command(
     path = settings.artifact_root / "scheduled-workflow-review.md"
     write_scheduled_workflow_review_markdown(report, path)
     typer.echo(path.read_text(encoding="utf-8"))
+
+
+@app.command("scheduled-workflow-verify")
+def scheduled_workflow_verify_command(
+    manifest_path: Annotated[
+        Path,
+        typer.Argument(help="Path to a scheduled review manifest JSON file."),
+    ],
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    report = verify_scheduled_workflow_review_manifest(manifest_path)
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+    else:
+        typer.echo(f"Scheduled review manifest: {report.status}")
+        typer.echo(f"Checked: {report.checked_count}")
+        typer.echo(f"Failed: {report.failed_count}")
+        for item in report.items:
+            if item.status == "fail":
+                typer.echo(f"- {item.path}: {item.message}")
+    raise typer.Exit(0 if report.status == "pass" else 1)
 
 
 @app.command("job-execution")

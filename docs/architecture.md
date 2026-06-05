@@ -271,6 +271,8 @@ It can also write a scheduled review manifest that indexes the Markdown, PR meta
 Console snapshot, worker receipts, release evidence paths, content asset paths, homepage handoffs,
 and published URLs committed by a manual draft PR workflow, including size, media type, SHA-256,
 and missing-file metadata for each local artifact.
+`contentops scheduled-workflow-verify` reloads that manifest and recomputes the metadata so CI can
+fail review packages whose artifacts are missing or whose hashes have drifted.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
 dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
 handoff success rate, and action-required counts.

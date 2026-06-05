@@ -309,6 +309,25 @@ class ScheduledWorkflowReviewManifest(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ScheduledWorkflowReviewVerificationItem(BaseModel):
+    path: str
+    status: str
+    message: str
+    expected: ScheduledWorkflowReviewArtifact
+    actual: ScheduledWorkflowReviewArtifact
+
+
+class ScheduledWorkflowReviewVerificationReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    manifest_path: str
+    status: str
+    checked_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    missing_count: int = Field(ge=0)
+    mismatch_count: int = Field(ge=0)
+    items: list[ScheduledWorkflowReviewVerificationItem] = Field(default_factory=list)
+
+
 class JobExecutionListResponse(BaseModel):
     items: list[JobExecutionReport]
     total: int
@@ -1053,6 +1072,64 @@ def write_scheduled_workflow_review_manifest(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
     return output_path
+
+
+def verify_scheduled_workflow_review_manifest(
+    manifest_path: Path,
+) -> ScheduledWorkflowReviewVerificationReport:
+    manifest = ScheduledWorkflowReviewManifest.model_validate_json(
+        manifest_path.read_text(encoding="utf-8")
+    )
+    items = [
+        _verify_scheduled_review_artifact(path, expected)
+        for path, expected in sorted(manifest.artifacts.items())
+    ]
+    missing_count = sum(1 for item in items if item.actual.exists is False)
+    mismatch_count = sum(1 for item in items if item.status == "fail" and item.actual.exists)
+    failed_count = sum(1 for item in items if item.status == "fail")
+    status = "pass" if failed_count == 0 else "fail"
+    if not items:
+        status = "warn"
+    return ScheduledWorkflowReviewVerificationReport(
+        manifest_path=str(manifest_path),
+        status=status,
+        checked_count=len(items),
+        failed_count=failed_count,
+        missing_count=missing_count,
+        mismatch_count=mismatch_count,
+        items=items,
+    )
+
+
+def _verify_scheduled_review_artifact(
+    path: str,
+    expected: ScheduledWorkflowReviewArtifact,
+) -> ScheduledWorkflowReviewVerificationItem:
+    actual = _scheduled_review_artifact(path)
+    mismatches: list[str] = []
+    if actual.exists != expected.exists:
+        mismatches.append("existence")
+    if actual.size_bytes != expected.size_bytes:
+        mismatches.append("size")
+    if actual.sha256 != expected.sha256:
+        mismatches.append("sha256")
+    if actual.media_type != expected.media_type:
+        mismatches.append("media_type")
+    if mismatches:
+        return ScheduledWorkflowReviewVerificationItem(
+            path=path,
+            status="fail",
+            message=f"Artifact metadata mismatch: {', '.join(mismatches)}.",
+            expected=expected,
+            actual=actual,
+        )
+    return ScheduledWorkflowReviewVerificationItem(
+        path=path,
+        status="pass",
+        message="Artifact metadata matches the scheduled review manifest.",
+        expected=expected,
+        actual=actual,
+    )
 
 
 def _optional_path(path: Path | None) -> str | None:

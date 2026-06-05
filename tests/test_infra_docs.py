@@ -110,6 +110,18 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "--pr-metadata-output scheduled-worker/project-updates-pr-metadata.json" in workflow
     assert "--manifest-output scheduled-worker/daily-review-manifest.json" in workflow
     assert "--manifest-output scheduled-worker/project-updates-review-manifest.json" in workflow
+    assert (
+        "contentops scheduled-workflow-verify scheduled-worker/daily-review-manifest.json --json"
+        in workflow
+    )
+    assert (
+        "contentops scheduled-workflow-verify "
+        "scheduled-worker/project-updates-review-manifest.json --json"
+        in workflow
+    )
+    assert "set -o pipefail" in workflow
+    assert "daily-review-manifest-verification.json" in workflow
+    assert "project-updates-review-manifest-verification.json" in workflow
     assert "--operations-console-path scheduled-worker/daily-operations-console.json" in workflow
     assert (
         "--operations-console-path scheduled-worker/project-updates-operations-console.json"

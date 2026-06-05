@@ -63,6 +63,9 @@ evidence paths, content asset paths, homepage handoffs, published URLs, and the 
 snapshot, with size, media type, SHA-256, and missing-file metadata for each local artifact. The
 workflow uses the generated PR metadata as the draft PR title and body. Leave this disabled for
 unattended cron runs unless every scheduled execution should create a review branch.
+Use `contentops scheduled-workflow-verify <manifest.json> --json` before merging a scheduled
+review PR to confirm every indexed artifact still exists and matches its recorded size and
+SHA-256.
 
 For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
 durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs
@@ -78,7 +81,9 @@ contentops job-execution-summary <execution_id>
 contentops job-execution-trends --days 14
 contentops scheduled-workflow-summary `
   --output artifacts/scheduled-workflow-review.md `
-  --pr-metadata-output artifacts/scheduled-pr-metadata.json
+  --pr-metadata-output artifacts/scheduled-pr-metadata.json `
+  --manifest-output artifacts/scheduled-review-manifest.json
+contentops scheduled-workflow-verify artifacts/scheduled-review-manifest.json --json
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 

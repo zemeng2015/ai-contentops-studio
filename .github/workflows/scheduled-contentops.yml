@@ -103,6 +103,12 @@ jobs:
             --manifest-output scheduled-worker/daily-review-manifest.json \
             --operations-console-path scheduled-worker/daily-operations-console.json
           cat scheduled-worker/daily-review.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify scheduled review manifest
+        if: always()
+        run: |
+          set -o pipefail
+          contentops scheduled-workflow-verify scheduled-worker/daily-review-manifest.json --json \
+            | tee scheduled-worker/daily-review-manifest-verification.json
       - name: Create review issue
         if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
         env:
@@ -210,6 +216,12 @@ jobs:
             --manifest-output scheduled-worker/project-updates-review-manifest.json \
             --operations-console-path scheduled-worker/project-updates-operations-console.json
           cat scheduled-worker/project-updates-review.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify scheduled review manifest
+        if: always()
+        run: |
+          set -o pipefail
+          contentops scheduled-workflow-verify scheduled-worker/project-updates-review-manifest.json --json \
+            | tee scheduled-worker/project-updates-review-manifest-verification.json
       - name: Create review issue
         if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
         env:

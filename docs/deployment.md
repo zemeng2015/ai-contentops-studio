@@ -285,6 +285,8 @@ indexes worker receipts, delivery summaries, release evidence, content asset pat
 handoffs, published URLs, and the Operations Console snapshot with size, media type, SHA-256, and
 missing-file metadata. Keep this manual until the team is comfortable with automatic publishing
 review branches.
+The workflow verifies that manifest immediately with `contentops scheduled-workflow-verify`; rerun
+the same command before merging if a review branch is updated after creation.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes

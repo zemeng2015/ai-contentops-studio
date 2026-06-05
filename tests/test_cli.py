@@ -860,6 +860,21 @@ def test_cli_job_execution_commands(
     assert review_manifest_payload["artifacts"][str(scheduled_operations_console)][
         "media_type"
     ] == "application/json"
+    scheduled_verify_result = runner.invoke(
+        app,
+        ["scheduled-workflow-verify", str(scheduled_review_manifest), "--json"],
+    )
+    assert scheduled_verify_result.exit_code == 0
+    scheduled_verify_payload = json.loads(scheduled_verify_result.output)
+    assert scheduled_verify_payload["status"] == "pass"
+    scheduled_summary_markdown.write_text("drift", encoding="utf-8")
+    scheduled_verify_drift_result = runner.invoke(
+        app,
+        ["scheduled-workflow-verify", str(scheduled_review_manifest), "--json"],
+    )
+    assert scheduled_verify_drift_result.exit_code != 0
+    scheduled_verify_drift_payload = json.loads(scheduled_verify_drift_result.output)
+    assert scheduled_verify_drift_payload["status"] == "fail"
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

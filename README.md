@@ -312,7 +312,9 @@ contentops job-execution-delivery-notify <execution_id>
 contentops job-execution-delivery-notifications
 contentops scheduled-workflow-summary `
   --output artifacts/scheduled-workflow-review.md `
-  --pr-metadata-output artifacts/scheduled-pr-metadata.json
+  --pr-metadata-output artifacts/scheduled-pr-metadata.json `
+  --manifest-output artifacts/scheduled-review-manifest.json
+contentops scheduled-workflow-verify artifacts/scheduled-review-manifest.json --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
@@ -347,6 +349,9 @@ The manifest indexes worker receipts, delivery summaries, release evidence direc
 asset paths, homepage handoffs, published URLs, and the Operations Console snapshot with file size,
 media type, and SHA-256 metadata for audit review. Scheduled cron runs do not open PRs
 automatically.
+`contentops scheduled-workflow-verify` reloads that manifest, recomputes artifact metadata, and
+fails when files are missing or hashes drift, making the review package suitable for pre-merge
+automation.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
