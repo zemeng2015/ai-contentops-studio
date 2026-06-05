@@ -777,6 +777,7 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
           <td>{reason.count}</td>
           <td>{escape(reason.latest_execution_id or "n/a")}</td>
           <td>{escape(reason.latest_at.isoformat() if reason.latest_at else "n/a")}</td>
+          <td>{_remediation_list_html(reason.remediation_steps)}</td>
         </tr>
         """
         for reason in report.summary.top_failure_reasons
@@ -784,7 +785,7 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     if not failure_rows:
         failure_rows = """
         <tr>
-          <td colspan="4"><span class="muted">No worker failure reasons recorded.</span></td>
+          <td colspan="5"><span class="muted">No worker failure reasons recorded.</span></td>
         </tr>
         """
     rows = "".join(
@@ -832,7 +833,10 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
       <h2>Failure Diagnostics</h2>
       <table>
         <thead>
-          <tr><th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th></tr>
+          <tr>
+            <th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th>
+            <th>Remediation</th>
+          </tr>
         </thead>
         <tbody>{failure_rows}</tbody>
       </table>
@@ -858,6 +862,7 @@ def _job_execution_alerts_html(report: JobExecutionAlertReport) -> str:
           <td>{escape(signal.message)}</td>
           <td>{escape(signal.latest_execution_id or "n/a")}</td>
           <td>{escape(signal.latest_at.isoformat() if signal.latest_at else "n/a")}</td>
+          <td>{_remediation_list_html(signal.remediation_steps)}</td>
         </tr>
         """
         for signal in report.signals
@@ -865,7 +870,7 @@ def _job_execution_alerts_html(report: JobExecutionAlertReport) -> str:
     if not signal_rows:
         signal_rows = """
         <tr>
-          <td colspan="5"><span class="muted">No worker alert signals recorded.</span></td>
+          <td colspan="6"><span class="muted">No worker alert signals recorded.</span></td>
         </tr>
         """
     actions = "".join(f"<li>{escape(action)}</li>" for action in report.recommended_actions)
@@ -891,7 +896,7 @@ def _job_execution_alerts_html(report: JobExecutionAlertReport) -> str:
         <thead>
           <tr>
             <th>Severity</th><th>Category</th><th>Message</th>
-            <th>Latest execution</th><th>Latest at</th>
+            <th>Latest execution</th><th>Latest at</th><th>Remediation</th>
           </tr>
         </thead>
         <tbody>{signal_rows}</tbody>
@@ -1328,6 +1333,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td>{escape(str(reason.get("count", 0)))}</td>
           <td>{escape(str(reason.get("latest_execution_id") or "n/a"))}</td>
           <td>{escape(str(reason.get("latest_at") or "n/a"))}</td>
+          <td>{_remediation_list_html(_dict_string_list(reason.get("remediation_steps")))}</td>
         </tr>
         """
         for reason in worker_failure_reasons
@@ -1336,7 +1342,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     if not worker_failure_rows:
         worker_failure_rows = """
         <tr>
-          <td colspan="4"><span class="muted">No worker failure reasons recorded.</span></td>
+          <td colspan="5"><span class="muted">No worker failure reasons recorded.</span></td>
         </tr>
         """
     worker_alert_signal_rows = "".join(
@@ -1346,6 +1352,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td>{escape(str(signal.get("category", "n/a")))}</td>
           <td>{escape(str(signal.get("message", "n/a")))}</td>
           <td>{escape(str(signal.get("latest_execution_id") or "n/a"))}</td>
+          <td>{_remediation_list_html(_dict_string_list(signal.get("remediation_steps")))}</td>
         </tr>
         """
         for signal in worker_alerts.get("signals", [])
@@ -1354,7 +1361,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     if not worker_alert_signal_rows:
         worker_alert_signal_rows = """
         <tr>
-          <td colspan="4"><span class="muted">No worker alert signals recorded.</span></td>
+          <td colspan="5"><span class="muted">No worker alert signals recorded.</span></td>
         </tr>
         """
     worker_alert_delivery_rows = "".join(
@@ -1465,7 +1472,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <p>{escape(str(worker_alerts.get("message", "Worker alert report unavailable.")))}</p>
       <table>
         <thead>
-          <tr><th>Severity</th><th>Category</th><th>Message</th><th>Latest execution</th></tr>
+          <tr>
+            <th>Severity</th><th>Category</th><th>Message</th><th>Latest execution</th>
+            <th>Remediation</th>
+          </tr>
         </thead>
         <tbody>{worker_alert_signal_rows}</tbody>
       </table>
@@ -1488,7 +1498,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <h2>Worker Failure Diagnostics</h2>
       <table>
         <thead>
-          <tr><th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th></tr>
+          <tr>
+            <th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th>
+            <th>Remediation</th>
+          </tr>
         </thead>
         <tbody>{worker_failure_rows}</tbody>
       </table>
@@ -1527,10 +1540,20 @@ def _release_gate_html(report: ReleaseGateReport) -> str:
 
 
 def _release_gate_remediation_html(steps: list[str]) -> str:
+    return _remediation_list_html(steps)
+
+
+def _remediation_list_html(steps: list[str]) -> str:
     if not steps:
         return '<span class="muted">No action required.</span>'
     items = "".join(f"<li>{escape(step)}</li>" for step in steps)
     return f"<ul>{items}</ul>"
+
+
+def _dict_string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if isinstance(item, str)]
 
 
 def _release_gate_history_html(reports: ReleaseGateListResponse) -> str:

@@ -935,6 +935,7 @@ def test_dashboard_job_execution_trends_renders() -> None:
     assert "Handoff success" in response.text
     assert "Failure Diagnostics" in response.text
     assert "Latest execution" in response.text
+    assert "Remediation" in response.text
 
 
 def test_dashboard_system_status_renders() -> None:
@@ -976,6 +977,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Worker alert" in response.text
     assert "Worker Alert Notifications" in response.text
     assert "Worker Failure Diagnostics" in response.text
+    assert "Remediation" in response.text
     assert "Download evidence bundle" in response.text
     assert "environment_template" in response.text
     assert "evidence_manifest.json" in response.text

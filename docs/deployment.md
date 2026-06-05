@@ -158,9 +158,12 @@ their run id, relative artifact path, size, SHA-256 digest, and update time so p
 publishing packages remain part of the release review trail.
 `worker_execution_trends.json` records recent scheduled automation success, publish, handoff,
 action-required rates, latest success/failure timestamps, and top failure reasons so release
-reviewers can see whether recurring content operations are healthy and why they degraded.
+reviewers can see whether recurring content operations are healthy and why they degraded. Top
+failure reasons include `remediation_steps` so reviewers can move from diagnosis to recovery
+without reverse-engineering the worker receipt.
 `worker_execution_alerts.json` condenses the same worker signal into severity, action-required
-state, alert signals, and recommended actions for release managers or on-call handoff.
+state, alert signals, signal-level remediation steps, and recommended actions for release managers
+or on-call handoff.
 `worker_execution_alert_deliveries.json` records worker alert notification receipts so release
 reviewers can distinguish healthy no-op checks, local skipped delivery, successful webhook delivery,
 and failed notification attempts.

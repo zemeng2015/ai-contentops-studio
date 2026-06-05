@@ -258,7 +258,9 @@ and file list in the job execution receipt. Use `--release-evidence-dir` to choo
 evidence directory, or `--skip-release-evidence` for local smoke tests that should only write the
 worker receipt. Worker execution trends and alerts also report the latest successful execution, the
 latest action-required execution, the most common failure reasons, severity, and recommended actions
-so recurring automation issues can be triaged from the dashboard or release evidence bundle. Alert
+so recurring automation issues can be triaged from the dashboard or release evidence bundle. Each
+top failure reason and alert signal includes `remediation_steps`, pointing operators to provider,
+homepage handoff, release evidence, dry-run, or recovery-plan fixes. Alert
 notification attempts write `worker-alert-notification-log.json` beside worker execution receipts,
 recording whether delivery was skipped locally, delivered to a webhook, or failed.
 Set `homepage_handoff: true` on a job when the homepage publisher is configured and the scheduled

@@ -127,6 +127,7 @@ class JobExecutionFailureReason(BaseModel):
     count: int = Field(ge=0)
     latest_execution_id: str | None = None
     latest_at: datetime | None = None
+    remediation_steps: list[str] = Field(default_factory=list)
 
 
 class JobExecutionTrendSummary(BaseModel):
@@ -160,6 +161,7 @@ class JobExecutionAlertSignal(BaseModel):
     message: str
     latest_execution_id: str | None = None
     latest_at: datetime | None = None
+    remediation_steps: list[str] = Field(default_factory=list)
 
 
 class JobExecutionAlertReport(BaseModel):
@@ -470,6 +472,10 @@ def job_execution_alert_report(receipt_dir: Path, days: int = 14) -> JobExecutio
                 ),
                 latest_execution_id=_latest_failure_execution_id(summary),
                 latest_at=summary.latest_failure_at,
+                remediation_steps=_worker_signal_remediation_steps(
+                    "worker_failure",
+                    summary,
+                ),
             )
         )
     if summary.homepage_handoff_failed > 0:
@@ -480,6 +486,10 @@ def job_execution_alert_report(receipt_dir: Path, days: int = 14) -> JobExecutio
                 message=f"{summary.homepage_handoff_failed} homepage handoff(s) failed.",
                 latest_execution_id=_latest_failure_execution_id(summary),
                 latest_at=summary.latest_failure_at,
+                remediation_steps=_worker_signal_remediation_steps(
+                    "homepage_handoff",
+                    summary,
+                ),
             )
         )
     if summary.action_required > 0 and not signals:
@@ -490,6 +500,10 @@ def job_execution_alert_report(receipt_dir: Path, days: int = 14) -> JobExecutio
                 message=f"{summary.action_required} worker execution(s) require review.",
                 latest_execution_id=_latest_failure_execution_id(summary),
                 latest_at=summary.latest_failure_at,
+                remediation_steps=_worker_signal_remediation_steps(
+                    "worker_action_required",
+                    summary,
+                ),
             )
         )
     severity = _max_alert_severity(signal.severity for signal in signals)
@@ -717,6 +731,7 @@ def _top_failure_reasons(
             count=count,
             latest_execution_id=latest[reason][0],
             latest_at=latest[reason][1],
+            remediation_steps=_job_failure_remediation_steps(reason),
         )
         for reason, count in counts.most_common(limit)
     ]
@@ -826,6 +841,8 @@ def _worker_alert_recommended_actions(summary: JobExecutionTrendSummary) -> list
         "Open /dashboard/job-execution-trends and inspect the latest action-required execution.",
         "Run contentops job-recovery-plan <execution_id> for failed worker jobs.",
     ]
+    if summary.top_failure_reasons:
+        actions.extend(summary.top_failure_reasons[0].remediation_steps[:2])
     if summary.homepage_handoff_failed > 0:
         actions.append("Check CONTENTOPS_HOMEPAGE_REPO_PATH and homepage handoff artifacts.")
     if summary.failed_jobs > 0:
@@ -833,6 +850,82 @@ def _worker_alert_recommended_actions(summary: JobExecutionTrendSummary) -> list
             "Review provider configuration, source reachability, and generated run logs."
         )
     return actions
+
+
+def _worker_signal_remediation_steps(
+    category: str,
+    summary: JobExecutionTrendSummary,
+) -> list[str]:
+    if category == "worker_failure":
+        steps = [
+            "Open the latest failed worker execution and inspect per-job error details.",
+            "Generate a recovery plan with `contentops job-recovery-plan <execution_id>`.",
+        ]
+        if summary.top_failure_reasons:
+            steps.extend(summary.top_failure_reasons[0].remediation_steps[:2])
+        return _dedupe_steps(steps)
+    if category == "homepage_handoff":
+        return [
+            "Confirm CONTENTOPS_HOMEPAGE_REPO_PATH points to a writable homepage checkout.",
+            "Inspect homepage handoff artifacts and rerun the failed worker job.",
+        ]
+    if category == "worker_action_required":
+        return [
+            "Open /dashboard/job-execution-trends and inspect the latest execution.",
+            "If the execution was a dry run, rerun it without `--dry-run` to generate runs.",
+        ]
+    return ["Inspect the worker execution receipt and rerun after resolving the failure."]
+
+
+def _job_failure_remediation_steps(reason: str) -> list[str]:
+    lowered = reason.lower()
+    if "dry run" in lowered:
+        return [
+            "Rerun the worker without `--dry-run` when a real execution is intended.",
+            "Use dry-run receipts only for schedule validation, not release readiness.",
+        ]
+    if "release evidence" in lowered:
+        return [
+            "Run `contentops release-evidence` locally to reproduce the evidence failure.",
+            "Fix missing artifacts, deployment checks, or artifact store settings.",
+            "Rerun the worker so a fresh post-run release evidence bundle is written.",
+        ]
+    if "homepage handoff" in lowered or "homepage repo" in lowered:
+        return [
+            "Check CONTENTOPS_HOMEPAGE_REPO_PATH and homepage repository permissions.",
+            "Inspect homepage handoff artifacts for missing files or git write errors.",
+            "Rerun the failed job after the homepage checkout is writable.",
+        ]
+    if "provider" in lowered or "research" in lowered or "source" in lowered:
+        return [
+            "Check provider API keys, network access, and source URL reachability.",
+            "Rerun the failed job with the same topic after provider access is restored.",
+        ]
+    if "approval" in lowered or "publish" in lowered:
+        return [
+            "Open the generated run in the dashboard and review approval or publish gates.",
+            "Approve the run or fix publish configuration before rerunning publication.",
+        ]
+    if "config" in lowered or "environment" in lowered:
+        return [
+            "Run `contentops config-audit --json` to identify missing settings.",
+            "Populate required environment variables or secret references.",
+        ]
+    return [
+        "Open the worker execution detail and inspect the failed job error.",
+        "Generate a recovery plan and rerun only the failed jobs after fixing the cause.",
+    ]
+
+
+def _dedupe_steps(steps: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for step in steps:
+        if step in seen:
+            continue
+        seen.add(step)
+        deduped.append(step)
+    return deduped
 
 
 def _max_alert_severity(severities: Iterable[IncidentSeverity]) -> IncidentSeverity:

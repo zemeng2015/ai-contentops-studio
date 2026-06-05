@@ -531,6 +531,10 @@ def test_cli_job_execution_commands(
             "count": 1,
             "latest_execution_id": report.execution_id,
             "latest_at": trends_payload["summary"]["latest_failure_at"],
+            "remediation_steps": [
+                "Rerun the worker without `--dry-run` when a real execution is intended.",
+                "Use dry-run receipts only for schedule validation, not release readiness.",
+            ],
         }
     ]
     assert alerts_result.exit_code == 0
@@ -538,6 +542,7 @@ def test_cli_job_execution_commands(
     assert alerts_payload["severity"] == "warning"
     assert alerts_payload["action_required"] is True
     assert alerts_payload["signals"][0]["category"] == "worker_action_required"
+    assert alerts_payload["signals"][0]["remediation_steps"]
     assert notify_result.exit_code == 0
     notify_payload = json.loads(notify_result.output)
     assert notify_payload["status"] == "skipped"

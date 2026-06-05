@@ -301,6 +301,9 @@ def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
         "failed: provider failed",
         "failed homepage handoff: missing homepage repo",
     ]
+    assert "release-evidence" in report.summary.top_failure_reasons[0].remediation_steps[0]
+    assert "provider" in report.summary.top_failure_reasons[1].remediation_steps[0]
+    assert "HOMEPAGE_REPO_PATH" in report.summary.top_failure_reasons[2].remediation_steps[0]
     assert report.buckets[-1].execution_count == 2
     assert report.buckets[-1].top_failure_reasons[0].latest_execution_id == second.execution_id
 
@@ -329,6 +332,8 @@ def test_job_execution_alert_report_flags_actionable_worker_failures(tmp_path: P
     assert report.action_required is True
     assert "research provider timeout" in report.message
     assert report.signals[0].category == "worker_failure"
+    assert report.signals[0].remediation_steps
+    assert "provider" in report.recommended_actions[2]
     assert "job-recovery-plan" in report.recommended_actions[1]
 
 
