@@ -286,7 +286,9 @@ live runs.
 After a scheduled run, `contentops scheduled-workflow-summary` turns recent worker receipts into a
 human-readable review packet with published URLs, homepage handoff artifacts, release evidence,
 failure reasons, and next actions. The scheduled workflow appends that Markdown to the GitHub
-Actions step summary and uploads it with the rest of the worker artifacts.
+Actions step summary and uploads it with the rest of the worker artifacts. The packet also includes
+a suggested PR title and checklist so homepage or publishing changes can move into a normal review
+PR without reconstructing the evidence by hand.
 When manually starting `Scheduled ContentOps`, set `create_review_issue=true` to open a GitHub
 issue containing the same review packet and a link back to the Actions run. This gives reviewers a
 normal issue thread for follow-up before homepage or publishing changes are accepted.

@@ -605,10 +605,15 @@ def test_cli_job_execution_commands(
     assert scheduled_summary_result.exit_code == 0
     scheduled_summary_payload = json.loads(scheduled_summary_result.output)
     assert scheduled_summary_payload["items"][0]["execution_id"] == report.execution_id
+    assert scheduled_summary_payload["items"][0]["pr_title"].startswith(
+        "Publish scheduled ContentOps output"
+    )
+    assert scheduled_summary_payload["items"][0]["pr_checklist"]
     assert scheduled_summary_output_result.exit_code == 0
     assert "Scheduled ContentOps Review" in scheduled_summary_markdown.read_text(
         encoding="utf-8"
     )
+    assert "PR Handoff" in scheduled_summary_markdown.read_text(encoding="utf-8")
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

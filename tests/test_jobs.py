@@ -317,9 +317,14 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert review.published_count == 1
     assert review.handoff_count == 1
     assert review.items[0].published_urls == ["https://example.com/posts/scheduled.html"]
+    assert review.items[0].pr_title.startswith("Publish scheduled ContentOps output")
+    assert any("homepage handoff" in item for item in review.items[0].pr_checklist)
     assert "Scheduled ContentOps Review" in markdown
     assert "https://example.com/posts/scheduled.html" in markdown
     assert "run-scheduled-homepage-handoff.zip" in markdown
+    assert "PR Handoff" in markdown
+    assert "Suggested PR title" in markdown
+    assert "Apply homepage handoff zip files" in markdown
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

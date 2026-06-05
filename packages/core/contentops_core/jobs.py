@@ -247,6 +247,8 @@ class ScheduledWorkflowReviewItem(BaseModel):
     delivery_summary_markdown_path: str | None = None
     failure_reasons: list[str] = Field(default_factory=list)
     recommended_actions: list[str] = Field(default_factory=list)
+    pr_title: str
+    pr_checklist: list[str] = Field(default_factory=list)
 
 
 class ScheduledWorkflowReviewReport(BaseModel):
@@ -1149,6 +1151,8 @@ def _scheduled_workflow_review_item(report: JobExecutionReport) -> ScheduledWork
         delivery_summary_markdown_path=report.delivery_summary_markdown_path,
         failure_reasons=failure_reasons,
         recommended_actions=_job_execution_delivery_actions(report, summary),
+        pr_title=_scheduled_pr_title(report),
+        pr_checklist=_scheduled_pr_checklist(report, summary, failure_reasons),
     )
 
 
@@ -1207,8 +1211,49 @@ def _scheduled_workflow_review_markdown(report: ScheduledWorkflowReviewReport) -
             lines.append("- None")
         lines.extend(["", "### Next Actions", ""])
         lines.extend(f"- {action}" for action in item.recommended_actions)
+        lines.extend(
+            [
+                "",
+                "### PR Handoff",
+                "",
+                f"- Suggested PR title: `{item.pr_title}`",
+                "- Suggested checklist:",
+            ]
+        )
+        lines.extend(f"  - [ ] {check}" for check in item.pr_checklist)
         lines.append("")
     return "\n".join(lines)
+
+
+def _scheduled_pr_title(report: JobExecutionReport) -> str:
+    return f"Publish scheduled ContentOps output: {report.name} {report.execution_id}"
+
+
+def _scheduled_pr_checklist(
+    report: JobExecutionReport,
+    summary: JobExecutionSummary,
+    failure_reasons: list[str],
+) -> list[str]:
+    checklist = [
+        f"Review worker receipt `{report.receipt_path or report.execution_id}`.",
+        "Confirm generated drafts, eval reports, source audits, and scorecards are acceptable.",
+    ]
+    if report.delivery_summary_markdown_path:
+        checklist.append(f"Read delivery summary `{report.delivery_summary_markdown_path}`.")
+    if report.release_evidence_path:
+        checklist.append(f"Inspect release evidence `{report.release_evidence_path}`.")
+    if summary.published_runs > 0:
+        checklist.append("Verify published URLs render and match the approved content.")
+    if summary.homepage_handoff_ready > 0:
+        checklist.append("Apply homepage handoff zip files in a separate homepage repository PR.")
+    if report.content_assets_path:
+        checklist.append("Review regenerated feed, promotion brief, and distribution manifest.")
+    if failure_reasons:
+        checklist.append("Resolve listed failure reasons before merging publishing changes.")
+    if report.dry_run:
+        checklist.append("Rerun without dry-run before opening a publishing PR.")
+    checklist.append("Link this scheduled review issue or Actions run from the PR description.")
+    return checklist
 
 
 def _job_execution_delivery_summary_payload(report: JobExecutionReport) -> dict[str, Any]:
