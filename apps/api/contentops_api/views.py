@@ -1062,6 +1062,220 @@ def _release_calendar_published_url(item: dict[object, object]) -> str:
     return f'<a href="{escaped}">{escaped}</a>'
 
 
+def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
+    items = _release_risk_summary_items(bundle)
+    fail_count = sum(1 for item in items if item["severity"] == "fail")
+    warn_count = sum(1 for item in items if item["severity"] == "warn")
+    posture = "ready"
+    if fail_count:
+        posture = "blocked"
+    elif warn_count:
+        posture = "attention"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item["area"])}</td>
+          <td><span class="pill">{escape(item["severity"])}</span></td>
+          <td>{escape(item["signal"])}</td>
+          <td>{escape(item["action"])}</td>
+        </tr>
+        """
+        for item in items
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="4"><span class="muted">No release risks detected.</span></td>
+        </tr>
+        """
+    return f"""
+      <div class="metrics">
+        <div><strong>{escape(posture)}</strong><span>Risk posture</span></div>
+        <div><strong>{len(items)}</strong><span>Open risks</span></div>
+        <div><strong>{fail_count}</strong><span>Blocking risks</span></div>
+        <div><strong>{warn_count}</strong><span>Warnings</span></div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Area</th><th>Severity</th><th>Signal</th><th>Recommended action</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for release_check in bundle.release_readiness.checks:
+        if release_check.status != "pass":
+            items.append(
+                _release_risk_item(
+                    "Release gate",
+                    release_check.status,
+                    release_check.name,
+                    release_check.message,
+                )
+            )
+    for deployment_check in bundle.deployment_check.checks:
+        if deployment_check.status != "pass":
+            items.append(
+                _release_risk_item(
+                    "Deployment preflight",
+                    deployment_check.status,
+                    deployment_check.name,
+                    deployment_check.message,
+                )
+            )
+    for provider in bundle.provider_health.items:
+        if provider.status != "pass":
+            action = "; ".join(provider.remediation_steps or provider.warnings)
+            items.append(
+                _release_risk_item(
+                    "Provider health",
+                    provider.status,
+                    f"{provider.category}: {provider.name}",
+                    action or "Review provider configuration.",
+                )
+            )
+    for smoke in bundle.integration_smoke_plan.items:
+        if smoke.status == "blocked":
+            items.append(
+                _release_risk_item(
+                    "Integration smoke",
+                    "warn",
+                    f"{smoke.category}: {smoke.name}",
+                    "; ".join(smoke.notes) or "Configure missing smoke-test environment.",
+                )
+            )
+    _append_calendar_risks(items, bundle.content_calendar_lineage)
+    if bundle.source_reviews.needs_review_count:
+        items.append(
+            _release_risk_item(
+                "Source governance",
+                "warn",
+                f"{bundle.source_reviews.needs_review_count} sources need review",
+                "Finish source review decisions before approving external publication.",
+            )
+        )
+    if bundle.publish_verifications.drift_count:
+        items.append(
+            _release_risk_item(
+                "Publish verification",
+                "fail",
+                f"{bundle.publish_verifications.drift_count} published outputs drifted",
+                "Recover or republish drifted runs before deployment sign-off.",
+            )
+        )
+    if bundle.publish_recovery_executions.failed_count:
+        items.append(
+            _release_risk_item(
+                "Publish recovery",
+                "fail",
+                f"{bundle.publish_recovery_executions.failed_count} recovery runs failed",
+                "Inspect publish recovery executions and retry the failed recovery action.",
+            )
+        )
+    if bundle.scheduled_review_packages.action_required_count:
+        items.append(
+            _release_risk_item(
+                "Scheduled review",
+                "warn",
+                (
+                    f"{bundle.scheduled_review_packages.action_required_count} "
+                    "packages need action"
+                ),
+                "Archive or verify scheduled review packages before release approval.",
+            )
+        )
+    _append_worker_risks(items, bundle.worker_execution_alerts, bundle.worker_recovery_lineage)
+    return items
+
+
+def _release_risk_item(area: str, severity: str, signal: str, action: str) -> dict[str, str]:
+    return {
+        "area": area,
+        "severity": _release_risk_severity(severity),
+        "signal": signal,
+        "action": action,
+    }
+
+
+def _release_risk_severity(status: str) -> str:
+    normalized = status.lower()
+    if normalized in {"fail", "failed", "blocked", "error"}:
+        return "fail"
+    if normalized in {"warn", "warning", "degraded"}:
+        return "warn"
+    return normalized
+
+
+def _append_calendar_risks(
+    items: list[dict[str, str]],
+    payload: dict[str, object],
+) -> None:
+    failed = _release_payload_int(payload, "failed_count")
+    action_required = _release_payload_int(payload, "action_required_count")
+    needs_review = _release_payload_int(payload, "needs_review_count")
+    if failed:
+        items.append(
+            _release_risk_item(
+                "Content calendar",
+                "fail",
+                f"{failed} calendar items have failed latest runs",
+                "Recover or rerun failed campaign items before release approval.",
+            )
+        )
+    elif action_required:
+        items.append(
+            _release_risk_item(
+                "Content calendar",
+                "warn",
+                f"{action_required} calendar items need action",
+                "Review the campaign lineage table and finish required next actions.",
+            )
+        )
+    elif needs_review:
+        items.append(
+            _release_risk_item(
+                "Content calendar",
+                "warn",
+                f"{needs_review} calendar items need review",
+                "Approve, revise, or publish reviewed campaign items before sign-off.",
+            )
+        )
+
+
+def _append_worker_risks(
+    items: list[dict[str, str]],
+    worker_alerts: dict[str, object],
+    worker_recovery: dict[str, object],
+) -> None:
+    if worker_alerts.get("action_required") is True:
+        items.append(
+            _release_risk_item(
+                "Worker automation",
+                str(worker_alerts.get("severity", "warn")),
+                str(worker_alerts.get("message", "Worker alert requires action.")),
+                "Inspect worker alert signals and fix the latest automation failure.",
+            )
+        )
+    unrecovered = _release_payload_int(worker_recovery, "unrecovered_execution_count")
+    if unrecovered:
+        items.append(
+            _release_risk_item(
+                "Worker recovery",
+                "warn",
+                f"{unrecovered} failed executions remain unrecovered",
+                "Run recovery plans or mark failed jobs out of scope before release.",
+            )
+        )
+
+
+def _release_payload_int(payload: dict[str, object], key: str) -> int:
+    value = payload.get(key, 0)
+    return value if isinstance(value, int) else 0
+
+
 def _worker_job_readiness_html(report: WorkerJobReadinessResponse) -> str:
     if not report.items:
         return """
@@ -1933,6 +2147,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
     calendar_lineage = bundle.content_calendar_lineage
     calendar_lineage_html = _release_calendar_lineage_html(calendar_lineage)
+    release_risk_summary_html = _release_risk_summary_html(bundle)
     source_review_latest = {
         item.run_id: item.latest_reviewed_at.isoformat() if item.latest_reviewed_at else "n/a"
         for item in bundle.source_reviews.items
@@ -2323,6 +2538,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
+      <h2>Release Risk Summary</h2>
+      {release_risk_summary_html}
       <h2>Operations Brief</h2>
       {_ops_brief_html(bundle.ops_brief)}
       <h2>Ops Brief Notifications</h2>

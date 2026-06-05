@@ -42,6 +42,9 @@ Expected result:
   campaign release reviews when content plan completeness matters.
 - The Release Evidence dashboard also shows this lineage as a campaign table with latest run,
   publish status, and next-action columns for reviewer sign-off.
+- Start deployment reviews from the dashboard Release Risk Summary. It rolls up release gate,
+  preflight, campaign lineage, worker recovery, publish drift, and source review risks before the
+  reviewer opens the detailed evidence tables.
 - If `contentops release-gate` reports `content_calendar_lineage=warn`, finish the campaign review
   items that are in scope for the release. If it reports `fail`, recover or rerun failed calendar
   items before deploying.

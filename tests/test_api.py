@@ -246,6 +246,9 @@ def test_release_approval_api_and_dashboard(
     assert dashboard_response.status_code == 200
     assert "Release Approval" in dashboard_response.text
     assert "Deployment Checklist" in dashboard_response.text
+    assert "Release Risk Summary" in dashboard_response.text
+    assert "Risk posture" in dashboard_response.text
+    assert "Open risks" in dashboard_response.text
     assert "Publish Verification Evidence" in dashboard_response.text
     assert "Publish Recovery Executions" in dashboard_response.text
     assert "Content Calendar Lineage Evidence" in dashboard_response.text
@@ -1633,6 +1636,9 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Integration Smoke Runs" in response.text
     assert "Deployment Preflight" in response.text
     assert "Release Gate Checks" in response.text
+    assert "Release Risk Summary" in response.text
+    assert "Risk posture" in response.text
+    assert "Open risks" in response.text
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
