@@ -163,6 +163,11 @@ expected manifest hash and git status before shipping a site update.
 If `contentops release-gate` reports `content_distribution=warn`, commit or intentionally stage the
 generated feed, promotion brief, and manifest before deployment. If it reports `fail`, regenerate
 distribution assets because the manifest is incomplete.
+When preparing a deployment handoff, run
+`contentops release-gate --git-sha <sha> --json --record --checklist-output release-gate-checklist.md`
+and review the Markdown checklist with the JSON report. The checklist translates failed or warning
+gate checks into operator actions, so it should be attached to the release review alongside the
+release evidence archive.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

@@ -48,6 +48,7 @@ from contentops_core.release_evidence import build_release_evidence, write_relea
 from contentops_core.release_gate import (
     list_release_gate_reports,
     release_gate,
+    write_release_gate_checklist,
     write_release_gate_report,
 )
 from contentops_core.repository import RunRepository
@@ -359,6 +360,10 @@ def show_release_gate(
         bool,
         typer.Option(help="Persist the release gate report under the artifact root."),
     ] = False,
+    checklist_output: Annotated[
+        Path | None,
+        typer.Option(help="Optional Markdown file where the deployment checklist is written."),
+    ] = None,
 ) -> None:
     settings = Settings()
     report = release_gate(
@@ -371,11 +376,16 @@ def show_release_gate(
     )
     if record:
         write_release_gate_report(report, settings.artifact_root)
+    if checklist_output is not None:
+        write_release_gate_checklist(report, checklist_output)
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
         raise typer.Exit(0 if report.can_deploy else 1)
     typer.echo(f"Status: {report.status}")
     typer.echo(f"Can deploy: {str(report.can_deploy).lower()}")
+    typer.echo("Deployment checklist:")
+    for item in report.deployment_checklist:
+        typer.echo(f"- [ ] {item}")
     for check in report.checks:
         typer.echo(f"- {check.name}: {check.status} - {check.message}")
         for step in check.remediation_steps:

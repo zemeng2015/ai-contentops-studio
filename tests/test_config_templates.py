@@ -89,9 +89,11 @@ def test_generate_release_gate_writes_json(
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
     output = tmp_path / "release-gate" / "release-gate.json"
+    checklist_output = tmp_path / "release-gate" / "deployment-checklist.md"
 
     report = generate_release_gate(
         output,
+        checklist_output=checklist_output,
         git_sha="ci-sha",
         require_approval=False,
         record=True,
@@ -101,6 +103,10 @@ def test_generate_release_gate_writes_json(
     text = output.read_text(encoding="utf-8")
     assert '"git_sha": "ci-sha"' in text
     assert '"name": "release_approval"' in text
+    assert '"deployment_checklist"' in text
+    assert checklist_output.exists()
+    assert "Release Gate Deployment Checklist" in checklist_output.read_text(encoding="utf-8")
     assert report.git_sha == "ci-sha"
+    assert report.deployment_checklist
     assert report.status in {"pass", "warn", "fail"}
     assert list((tmp_path / "artifacts" / "release-gates").glob("*.json"))

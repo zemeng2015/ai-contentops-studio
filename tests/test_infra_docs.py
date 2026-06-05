@@ -66,6 +66,8 @@ def test_ci_validates_terraform() -> None:
     assert "scripts/generate_release_gate.py" in workflow
     assert "deployment-check/deployment-check.json" in workflow
     assert "release-gate/release-gate.json" in workflow
+    assert "--checklist-output release-gate/deployment-checklist.md" in workflow
+    assert "release-gate/deployment-checklist.md" in workflow
 
 
 def test_scheduled_contentops_workflow_runs_worker_gates() -> None:

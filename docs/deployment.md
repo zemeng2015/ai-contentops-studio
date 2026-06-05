@@ -214,7 +214,7 @@ decisions require release readiness and deployment preflight to pass unless `--f
 Use the release gate in deployment automation after the approval is recorded:
 
 ```powershell
-contentops release-gate --git-sha $env:GITHUB_SHA --json --record
+contentops release-gate --git-sha $env:GITHUB_SHA --json --record --checklist-output release-gate-checklist.md
 Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 ```
 
@@ -227,8 +227,9 @@ Every release gate check also includes `remediation_steps`, so failed API, CLI, 
 reports can point operators to the next command or review action instead of only exposing raw
 status.
 CI also uploads a non-blocking `release-gate/release-gate.json` report with
-`--no-require-approval`, so reviewers can inspect the gate shape before a human approval exists.
-Use `--strict` in an actual deployment job once approval is required.
+`--no-require-approval`, plus `release-gate/deployment-checklist.md` with the human deployment
+steps derived from the same gate checks. Review the checklist before promoting a build, then use
+`--strict` in an actual deployment job once approval is required.
 Recorded gate reports are stored under `artifacts/release-gates` and can be inspected through
 `contentops release-gates --json` or `GET /release-gates`. Both surfaces include a release gate
 history summary with pass rate, blocked deployment count, consecutive failures, latest status, and

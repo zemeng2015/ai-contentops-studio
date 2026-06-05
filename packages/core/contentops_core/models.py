@@ -696,6 +696,7 @@ class ReleaseGateReport(BaseModel):
     can_deploy: bool
     git_sha: str | None = None
     checks: list[ReleaseGateItem]
+    deployment_checklist: list[str] = Field(default_factory=list)
     release_evidence: ReleaseEvidenceSummary
     latest_release_approval: ReleaseApprovalRecord | None = None
     config_audit: ConfigAuditReport | None = None

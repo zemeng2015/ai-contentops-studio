@@ -120,7 +120,15 @@ def test_cli_release_approval_records_decision(
     approval_payload = json.loads(approval_result.output)
     gate_result = runner.invoke(
         app,
-        ["release-gate", "--git-sha", approval_payload["git_sha"], "--json", "--record"],
+        [
+            "release-gate",
+            "--git-sha",
+            approval_payload["git_sha"],
+            "--json",
+            "--record",
+            "--checklist-output",
+            str(tmp_path / "release-gate-checklist.md"),
+        ],
     )
     gate_history_result = runner.invoke(app, ["release-gates", "--json"])
     assert approval_payload["decision"] == "approved"
@@ -139,9 +147,14 @@ def test_cli_release_approval_records_decision(
     assert gate_result.exit_code == 0
     gate_payload = json.loads(gate_result.output)
     assert gate_payload["can_deploy"] is True
+    assert gate_payload["deployment_checklist"]
     assert gate_payload["latest_release_approval"]["approval_id"] == (
         approval_payload["approval_id"]
     )
+    assert (tmp_path / "release-gate-checklist.md").exists()
+    assert "Release Gate Deployment Checklist" in (
+        tmp_path / "release-gate-checklist.md"
+    ).read_text(encoding="utf-8")
     assert gate_history_result.exit_code == 0
     gate_history_payload = json.loads(gate_history_result.output)
     assert gate_history_payload["total"] == 1
@@ -163,6 +176,7 @@ def test_cli_release_gate_prints_remediation_steps(
 
     assert result.exit_code != 0
     assert "fix:" in result.output
+    assert "Deployment checklist:" in result.output
     assert "release-approve" in result.output
     assert "Traceback" not in result.output
 

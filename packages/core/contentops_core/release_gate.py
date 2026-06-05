@@ -54,6 +54,12 @@ def release_gate(
         can_deploy=status == "pass",
         git_sha=resolved_git_sha,
         checks=checks,
+        deployment_checklist=_deployment_checklist(
+            status=status,
+            checks=checks,
+            bundle=bundle,
+            git_sha=resolved_git_sha,
+        ),
         release_evidence=bundle.summary,
         latest_release_approval=bundle.latest_release_approval,
         config_audit=audit,
@@ -66,6 +72,12 @@ def write_release_gate_report(report: ReleaseGateReport, artifact_root: Path) ->
     path = directory / f"{_release_gate_report_id(report)}.json"
     path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def write_release_gate_checklist(report: ReleaseGateReport, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(_release_gate_checklist_markdown(report), encoding="utf-8")
+    return output_path
 
 
 def list_release_gate_reports(
@@ -396,6 +408,81 @@ def _gate_status(checks: list[ReleaseGateItem]) -> str:
     if any(check.status == "warn" for check in checks):
         return "warn"
     return "pass"
+
+
+def _deployment_checklist(
+    *,
+    status: str,
+    checks: list[ReleaseGateItem],
+    bundle: ReleaseEvidenceBundle,
+    git_sha: str | None,
+) -> list[str]:
+    checklist = [
+        f"Confirm release gate status is `{status}` for git SHA `{git_sha or 'not provided'}`.",
+        (
+            "Archive the release evidence bundle and release gate JSON before deploying; "
+            f"evidence files include `{', '.join(bundle.summary.artifact_files)}`."
+        ),
+        (
+            "Verify deployment preflight status "
+            f"`{bundle.deployment_check.status}` and release readiness "
+            f"`{bundle.summary.release_status}`."
+        ),
+    ]
+    approval = bundle.latest_release_approval
+    if approval is None:
+        checklist.append("Record a release approval for this git SHA before production deploy.")
+    else:
+        checklist.append(
+            "Confirm release approval "
+            f"`{approval.approval_id}` by `{approval.approver}` applies to this deployment."
+        )
+    for check in checks:
+        if check.status == "pass":
+            continue
+        checklist.append(f"Resolve `{check.name}` because it is `{check.status}`: {check.message}")
+        checklist.extend(check.remediation_steps)
+    if status == "pass":
+        checklist.extend(
+            [
+                "Deploy the reviewed commit through the approved environment pipeline.",
+                "After deploy, verify published URLs, distribution assets, and rollback hints.",
+                "Record deployment notes with the release gate JSON and evidence archive.",
+            ]
+        )
+    else:
+        checklist.append("Do not deploy until every failed release gate check is resolved.")
+    return _dedupe_preserve_order(checklist)
+
+
+def _release_gate_checklist_markdown(report: ReleaseGateReport) -> str:
+    lines = [
+        "# Release Gate Deployment Checklist",
+        "",
+        f"- Status: `{report.status}`",
+        f"- Can deploy: `{str(report.can_deploy).lower()}`",
+        f"- Git SHA: `{report.git_sha or 'not provided'}`",
+        "",
+        "## Checklist",
+        "",
+    ]
+    lines.extend(f"- [ ] {item}" for item in report.deployment_checklist)
+    lines.extend(["", "## Gate Checks", ""])
+    for check in report.checks:
+        lines.append(f"- `{check.name}`: `{check.status}` - {check.message}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        deduped.append(item)
+    return deduped
 
 
 def _release_gate_report_paths(artifact_root: Path) -> list[Path]:

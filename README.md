@@ -135,7 +135,7 @@ contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
-contentops release-gate --git-sha <commit_sha> --json --record
+contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
 contentops release-gates --json
 contentops ops-trends --days 14 --json
 ```
@@ -220,8 +220,11 @@ status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 state, content distribution readiness, and git SHA matching into a single CI/CD pass/fail report.
 Each check includes `remediation_steps`, giving operators concrete next actions when approval,
 configuration, source governance, content distribution, or deployment preflight blocks a release.
-CI uploads `release-gate/release-gate.json` as a non-blocking report; deployment jobs can rerun the
-same command with `--strict` after an approval exists.
+The report also includes a human deployment checklist, and the CLI can write it with
+`--checklist-output` for release review packets.
+CI uploads `release-gate/release-gate.json` and `release-gate/deployment-checklist.md` as a
+non-blocking report; deployment jobs can rerun the same command with `--strict` after an approval
+exists.
 Use `--record` to store local gate history under `artifacts/release-gates`, which is also exposed
 through `/release-gates` and the release evidence dashboard. The history response includes a
 rollup with pass rate, blocked deployments, consecutive failures, and the most common failed

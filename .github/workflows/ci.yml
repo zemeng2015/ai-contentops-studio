@@ -48,6 +48,7 @@ jobs:
           export CONTENTOPS_DATABASE_URL=sqlite:///release-gate.db
           python scripts/generate_release_gate.py \
             --output release-gate/release-gate.json \
+            --checklist-output release-gate/deployment-checklist.md \
             --git-sha "$GITHUB_SHA" \
             --no-require-approval
       - uses: actions/upload-artifact@v7
@@ -61,7 +62,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: release-gate
-          path: release-gate/release-gate.json
+          path: |
+            release-gate/release-gate.json
+            release-gate/deployment-checklist.md
       - name: Test
         run: pytest
 

@@ -1741,6 +1741,9 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
 
 
 def _release_gate_html(report: ReleaseGateReport) -> str:
+    checklist_items = "".join(
+        f"<li>{escape(item)}</li>" for item in report.deployment_checklist
+    )
     rows = "".join(
         f"""
         <tr>
@@ -1760,6 +1763,8 @@ def _release_gate_html(report: ReleaseGateReport) -> str:
         Status: <strong>{escape(report.status)}</strong> |
         Can deploy: <strong>{str(report.can_deploy).lower()}</strong>
       </p>
+      <h3>Deployment Checklist</h3>
+      <ul>{checklist_items}</ul>
       <table>
         <thead>
           <tr>
