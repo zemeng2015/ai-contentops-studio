@@ -577,7 +577,13 @@ def get_job_execution_report(receipt_dir: Path, execution_id: str) -> JobExecuti
     raise FileNotFoundError(f"Job execution not found: {execution_id}")
 
 
-def job_recovery_plan(receipt_dir: Path, execution_id: str) -> JobRecoveryPlan:
+def job_recovery_plan(
+    receipt_dir: Path,
+    execution_id: str,
+    *,
+    actor: str | None = None,
+    notes: str | None = None,
+) -> JobRecoveryPlan:
     report = get_job_execution_report(receipt_dir, execution_id)
     failed_jobs = [
         ContentJob(
@@ -590,6 +596,7 @@ def job_recovery_plan(receipt_dir: Path, execution_id: str) -> JobRecoveryPlan:
             metadata={
                 **result.metadata,
                 "recovery_source_execution_id": report.execution_id,
+                **_recovery_metadata(actor=actor, notes=notes),
             },
         )
         for result in report.results
@@ -601,6 +608,17 @@ def job_recovery_plan(receipt_dir: Path, execution_id: str) -> JobRecoveryPlan:
         failed_count=len(failed_jobs),
         jobs=failed_jobs,
     )
+
+
+def _recovery_metadata(*, actor: str | None, notes: str | None) -> dict[str, str]:
+    metadata: dict[str, str] = {}
+    normalized_actor = (actor or "").strip()
+    normalized_notes = (notes or "").strip()
+    if normalized_actor:
+        metadata["recovery_actor"] = normalized_actor
+    if normalized_notes:
+        metadata["recovery_notes"] = normalized_notes
+    return metadata
 
 
 def job_execution_run_ids(report: JobExecutionReport) -> list[str]:

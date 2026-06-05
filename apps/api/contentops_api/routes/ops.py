@@ -363,11 +363,17 @@ def build_ops_router(
         response_model=JobExecutionReport,
         dependencies=[Depends(require_operator)],
     )
-    def run_job_recovery_plan(execution_id: str) -> JobExecutionReport:
+    def run_job_recovery_plan(
+        execution_id: str,
+        actor: str = Query(default="operator", min_length=1, max_length=80),
+        notes: str = Query(default="", max_length=500),
+    ) -> JobExecutionReport:
         try:
             plan = job_recovery_plan(
                 job_execution_dir(settings.artifact_root),
                 execution_id,
+                actor=actor,
+                notes=notes,
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc

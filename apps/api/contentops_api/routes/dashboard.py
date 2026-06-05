@@ -510,6 +510,8 @@ def build_dashboard_router(
           <h3>Recovery</h3>
           <form method="post" action="{recovery_action}">
             {_api_key_hidden(api_key)}
+            <input name="actor" placeholder="Operator" value="operator">
+            <input name="notes" placeholder="Recovery notes">
             <button type="submit">Run recovery jobs</button>
           </form>
         """
@@ -537,11 +539,15 @@ def build_dashboard_router(
     def dashboard_run_job_recovery(
         execution_id: str,
         api_key: str = Query(default=""),
+        actor: Annotated[str, Form()] = "operator",
+        notes: Annotated[str, Form()] = "",
     ) -> RedirectResponse:
         try:
             plan = job_recovery_plan(
                 job_execution_dir(settings.artifact_root),
                 execution_id,
+                actor=actor,
+                notes=notes,
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc

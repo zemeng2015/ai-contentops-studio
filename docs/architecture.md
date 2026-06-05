@@ -209,7 +209,7 @@ failed jobs as a YAML-compatible content calendar while preserving topic, source
 intent, tags, and metadata for controlled reruns. Operators can execute the same plan immediately
 through `POST /job-executions/{id}/recovery-runs`, `contentops job-recovery-plan <id> --run`, or
 the dashboard detail page; the new recovery execution is recorded as a normal worker receipt with
-`recovery_source_execution_id` metadata for traceability.
+`recovery_source_execution_id`, `recovery_actor`, and `recovery_notes` metadata for traceability.
 
 ## Production path
 

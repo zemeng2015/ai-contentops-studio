@@ -641,12 +641,22 @@ def job_recovery_plan_command(
         bool,
         typer.Option("--run", help="Execute the generated recovery plan immediately."),
     ] = False,
+    actor: Annotated[
+        str,
+        typer.Option(help="Operator identity recorded on recovery job metadata."),
+    ] = "operator",
+    notes: Annotated[
+        str,
+        typer.Option(help="Recovery notes recorded on recovery job metadata."),
+    ] = "",
 ) -> None:
     settings = Settings()
     try:
         plan = job_recovery_plan(
             job_execution_dir(settings.artifact_root),
             execution_id,
+            actor=actor if run_recovery else None,
+            notes=notes if run_recovery else None,
         )
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from exc

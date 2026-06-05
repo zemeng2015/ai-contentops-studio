@@ -581,7 +581,18 @@ def test_cli_job_recovery_plan_can_run_failed_jobs(
     write_job_execution_report(failed, job_execution_dir(Settings().artifact_root))
     runner = CliRunner()
 
-    result = runner.invoke(app, ["job-recovery-plan", failed.execution_id, "--run"])
+    result = runner.invoke(
+        app,
+        [
+            "job-recovery-plan",
+            failed.execution_id,
+            "--run",
+            "--actor",
+            "zack",
+            "--notes",
+            "Retry provider timeout.",
+        ],
+    )
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
@@ -591,6 +602,8 @@ def test_cli_job_recovery_plan_can_run_failed_jobs(
     assert payload["results"][0]["metadata"]["recovery_source_execution_id"] == (
         failed.execution_id
     )
+    assert payload["results"][0]["metadata"]["recovery_actor"] == "zack"
+    assert payload["results"][0]["metadata"]["recovery_notes"] == "Retry provider timeout."
 
 
 def test_cli_worker_jobs_command(

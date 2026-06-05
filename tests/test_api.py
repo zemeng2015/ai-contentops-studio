@@ -703,12 +703,16 @@ def test_job_execution_recovery_can_be_run_from_api_and_dashboard(
         write_job_execution_report(failed, job_execution_dir(settings.artifact_root))
 
         recovery_response = client.post(
-            f"/job-executions/{failed.execution_id}/recovery-runs"
+            f"/job-executions/{failed.execution_id}/recovery-runs",
+            params={"actor": "zack", "notes": "Retry provider timeout."},
         )
         dashboard_response = client.post(
             f"/dashboard/job-executions/{failed.execution_id}/recovery-runs",
+            data={"actor": "dashboard-operator", "notes": "Retry from dashboard."},
             follow_redirects=False,
         )
+        dashboard_execution_id = dashboard_response.headers["location"].rsplit("/", 1)[-1]
+        dashboard_detail = client.get(f"/job-executions/{dashboard_execution_id}")
     finally:
         settings.artifact_root = original_artifact_root
         settings.site_output_dir = original_site_output_dir
@@ -721,8 +725,16 @@ def test_job_execution_recovery_can_be_run_from_api_and_dashboard(
     assert recovery_payload["results"][0]["metadata"]["recovery_source_execution_id"] == (
         failed.execution_id
     )
+    assert recovery_payload["results"][0]["metadata"]["recovery_actor"] == "zack"
+    assert recovery_payload["results"][0]["metadata"]["recovery_notes"] == (
+        "Retry provider timeout."
+    )
     assert dashboard_response.status_code == 303
     assert "/dashboard/job-executions/" in dashboard_response.headers["location"]
+    assert dashboard_detail.status_code == 200
+    dashboard_metadata = dashboard_detail.json()["results"][0]["metadata"]
+    assert dashboard_metadata["recovery_actor"] == "dashboard-operator"
+    assert dashboard_metadata["recovery_notes"] == "Retry from dashboard."
 
 
 def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:

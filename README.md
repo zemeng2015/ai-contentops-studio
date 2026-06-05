@@ -285,13 +285,13 @@ Failed worker executions can produce recovery YAML:
 
 ```powershell
 contentops job-recovery-plan <execution_id> --output recovery.yaml
-contentops job-recovery-plan <execution_id> --run
+contentops job-recovery-plan <execution_id> --run --actor zack --notes "Retry provider timeout"
 ```
 
 The API and dashboard can also run the recovery plan directly with
 `POST /job-executions/{execution_id}/recovery-runs` or the job execution detail page. Recovery
-executions write normal worker receipts and preserve `recovery_source_execution_id` metadata so
-reruns remain auditable.
+executions write normal worker receipts and preserve `recovery_source_execution_id`,
+`recovery_actor`, and `recovery_notes` metadata so reruns remain auditable.
 
 ## Configuration
 
