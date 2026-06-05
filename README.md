@@ -295,6 +295,9 @@ title, body, checklist, and source execution ids as JSON for GitHub Actions or r
 When manually starting `Scheduled ContentOps`, set `create_review_issue=true` to open a GitHub
 issue containing the same review packet and a link back to the Actions run. This gives reviewers a
 normal issue thread for follow-up before homepage or publishing changes are accepted.
+Set `create_draft_pr=true` on a manual run to create a draft PR that commits the generated
+scheduled review Markdown and PR metadata under `scheduled-reviews/`. Scheduled cron runs do not
+open PRs automatically.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,

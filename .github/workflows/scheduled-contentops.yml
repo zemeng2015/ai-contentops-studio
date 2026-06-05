@@ -25,6 +25,11 @@ on:
         required: true
         default: false
         type: boolean
+      create_draft_pr:
+        description: "Create a draft PR with scheduled review metadata"
+        required: true
+        default: false
+        type: boolean
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -38,8 +43,9 @@ env:
   CONTENTOPS_NOTIFICATION_WEBHOOK_URL: ${{ secrets.CONTENTOPS_NOTIFICATION_WEBHOOK_URL }}
 
 permissions:
-  contents: read
+  contents: write
   issues: write
+  pull-requests: write
 
 jobs:
   daily-ai-roundup:
@@ -99,6 +105,34 @@ jobs:
           gh issue create \
             --title "Scheduled ContentOps review: daily AI roundup #${GITHUB_RUN_NUMBER}" \
             --body-file scheduled-worker/daily-review-issue.md
+      - name: Create draft PR
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.create_draft_pr == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="contentops/scheduled-daily-${GITHUB_RUN_ID}"
+          mkdir -p scheduled-reviews
+          cp scheduled-worker/daily-review.md "scheduled-reviews/daily-${GITHUB_RUN_ID}.md"
+          cp scheduled-worker/daily-pr-metadata.json "scheduled-reviews/daily-${GITHUB_RUN_ID}.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          metadata = json.loads(Path("scheduled-worker/daily-pr-metadata.json").read_text())
+          Path("scheduled-worker/daily-pr-title.txt").write_text(metadata["title"])
+          Path("scheduled-worker/daily-pr-body.md").write_text(metadata["body"])
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add scheduled-reviews
+          git commit -m "Add scheduled daily ContentOps review ${GITHUB_RUN_ID}"
+          git push --set-upstream origin "$branch"
+          gh pr create \
+            --draft \
+            --base main \
+            --head "$branch" \
+            --title "$(cat scheduled-worker/daily-pr-title.txt)" \
+            --body-file scheduled-worker/daily-pr-body.md
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -166,6 +200,34 @@ jobs:
           gh issue create \
             --title "Scheduled ContentOps review: project updates #${GITHUB_RUN_NUMBER}" \
             --body-file scheduled-worker/project-updates-review-issue.md
+      - name: Create draft PR
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.create_draft_pr == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="contentops/scheduled-project-updates-${GITHUB_RUN_ID}"
+          mkdir -p scheduled-reviews
+          cp scheduled-worker/project-updates-review.md "scheduled-reviews/project-updates-${GITHUB_RUN_ID}.md"
+          cp scheduled-worker/project-updates-pr-metadata.json "scheduled-reviews/project-updates-${GITHUB_RUN_ID}.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          metadata = json.loads(Path("scheduled-worker/project-updates-pr-metadata.json").read_text())
+          Path("scheduled-worker/project-updates-pr-title.txt").write_text(metadata["title"])
+          Path("scheduled-worker/project-updates-pr-body.md").write_text(metadata["body"])
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add scheduled-reviews
+          git commit -m "Add scheduled project ContentOps review ${GITHUB_RUN_ID}"
+          git push --set-upstream origin "$branch"
+          gh pr create \
+            --draft \
+            --base main \
+            --head "$branch" \
+            --title "$(cat scheduled-worker/project-updates-pr-title.txt)" \
+            --body-file scheduled-worker/project-updates-pr-body.md
       - uses: actions/upload-artifact@v7
         if: always()
         with:
