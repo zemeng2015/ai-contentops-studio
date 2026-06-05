@@ -22,6 +22,8 @@ from contentops_core.jobs import (
     list_worker_job_catalog,
     load_job_file,
     notify_job_execution_alert,
+    notify_worker_delivery_summary,
+    worker_delivery_summary_notification_log,
     write_job_execution_delivery_summary,
     write_job_execution_report,
 )
@@ -406,6 +408,91 @@ def test_notify_job_execution_alert_writes_delivery_receipt(tmp_path: Path) -> N
     assert delivery.action_required is True
     assert delivery.severity.value == "critical"
     assert deliveries[0].delivery_id == delivery.delivery_id
+
+
+def test_notify_worker_delivery_summary_writes_delivery_receipt(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    report = JobExecutionReport(
+        name="summary-notify",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="daily-ai",
+                topic="Daily AI",
+                publish=True,
+                run_id="run-summary-notify",
+                status="published",
+                published_url="https://example.com/daily-ai",
+            )
+        ],
+    )
+    write_job_execution_report(report, receipt_dir)
+    write_job_execution_delivery_summary(report)
+
+    delivery = notify_worker_delivery_summary(report)
+    deliveries = worker_delivery_summary_notification_log(receipt_dir)
+
+    assert delivery.status == "skipped"
+    assert delivery.provider == "local"
+    assert delivery.action_required is False
+    assert delivery.summary_path == report.delivery_summary_path
+    assert delivery.markdown_path == report.delivery_summary_markdown_path
+    assert deliveries[0].delivery_id == delivery.delivery_id
+
+
+def test_notify_worker_delivery_summary_posts_webhook(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    receipt_dir = tmp_path / "receipts"
+    requests: list[dict[str, object]] = []
+
+    class Response:
+        is_success = True
+        status_code = 202
+        text = "accepted"
+
+    def fake_post(url: str, *, json: dict[str, object], timeout: float) -> Response:
+        requests.append({"url": url, "json": json, "timeout": timeout})
+        return Response()
+
+    monkeypatch.setattr("contentops_core.jobs.httpx.post", fake_post)
+    report = JobExecutionReport(
+        name="summary-webhook",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="daily-ai",
+                topic="Daily AI",
+                publish=True,
+                run_id="run-summary-webhook",
+                status="published",
+                published_url="https://example.com/daily-ai",
+            )
+        ],
+    )
+    write_job_execution_report(report, receipt_dir)
+    write_job_execution_delivery_summary(report)
+
+    delivery = notify_worker_delivery_summary(
+        report,
+        endpoint="https://hooks.example.com/contentops",
+        timeout_seconds=2.5,
+    )
+
+    assert delivery.status == "delivered"
+    assert delivery.provider == "webhook"
+    assert delivery.status_code == 202
+    assert requests[0]["url"] == "https://hooks.example.com/contentops"
+    assert requests[0]["timeout"] == 2.5
+    payload = requests[0]["json"]
+    assert "worker_delivery_summary" in payload
+    assert "markdown" in payload
+    assert payload["worker_delivery_summary"]["execution_id"] == report.execution_id
 
 
 def test_job_execution_alert_report_is_info_when_worker_window_is_clean(tmp_path: Path) -> None:

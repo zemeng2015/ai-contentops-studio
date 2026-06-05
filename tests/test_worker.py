@@ -162,6 +162,11 @@ jobs:
     worker_delivery_summaries = json.loads(
         (evidence_dir / "worker_delivery_summaries.json").read_text(encoding="utf-8")
     )
+    notification_log = json.loads(
+        (receipt_dir / "worker-delivery-summary-notification-log.json").read_text(
+            encoding="utf-8"
+        )
+    )
     assert delivery_summary_path.exists()
     assert delivery_summary_markdown_path.exists()
     assert delivery_summary["published_items"][0]["published_url"].startswith(
@@ -169,6 +174,8 @@ jobs:
     )
     assert worker_delivery_summaries["total"] == 1
     assert worker_delivery_summaries["items"][0]["execution_id"] == payload["execution_id"]
+    assert notification_log[0]["execution_id"] == payload["execution_id"]
+    assert notification_log[0]["status"] == "skipped"
 
 
 def test_worker_run_can_prepare_requested_homepage_handoff(

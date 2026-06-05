@@ -272,7 +272,10 @@ recording whether delivery was skipped locally, delivered to a webhook, or faile
 Non-dry-run executions also write `<execution_id>-delivery-summary.json` and
 `<execution_id>-delivery-summary.md` beside the receipt. The summary lists published items,
 distribution asset status, release evidence status, failures, and recommended next actions, and
-release evidence records recent summaries in `worker_delivery_summaries.json`.
+release evidence records recent summaries in `worker_delivery_summaries.json`. The worker writes an
+auditable `worker-delivery-summary-notification-log.json` after each summary; when
+`CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, the JSON summary plus Markdown body are posted
+to the webhook. Use `--skip-delivery-notification` for local runs that should not notify.
 Set `homepage_handoff: true` on a job when the homepage publisher is configured and the scheduled
 run should prepare a reviewable GitHub Pages handoff zip after the draft is generated. The handoff
 path and any handoff error are stored on that job's execution result, and the post-run release

@@ -11,6 +11,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
     job_execution_dir,
+    notify_worker_delivery_summary,
     write_job_execution_delivery_summary,
     write_job_execution_report,
 )
@@ -50,6 +51,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
         "worker_execution_trends.json",
+        "worker_delivery_summary_deliveries.json",
         "worker_delivery_summaries.json",
     }
     assert {path.name for path in output_dir.glob("*.json")} == expected_files
@@ -75,6 +77,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     worker_delivery_summaries = json.loads(
         (output_dir / "worker_delivery_summaries.json").read_text(encoding="utf-8")
     )
+    worker_summary_deliveries = json.loads(
+        (output_dir / "worker_delivery_summary_deliveries.json").read_text(encoding="utf-8")
+    )
     source_reviews = json.loads(
         (output_dir / "source_reviews.json").read_text(encoding="utf-8")
     )
@@ -90,12 +95,14 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert worker_trends["summary"]["top_failure_reasons"] == []
     assert worker_alerts["severity"] == "info"
     assert worker_alert_deliveries == []
+    assert worker_summary_deliveries == []
     assert worker_delivery_summaries["total"] == 0
     assert source_reviews["total_runs"] == 0
     assert source_reviews["total_decisions"] == 0
     assert bundle.worker_execution_alerts["severity"] == "info"
     assert bundle.source_reviews.total_decisions == 0
     assert bundle.worker_execution_alert_deliveries == []
+    assert bundle.worker_delivery_summary_deliveries == []
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
     assert bundle.worker_delivery_summaries.total == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
@@ -178,6 +185,7 @@ def test_release_evidence_indexes_worker_delivery_summaries(
     )
     write_job_execution_report(report, receipt_dir)
     write_job_execution_delivery_summary(report)
+    notify_worker_delivery_summary(report)
     output_dir = tmp_path / "release-evidence"
 
     bundle = generate_release_evidence(output_dir)
@@ -191,8 +199,15 @@ def test_release_evidence_indexes_worker_delivery_summaries(
     assert payload["items"][0]["content_assets_status"] == "generated"
     assert payload["items"][0]["release_evidence_status"] == "warn"
     assert payload["items"][0]["markdown_path"].endswith("-delivery-summary.md")
+    deliveries = json.loads(
+        (output_dir / "worker_delivery_summary_deliveries.json").read_text(encoding="utf-8")
+    )
+    assert deliveries[0]["execution_id"] == report.execution_id
+    assert deliveries[0]["status"] == "skipped"
     assert bundle.worker_delivery_summaries.total == 1
+    assert bundle.worker_delivery_summary_deliveries[0]["execution_id"] == report.execution_id
     assert "worker_delivery_summaries.json" in bundle.summary.artifact_files
+    assert "worker_delivery_summary_deliveries.json" in bundle.summary.artifact_files
 
 
 def test_release_evidence_indexes_homepage_handoff_bundles(

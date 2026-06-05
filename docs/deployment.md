@@ -273,6 +273,9 @@ automation can be audited from a single JSON record.
 The worker also writes a delivery summary in JSON and Markdown beside the receipt. Use the Markdown
 file for human review or notification handoff, and use `worker_delivery_summaries.json` in release
 evidence to verify recent scheduled publishing outcomes during deployment reviews.
+When `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, the worker posts that delivery summary to
+the webhook and records the result in `worker-delivery-summary-notification-log.json`; release
+evidence mirrors the log as `worker_delivery_summary_deliveries.json`.
 When a worker execution publishes content, it also regenerates the content distribution assets in
 the configured publishing target before release evidence is generated. The same receipt records the
 asset path, status, generated filenames, and errors, and release evidence includes the resulting

@@ -89,6 +89,9 @@ Open `delivery_summary_markdown_path` when an operator needs the short human-rea
 scheduled run. The Markdown summary lists published URLs, content distribution status, release
 evidence status, failures, and recommended actions; release evidence stores recent summaries in
 `worker_delivery_summaries.json` for deployment review.
+Check `worker-delivery-summary-notification-log.json` beside the worker receipts to confirm whether
+the summary notification was skipped locally, delivered to the configured webhook, or failed. A
+configured `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` receives both the JSON summary and Markdown body.
 When a scheduled execution publishes content, check `content_assets_status` in the same receipt.
 `generated` means the worker refreshed `feed.xml`, `promotion-brief.md`, and
 `content-distribution-manifest.json` before release evidence was built; `failed` means the publish

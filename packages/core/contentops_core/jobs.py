@@ -196,6 +196,22 @@ class JobExecutionAlertDelivery(BaseModel):
     delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class WorkerDeliverySummaryDelivery(BaseModel):
+    delivery_id: str = Field(default_factory=lambda: uuid4().hex[:12])
+    action: str = "worker_delivery_summary"
+    execution_id: str
+    provider: str
+    status: str
+    action_required: bool
+    message: str
+    summary_path: str | None = None
+    markdown_path: str | None = None
+    endpoint: str | None = None
+    status_code: int | None = None
+    error: str | None = None
+    delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class JobExecutionListResponse(BaseModel):
     items: list[JobExecutionReport]
     total: int
@@ -395,6 +411,56 @@ def write_job_execution_delivery_summary(report: JobExecutionReport) -> tuple[Pa
     report.delivery_summary_error = None
     rewrite_job_execution_report(report)
     return json_path, markdown_path
+
+
+def notify_worker_delivery_summary(
+    report: JobExecutionReport,
+    receipt_dir: Path | None = None,
+    *,
+    endpoint: str | None = None,
+    timeout_seconds: float = 5.0,
+) -> WorkerDeliverySummaryDelivery:
+    if report.delivery_summary_path is None:
+        write_job_execution_delivery_summary(report)
+    resolved_receipt_dir = receipt_dir or _report_receipt_dir(report)
+    delivery = _deliver_worker_delivery_summary(
+        report,
+        endpoint=endpoint,
+        timeout_seconds=timeout_seconds,
+    )
+    write_worker_delivery_summary_delivery(delivery, resolved_receipt_dir)
+    return delivery
+
+
+def write_worker_delivery_summary_delivery(
+    delivery: WorkerDeliverySummaryDelivery,
+    receipt_dir: Path,
+) -> Path:
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    path = worker_delivery_summary_notification_log_path(receipt_dir)
+    if path.exists():
+        deliveries = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        deliveries = []
+    deliveries.append(delivery.model_dump(mode="json"))
+    path.write_text(json.dumps(deliveries, indent=2), encoding="utf-8")
+    return path
+
+
+def worker_delivery_summary_notification_log(
+    receipt_dir: Path,
+) -> list[WorkerDeliverySummaryDelivery]:
+    path = worker_delivery_summary_notification_log_path(receipt_dir)
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        return []
+    return [WorkerDeliverySummaryDelivery.model_validate(item) for item in data]
+
+
+def worker_delivery_summary_notification_log_path(receipt_dir: Path) -> Path:
+    return receipt_dir / "worker-delivery-summary-notification-log.json"
 
 
 def job_execution_dir(artifact_root: Path) -> Path:
@@ -1002,6 +1068,104 @@ def _deliver_job_execution_alert(
     )
 
 
+def _deliver_worker_delivery_summary(
+    report: JobExecutionReport,
+    *,
+    endpoint: str | None,
+    timeout_seconds: float,
+) -> WorkerDeliverySummaryDelivery:
+    payload = _read_delivery_summary_payload(report)
+    action_required = bool(payload.get("summary", {}).get("action_required"))
+    message = _worker_delivery_summary_message(payload)
+    if endpoint is None:
+        return WorkerDeliverySummaryDelivery(
+            execution_id=report.execution_id,
+            provider="local",
+            status="skipped",
+            action_required=action_required,
+            message=message,
+            summary_path=report.delivery_summary_path,
+            markdown_path=report.delivery_summary_markdown_path,
+        )
+    try:
+        response = httpx.post(
+            endpoint,
+            json={
+                "worker_delivery_summary": payload,
+                "markdown": _read_delivery_summary_markdown(report),
+            },
+            timeout=timeout_seconds,
+        )
+    except httpx.HTTPError as exc:
+        return WorkerDeliverySummaryDelivery(
+            execution_id=report.execution_id,
+            provider="webhook",
+            status="failed",
+            action_required=action_required,
+            message=message,
+            summary_path=report.delivery_summary_path,
+            markdown_path=report.delivery_summary_markdown_path,
+            endpoint=endpoint,
+            error=str(exc),
+        )
+    return WorkerDeliverySummaryDelivery(
+        execution_id=report.execution_id,
+        provider="webhook",
+        status="delivered" if response.is_success else "failed",
+        action_required=action_required,
+        message=message,
+        summary_path=report.delivery_summary_path,
+        markdown_path=report.delivery_summary_markdown_path,
+        endpoint=endpoint,
+        status_code=response.status_code,
+        error=None if response.is_success else response.text[:500],
+    )
+
+
+def _read_delivery_summary_payload(report: JobExecutionReport) -> dict[str, Any]:
+    if report.delivery_summary_path is None:
+        return _job_execution_delivery_summary_payload(report)
+    path = Path(report.delivery_summary_path)
+    if not path.exists():
+        return _job_execution_delivery_summary_payload(report)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return _job_execution_delivery_summary_payload(report)
+    return data
+
+
+def _read_delivery_summary_markdown(report: JobExecutionReport) -> str:
+    if report.delivery_summary_markdown_path is None:
+        return _job_execution_delivery_summary_markdown(
+            _job_execution_delivery_summary_payload(report)
+        )
+    path = Path(report.delivery_summary_markdown_path)
+    if not path.exists():
+        return _job_execution_delivery_summary_markdown(
+            _job_execution_delivery_summary_payload(report)
+        )
+    return path.read_text(encoding="utf-8")
+
+
+def _worker_delivery_summary_message(payload: dict[str, Any]) -> str:
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        summary = {}
+    published_runs = int(summary.get("published_runs") or 0)
+    action_required = bool(summary.get("action_required"))
+    outcome = "requires review" if action_required else "completed"
+    return (
+        f"Worker execution {payload.get('execution_id', 'unknown')} {outcome}: "
+        f"{published_runs} published run(s)."
+    )
+
+
+def _report_receipt_dir(report: JobExecutionReport) -> Path:
+    if report.receipt_path is None:
+        raise ValueError("Job execution receipt path is missing.")
+    return Path(report.receipt_path).parent
+
+
 def _latest_failure_execution_id(summary: JobExecutionTrendSummary) -> str | None:
     if not summary.top_failure_reasons:
         return None
@@ -1143,7 +1307,11 @@ def _ratio(numerator: int, denominator: int) -> float:
 def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:
     if not receipt_dir.exists():
         return []
-    ignored_names = {"s3-mirror-log.json", "worker-alert-notification-log.json"}
+    ignored_names = {
+        "s3-mirror-log.json",
+        "worker-alert-notification-log.json",
+        "worker-delivery-summary-notification-log.json",
+    }
     return sorted(
         (
             path

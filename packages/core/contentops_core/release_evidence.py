@@ -25,6 +25,7 @@ from contentops_core.jobs import (
     job_execution_alert_report,
     job_execution_dir,
     job_execution_trends,
+    worker_delivery_summary_notification_log,
 )
 from contentops_core.models import (
     ArtifactManifest,
@@ -82,6 +83,9 @@ def build_release_evidence(
     worker_alert_deliveries = job_execution_alert_notification_log(
         job_execution_dir(settings.artifact_root)
     )
+    worker_summary_deliveries = worker_delivery_summary_notification_log(
+        job_execution_dir(settings.artifact_root)
+    )
     artifact_files = [
         "doctor.json",
         "deployment_check.json",
@@ -96,6 +100,7 @@ def build_release_evidence(
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
         "worker_execution_trends.json",
+        "worker_delivery_summary_deliveries.json",
         "worker_delivery_summaries.json",
     ]
     if approval is not None:
@@ -122,6 +127,9 @@ def build_release_evidence(
         worker_execution_alert_deliveries=[
             delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
         ],
+        worker_delivery_summary_deliveries=[
+            delivery.model_dump(mode="json") for delivery in worker_summary_deliveries
+        ],
         worker_execution_trends=worker_execution_trends.model_dump(mode="json"),
         latest_release_approval=approval,
     )
@@ -146,6 +154,7 @@ def write_release_evidence(
         "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
         "worker_execution_alerts": bundle.worker_execution_alerts,
         "worker_execution_trends": bundle.worker_execution_trends,
+        "worker_delivery_summary_deliveries": bundle.worker_delivery_summary_deliveries,
         "worker_delivery_summaries": bundle.worker_delivery_summaries.model_dump(mode="json"),
     }
     if bundle.latest_release_approval is not None:

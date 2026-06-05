@@ -214,7 +214,9 @@ auditable artifact even when stdout logs are rotated.
 Executed workers also write a JSON and Markdown delivery summary beside the receipt. The summary is
 designed for operator review: it captures published items, distribution asset status, release
 evidence status, failures, and recommended next actions, and release evidence indexes recent
-summaries in `worker_delivery_summaries.json`.
+summaries in `worker_delivery_summaries.json`. The worker can deliver the same summary to the
+configured notification webhook and records the attempt in
+`worker-delivery-summary-notification-log.json`.
 For executions that publish content, the worker refreshes distribution assets from the publish
 index before generating release evidence. The receipt records `content_assets_path`,
 `content_assets_status`, `content_assets_files`, and `content_assets_error`, while the evidence

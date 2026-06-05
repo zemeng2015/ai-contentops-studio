@@ -14,6 +14,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobRunner,
     load_job_file,
+    notify_worker_delivery_summary,
     rewrite_job_execution_report,
     write_job_execution_delivery_summary,
     write_job_execution_report,
@@ -70,6 +71,10 @@ def run_pipeline(
         bool,
         typer.Option(help="Skip post-run worker delivery summary generation."),
     ] = False,
+    skip_delivery_notification: Annotated[
+        bool,
+        typer.Option(help="Skip post-run worker delivery summary notification."),
+    ] = False,
 ) -> None:
     job_file = load_job_file(path)
     settings = Settings()
@@ -109,6 +114,7 @@ def run_pipeline(
                 report,
                 release_evidence_dir,
                 write_delivery_summary=not skip_delivery_summary,
+                notify_delivery_summary=not skip_delivery_notification,
             )
         except Exception as exc:
             report.release_evidence_status = "failed"
@@ -117,6 +123,8 @@ def run_pipeline(
             raise typer.BadParameter(f"Failed to generate release evidence: {exc}") from exc
     elif not skip_delivery_summary:
         _attach_delivery_summary(report)
+        if not skip_delivery_notification:
+            _notify_delivery_summary(settings, report)
     _mirror_receipt_if_configured(settings, report.receipt_path)
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
@@ -194,6 +202,7 @@ def _attach_release_evidence(
     release_evidence_dir: Path | None,
     *,
     write_delivery_summary: bool,
+    notify_delivery_summary: bool,
 ) -> None:
     target_dir = (
         release_evidence_dir
@@ -211,6 +220,8 @@ def _attach_release_evidence(
     rewrite_job_execution_report(report)
     if write_delivery_summary:
         _attach_delivery_summary(report)
+        if notify_delivery_summary:
+            _notify_delivery_summary(settings, report)
         delivery_summary_paths = (
             [Path(report.delivery_summary_path)] if report.delivery_summary_path else None
         )
@@ -232,6 +243,14 @@ def _attach_delivery_summary(report: JobExecutionReport) -> None:
         report.delivery_summary_error = str(exc)
         rewrite_job_execution_report(report)
         raise
+
+
+def _notify_delivery_summary(settings: Settings, report: JobExecutionReport) -> None:
+    notify_worker_delivery_summary(
+        report,
+        endpoint=settings.notification_webhook_url,
+        timeout_seconds=settings.notification_timeout_seconds,
+    )
 
 
 def _publisher_target_dir(settings: Settings) -> Path:
