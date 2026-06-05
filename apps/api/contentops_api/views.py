@@ -1612,6 +1612,19 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         """
         for item in bundle.provider_health.items
     )
+    smoke_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.category)}</td>
+          <td>{escape(item.name)}</td>
+          <td><span class="pill">{escape(item.status)}</span></td>
+          <td><code>{escape(item.command)}</code></td>
+          <td>{escape(", ".join(item.missing_env) or "none")}</td>
+          <td>{escape("; ".join(item.notes) or "none")}</td>
+        </tr>
+        """
+        for item in bundle.integration_smoke_plan.items
+    )
     source_review_rows = "".join(
         f"""
         <tr>
@@ -1880,6 +1893,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <strong>{escape(bundle.provider_health.status)}</strong>
           <span>Provider health</span>
         </div>
+        <div>
+          <strong>{escape(bundle.integration_smoke_plan.status)}</strong>
+          <span>Smoke plan</span>
+        </div>
         <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
@@ -1940,6 +1957,19 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </tr>
         </thead>
         <tbody>{provider_rows}</tbody>
+      </table>
+      <h2>Integration Smoke Plan</h2>
+      <p>
+        Run all: <code>{escape(bundle.integration_smoke_plan.command)}</code>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th><th>Provider</th><th>Status</th><th>Selector</th>
+            <th>Missing env</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>{smoke_rows}</tbody>
       </table>
       <h2>Deployment Preflight</h2>
       <table>

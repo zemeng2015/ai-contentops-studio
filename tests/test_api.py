@@ -239,6 +239,7 @@ def test_release_approval_api_and_dashboard(
     assert "Publish Verification Evidence" in dashboard_response.text
     assert "Publish Recovery Executions" in dashboard_response.text
     assert "Provider Health" in dashboard_response.text
+    assert "Integration Smoke Plan" in dashboard_response.text
     assert "Remediation" in dashboard_response.text
     assert "Recent Release Gates" in dashboard_response.text
     assert "Pass rate:" in dashboard_response.text

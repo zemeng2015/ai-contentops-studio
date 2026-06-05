@@ -17,6 +17,7 @@ from contentops_core.artifacts import (
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    integration_smoke_plan,
     provider_health,
     release_readiness,
     system_status,
@@ -71,6 +72,7 @@ def build_release_evidence(
 ) -> ReleaseEvidenceBundle:
     doctor = system_status(settings, repository)
     providers = provider_health(settings)
+    smoke_plan = integration_smoke_plan(settings)
     manifest = deployment_manifest(settings, repository)
     operations = review_service.operations_summary(window_size=window_size)
     operations_console = build_operations_console(
@@ -140,6 +142,7 @@ def build_release_evidence(
         "ops_brief.json",
         "ops_brief_deliveries.json",
         "provider_health.json",
+        "integration_smoke_plan.json",
         "publish_recovery_executions.json",
         "publish_verifications.json",
         "release_readiness.json",
@@ -166,6 +169,7 @@ def build_release_evidence(
         summary=summary,
         doctor=doctor,
         provider_health=providers,
+        integration_smoke_plan=smoke_plan,
         operations_console=operations_console,
         ops_brief=ops_brief,
         ops_brief_deliveries=ops_brief_deliveries,
@@ -212,6 +216,7 @@ def write_release_evidence(
             delivery.model_dump(mode="json") for delivery in bundle.ops_brief_deliveries
         ],
         "provider_health": bundle.provider_health.model_dump(mode="json"),
+        "integration_smoke_plan": bundle.integration_smoke_plan.model_dump(mode="json"),
         "publish_recovery_executions": bundle.publish_recovery_executions.model_dump(
             mode="json"
         ),

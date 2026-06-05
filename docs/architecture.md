@@ -205,7 +205,9 @@ worker reruns while keeping the source audit and research artifact contract unch
 Provider health is a first-class diagnostic surface. It reports research, generator, and publisher
 status, credential posture, scheduled readiness, retry/cache settings, and provider-specific
 warnings through `contentops provider-health`, `GET /provider-health`, the deployment manifest
-health details, and release evidence `provider_health.json`.
+health details, and release evidence `provider_health.json`. Release evidence also writes
+`integration_smoke_plan.json`, which records the live provider smoke selectors and missing
+environment variables operators must resolve before running opt-in external tests.
 
 ```text
 needs_review -> approved -> publishing -> published

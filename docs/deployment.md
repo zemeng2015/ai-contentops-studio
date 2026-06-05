@@ -259,6 +259,8 @@ Review `provider_health.json` in release evidence or run `contentops provider-he
 before enabling scheduled jobs. Search research should show configured credentials, feed/discovery
 providers should show scheduled readiness, and GitHub research should record whether a token is
 configured for higher API limits or private repositories.
+Review `integration_smoke_plan.json` in the same evidence bundle to confirm the live provider smoke
+selectors and missing environment variables before opting into external smoke tests.
 Review `ops_brief.json` or run `contentops ops-brief --days 14 --json` after each scheduled
 execution window. It summarizes provider health, worker alerts, run incidents, quality, budget,
 and review queue pressure into a status, top risks, and recommended operator actions.
