@@ -594,6 +594,7 @@ See [Deployment](docs/deployment.md) and [Production Runbook](docs/runbook.md).
 - [Showcase Package](docs/showcase.md)
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
+- [Long-Term CI Plan](docs/ci-plan.md)
 - [Production Runbook](docs/runbook.md)
 - [Evaluation Methodology](docs/eval-methodology.md)
 - [Integration Smoke Tests](docs/integration-smoke.md)

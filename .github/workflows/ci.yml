@@ -15,11 +15,15 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install
         run: pip install -e ".[dev]"
@@ -53,15 +57,15 @@ jobs:
             --no-require-approval
       - uses: actions/upload-artifact@v7
         with:
-          name: deployment-check
+          name: deployment-check-py${{ matrix.python-version }}
           path: deployment-check/deployment-check.json
       - uses: actions/upload-artifact@v7
         with:
-          name: release-evidence
+          name: release-evidence-py${{ matrix.python-version }}
           path: release-evidence/*.json
       - uses: actions/upload-artifact@v7
         with:
-          name: release-gate
+          name: release-gate-py${{ matrix.python-version }}
           path: |
             release-gate/release-gate.json
             release-gate/deployment-checklist.md

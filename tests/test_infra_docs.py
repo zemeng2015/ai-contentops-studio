@@ -79,6 +79,9 @@ def test_ci_validates_terraform() -> None:
     assert "permissions:\n  contents: read" in workflow
     assert "actions/checkout@v5" in workflow
     assert "actions/setup-python@v6" in workflow
+    assert 'python-version: ${{ matrix.python-version }}' in workflow
+    assert 'python-version: ["3.11", "3.12", "3.13"]' in workflow
+    assert "fail-fast: false" in workflow
     assert "actions/upload-artifact@v7" in workflow
     assert "hashicorp/setup-terraform@v4" in workflow
     assert "terraform fmt -check" in workflow
@@ -88,9 +91,25 @@ def test_ci_validates_terraform() -> None:
     assert "scripts/generate_deployment_check.py" in workflow
     assert "scripts/generate_release_gate.py" in workflow
     assert "deployment-check/deployment-check.json" in workflow
+    assert "deployment-check-py${{ matrix.python-version }}" in workflow
+    assert "release-evidence-py${{ matrix.python-version }}" in workflow
+    assert "release-gate-py${{ matrix.python-version }}" in workflow
     assert "release-gate/release-gate.json" in workflow
     assert "--checklist-output release-gate/deployment-checklist.md" in workflow
     assert "release-gate/deployment-checklist.md" in workflow
+
+
+def test_long_term_ci_plan_documents_quality_roadmap() -> None:
+    plan = Path("docs/ci-plan.md").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "Long-Term CI Plan" in plan
+    assert "Python 3.11, 3.12, and 3.13" in plan
+    assert "deployment preflight" in plan
+    assert "release evidence" in plan
+    assert "container image vulnerability scanning" in plan
+    assert "Terraform security checks" in plan
+    assert "docs/ci-plan.md" in readme
 
 
 def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
