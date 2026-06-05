@@ -187,6 +187,30 @@ variable "worker_alert_window_days" {
   default     = 14
 }
 
+variable "release_gate_schedule_expression" {
+  description = "EventBridge Scheduler expression for recurring release gate evidence checks."
+  type        = string
+  default     = "cron(0 14 * * ? *)"
+}
+
+variable "release_gate_schedule_enabled" {
+  description = "Whether the recurring release gate evidence check is enabled."
+  type        = bool
+  default     = false
+}
+
+variable "release_gate_window_size" {
+  description = "Number of recent runs included by the recurring release gate task."
+  type        = number
+  default     = 100
+}
+
+variable "release_gate_require_approval" {
+  description = "Whether the recurring release gate task requires release approval."
+  type        = bool
+  default     = true
+}
+
 variable "alarm_actions" {
   description = "SNS topic ARNs or other CloudWatch alarm actions for alarm and OK transitions."
   type        = list(string)

@@ -243,6 +243,13 @@ Terraform also defines a disabled-by-default worker alert notifier task. Enable
 `contentops job-execution-alert-notify` after the worker schedule. The notifier records
 `worker-alert-notification-log.json`; release evidence mirrors those receipts in
 `worker_execution_alert_deliveries.json`.
+Terraform also defines a disabled-by-default release gate scheduler. Enable
+`release_gate_schedule_enabled=true` after release approvals and source review governance are part
+of the operating rhythm, and tune `release_gate_schedule_expression`, `release_gate_window_size`,
+and `release_gate_require_approval` for the deployment environment. The task runs
+`contentops release-gate --record --json`, records release gate reports under the artifact root,
+and exits non-zero when deployment is blocked, making release readiness visible in EventBridge and
+CloudWatch.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.

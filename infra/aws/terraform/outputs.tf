@@ -23,6 +23,11 @@ output "worker_alert_notifier_task_definition_arn" {
   value       = aws_ecs_task_definition.worker_alert_notifier.arn
 }
 
+output "release_gate_task_definition_arn" {
+  description = "Release gate task definition ARN."
+  value       = aws_ecs_task_definition.release_gate.arn
+}
+
 output "metadata_db_endpoint" {
   description = "RDS Postgres endpoint for run metadata."
   value       = aws_db_instance.metadata.endpoint
@@ -41,6 +46,11 @@ output "daily_worker_schedule_arn" {
 output "worker_alert_notifier_schedule_arn" {
   description = "EventBridge Scheduler ARN for recurring worker alert notifications."
   value       = aws_scheduler_schedule.worker_alert_notifier.arn
+}
+
+output "release_gate_schedule_arn" {
+  description = "EventBridge Scheduler ARN for recurring release gate checks."
+  value       = aws_scheduler_schedule.release_gate.arn
 }
 
 output "operations_dashboard_name" {
