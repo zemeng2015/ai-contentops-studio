@@ -2229,7 +2229,9 @@ def _scheduled_pr_checklist(
     if summary.homepage_handoff_ready > 0:
         checklist.append("Apply homepage handoff zip files in a separate homepage repository PR.")
     if report.content_assets_path:
-        checklist.append("Review regenerated feed, promotion brief, and distribution manifest.")
+        checklist.append(
+            "Review regenerated feed, sitemap, promotion brief, and distribution manifest."
+        )
     if failure_reasons:
         checklist.append("Resolve listed failure reasons before merging publishing changes.")
     if report.dry_run:
@@ -2258,7 +2260,7 @@ def _scheduled_workflow_pr_checklist(report: ScheduledWorkflowReviewReport) -> l
     if report.published_count:
         checklist.append("Verify published URLs and generated content assets.")
     if report.content_assets_count:
-        checklist.append("Review generated feed, promotion brief, and distribution manifest.")
+        checklist.append("Review generated feed, sitemap, promotion brief, and manifest.")
     if report.content_assets_failed_count:
         checklist.append("Regenerate failed content distribution assets before merge.")
     if report.handoff_count:

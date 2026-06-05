@@ -212,6 +212,7 @@ GET  /ops-trends
 GET  /content
 POST /content-assets
 GET  /content-assets/feed
+GET  /content-assets/sitemap
 GET  /content-assets/promotion-brief
 GET  /content-assets/manifest
 GET  /config-audit
@@ -425,7 +426,7 @@ Set `homepage_handoff: true` on a job when the homepage publisher is configured 
 run should prepare a reviewable GitHub Pages handoff zip after the draft is generated. The handoff
 path and any handoff error are stored on that job's execution result, and the post-run release
 evidence indexes the zip in `homepage_handoffs.json`.
-When a scheduled execution publishes content, the worker also refreshes `feed.xml`,
+When a scheduled execution publishes content, the worker also refreshes `feed.xml`, `sitemap.xml`,
 `promotion-brief.md`, and `content-distribution-manifest.json` from the publish index before it
 builds release evidence. The receipt records the content asset path, generated files, status, and
 any generation error, so recurring publishing jobs leave both content and distribution evidence.
@@ -505,7 +506,7 @@ Publishing adapters also maintain `contentops-publish-index.json` beside the tar
 machine-readable catalog records published article URLs, run ids, providers, timestamps, and
 quality scores so a homepage, search indexer, RSS generator, or promotion workflow can consume
 published content without scraping HTML.
-Scheduled worker publishes refresh `feed.xml`, `promotion-brief.md`, and
+Scheduled worker publishes refresh `feed.xml`, `sitemap.xml`, `promotion-brief.md`, and
 `content-distribution-manifest.json` automatically. Operators can also run
 `contentops content-assets` after manual publishing to regenerate the same assets for newsletters,
 search indexing, or social promotion. The manifest includes asset hashes, git status, and suggested

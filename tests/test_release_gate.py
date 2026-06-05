@@ -905,6 +905,7 @@ def _write_distribution_manifest(site_dir: Path, dirty: bool) -> None:
                 "output_dir": str(site_dir),
                 "assets": [
                     {"relative_path": "feed.xml", "sha256": "feed-sha"},
+                    {"relative_path": "sitemap.xml", "sha256": "sitemap-sha"},
                     {"relative_path": "promotion-brief.md", "sha256": "brief-sha"},
                     {
                         "relative_path": "content-distribution-manifest.json",

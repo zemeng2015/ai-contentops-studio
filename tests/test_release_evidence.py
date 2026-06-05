@@ -329,6 +329,7 @@ def test_release_evidence_indexes_content_distribution_manifests(
                 "output_dir": str(site_dir),
                 "assets": [
                     {"relative_path": "feed.xml", "sha256": "feed-sha"},
+                    {"relative_path": "sitemap.xml", "sha256": "sitemap-sha"},
                     {"relative_path": "promotion-brief.md", "sha256": "brief-sha"},
                 ],
                 "git": {"is_repository": True, "branch": "main", "dirty": True},
@@ -349,7 +350,7 @@ def test_release_evidence_indexes_content_distribution_manifests(
     assert bundle.content_distribution.items[0].manifest_path == (
         "content-distribution-manifest.json"
     )
-    assert bundle.content_distribution.items[0].asset_count == 2
+    assert bundle.content_distribution.items[0].asset_count == 3
     assert bundle.content_distribution.items[0].sha256 == expected_sha
     assert payload["items"][0]["git"]["branch"] == "main"
     assert "content_distribution.json" in bundle.summary.artifact_files

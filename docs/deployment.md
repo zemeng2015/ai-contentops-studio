@@ -107,9 +107,9 @@ When publishing to a static site or homepage repository, preserve
 and should be committed or deployed with the generated post, eval report, and homepage index so
 downstream automation can discover published content from a stable JSON contract.
 Run `contentops content-assets --output-dir <site-output>` after approved publishes to generate
-`feed.xml` and `promotion-brief.md` from the same index. Deploy `feed.xml` with the site if RSS or
-search discovery matters, and archive the promotion brief with release evidence when a reviewer
-needs to approve external distribution copy.
+`feed.xml`, `sitemap.xml`, and `promotion-brief.md` from the same index. Deploy `feed.xml` and
+`sitemap.xml` with the site if RSS or search discovery matters, and archive the promotion brief
+with release evidence when a reviewer needs to approve external distribution copy.
 The command also writes `content-distribution-manifest.json`, which records file hashes, git
 status, and suggested commit commands for the generated distribution assets.
 The API exposes the same workflow through `POST /content-assets` and read endpoints under
@@ -127,8 +127,8 @@ Release evidence and worker execution receipts use the same bucket and prefix. T
 directories include `s3-mirror-log.json`, which records the bucket, key, content type, status, and
 error message for every standalone artifact mirror attempt.
 When distribution assets have been generated, release evidence also writes
-`content_distribution.json` so deployment reviewers can verify the RSS feed, promotion brief, and
-distribution manifest were prepared with file hashes before the site is deployed.
+`content_distribution.json` so deployment reviewers can verify the RSS feed, sitemap, promotion
+brief, and distribution manifest were prepared with file hashes before the site is deployed.
 When `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` is configured, `contentops retention-archive` mirrors
 retention zip files and archive receipts to S3 and writes a local `s3-mirror-log.json`. The AWS
 retention archive scheduler runs the same command with `retention_archive_schedule_expression`,

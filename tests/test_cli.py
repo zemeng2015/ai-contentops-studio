@@ -378,9 +378,13 @@ def test_cli_approve_then_publish(
     assert '"provider": "static"' in content_result.output
     assert content_assets_result.exit_code == 0
     assert "feed.xml" in content_assets_result.output
+    assert "sitemap.xml" in content_assets_result.output
     assert "promotion-brief.md" in content_assets_result.output
     assert "content-distribution-manifest.json" in content_assets_result.output
     assert "Zack AI Notes" in (content_assets_dir / "feed.xml").read_text(encoding="utf-8")
+    assert "https://example.com" in (content_assets_dir / "sitemap.xml").read_text(
+        encoding="utf-8"
+    )
     assert "CLI approval publish" in (content_assets_dir / "promotion-brief.md").read_text(
         encoding="utf-8"
     )
@@ -390,6 +394,7 @@ def test_cli_approve_then_publish(
     assert distribution_manifest["manifest_type"] == "content_distribution"
     assert {asset["relative_path"] for asset in distribution_manifest["assets"]} == {
         "feed.xml",
+        "sitemap.xml",
         "promotion-brief.md",
         "content-distribution-manifest.json",
     }
@@ -915,6 +920,7 @@ def test_cli_job_execution_commands(
     site_dir = tmp_path / "site"
     site_dir.mkdir()
     (site_dir / "feed.xml").write_text("<rss />", encoding="utf-8")
+    (site_dir / "sitemap.xml").write_text("<urlset />", encoding="utf-8")
     (site_dir / "promotion-brief.md").write_text("# Promotion", encoding="utf-8")
     (site_dir / "content-distribution-manifest.json").write_text("{}", encoding="utf-8")
     report = JobRunner.dry_run_report(load_job_file(path))
@@ -922,6 +928,7 @@ def test_cli_job_execution_commands(
     report.content_assets_status = "generated"
     report.content_assets_files = [
         "feed.xml",
+        "sitemap.xml",
         "promotion-brief.md",
         "content-distribution-manifest.json",
     ]
@@ -1048,7 +1055,7 @@ def test_cli_job_execution_commands(
         "warn",
         "fail",
     }
-    assert "Review generated feed, promotion brief, and distribution manifest." in (
+    assert "Review generated feed, sitemap, promotion brief, and manifest." in (
         pr_metadata_payload["body"]
     )
     assert pr_metadata_payload["checklist"]

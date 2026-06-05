@@ -161,7 +161,7 @@ executions. The worker sends the operations brief before writing final release e
 `ops_brief_deliveries.json` confirms whether the brief notification was skipped locally, delivered,
 or failed for the same evidence window.
 When a scheduled execution publishes content, check `content_assets_status` in the same receipt.
-`generated` means the worker refreshed `feed.xml`, `promotion-brief.md`, and
+`generated` means the worker refreshed `feed.xml`, `sitemap.xml`, `promotion-brief.md`, and
 `content-distribution-manifest.json` before release evidence was built; `failed` means the publish
 index or publishing target needs repair before deployment.
 If a scheduled job declares `homepage_handoff: true`, inspect `homepage_handoff_path` on that job
@@ -183,18 +183,19 @@ For manual publishing outside the worker, generate distribution assets:
 contentops content-assets --output-dir site
 ```
 
-Review `promotion-brief.md` before posting externally, and deploy `feed.xml` with the site when
-the published content should be discoverable by feed readers, search crawlers, or automation.
+Review `promotion-brief.md` before posting externally, and deploy `feed.xml` plus `sitemap.xml`
+with the site when the published content should be discoverable by feed readers, search crawlers,
+or automation.
 Inspect `content-distribution-manifest.json` for the generated file hashes and suggested git
 commands before committing the distribution assets.
 Operators can also generate the same files from the dashboard Published Content section or by
 calling `POST /content-assets`, then download them from `/content-assets/feed`,
-`/content-assets/promotion-brief`, and `/content-assets/manifest`.
+`/content-assets/sitemap`, `/content-assets/promotion-brief`, and `/content-assets/manifest`.
 The next release evidence run will include `content_distribution.json`; confirm it lists the
 expected manifest hash and git status before shipping a site update.
 If `contentops release-gate` reports `content_distribution=warn`, commit or intentionally stage the
-generated feed, promotion brief, and manifest before deployment. If it reports `fail`, regenerate
-distribution assets because the manifest is incomplete.
+generated feed, sitemap, promotion brief, and manifest before deployment. If it reports `fail`,
+regenerate distribution assets because the manifest is incomplete.
 If the gate reports `publish_verification=fail`, run `contentops verify-publish <run_id>` for each
 drifting run in `publish_verifications.json`, then restore the expected target files, republish the
 approved content, or roll the run back before regenerating release evidence.

@@ -259,7 +259,7 @@ def test_job_execution_delivery_summary_writes_json_and_markdown(tmp_path: Path)
         failed=0,
         content_assets_path=str(tmp_path / "site"),
         content_assets_status="generated",
-        content_assets_files=["feed.xml", "promotion-brief.md"],
+        content_assets_files=["feed.xml", "sitemap.xml", "promotion-brief.md"],
         release_evidence_path=str(tmp_path / "release-evidence"),
         release_evidence_status="warn",
         release_evidence_files=["summary.json", "worker_delivery_summaries.json"],
@@ -299,6 +299,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     site_dir.mkdir()
     release_evidence_dir.mkdir()
     (site_dir / "feed.xml").write_text("<feed />", encoding="utf-8")
+    (site_dir / "sitemap.xml").write_text("<urlset />", encoding="utf-8")
     (site_dir / "promotion-brief.md").write_text("Promotion brief", encoding="utf-8")
     (release_evidence_dir / "summary.json").write_text("{}", encoding="utf-8")
     (tmp_path / "summary.md").write_text("# Delivery Summary", encoding="utf-8")
@@ -313,6 +314,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
         content_assets_status="generated",
         content_assets_files=[
             "feed.xml",
+            "sitemap.xml",
             "promotion-brief.md",
             "content-distribution-manifest.json",
         ],
@@ -385,6 +387,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert review.items[0].content_assets_status == "generated"
     assert review.items[0].content_assets_files == [
         "feed.xml",
+        "sitemap.xml",
         "promotion-brief.md",
         "content-distribution-manifest.json",
     ]
@@ -406,7 +409,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert metadata["source_execution_ids"] == [report.execution_id]
     assert "Scheduled ContentOps Publish Review" in metadata["body"]
     assert "Content asset sets: `1`" in metadata["body"]
-    assert "Review generated feed, promotion brief, and distribution manifest." in metadata[
+    assert "Review generated feed, sitemap, promotion brief, and manifest." in metadata[
         "body"
     ]
     assert "Resolve Operations Console action-required signals." in metadata["body"]
@@ -459,6 +462,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert "scheduled-review-verification.json" in names
     assert "scheduled-review-package.json" in names
     assert any(name.endswith("/feed.xml") for name in names)
+    assert any(name.endswith("/sitemap.xml") for name in names)
     assert any(name.endswith("/run-scheduled-homepage-handoff.zip") for name in names)
     packages = list_scheduled_workflow_review_packages(tmp_path)
     assert packages.total == 1

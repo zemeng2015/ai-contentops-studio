@@ -143,6 +143,25 @@ def render_promotion_brief(index_path: Path, *, limit: int = 5) -> str:
     return "\n".join(lines)
 
 
+def render_sitemap(index_path: Path, *, site_url: str = "", limit: int = 100) -> str:
+    entries = load_publish_index_entries(index_path)[:limit]
+    urlset = Element("urlset", {"xmlns": "http://www.sitemaps.org/schemas/sitemap/0.9"})
+    seen_urls: set[str] = set()
+    if site_url:
+        _append_sitemap_url(urlset, site_url, datetime.now(UTC), seen_urls)
+    for entry in entries:
+        url = str(entry.get("url") or "").strip()
+        if not url:
+            continue
+        published_at = _parse_iso_datetime(entry.get("published_at"))
+        _append_sitemap_url(urlset, url, published_at or datetime.now(UTC), seen_urls)
+    return '<?xml version="1.0" encoding="utf-8"?>\n' + tostring(
+        urlset,
+        encoding="unicode",
+        short_empty_elements=False,
+    )
+
+
 def write_distribution_assets(
     index_path: Path,
     output_dir: Path,
@@ -154,6 +173,7 @@ def write_distribution_assets(
 ) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     feed_path = output_dir / "feed.xml"
+    sitemap_path = output_dir / "sitemap.xml"
     brief_path = output_dir / "promotion-brief.md"
     manifest_path = output_dir / "content-distribution-manifest.json"
     feed_path.write_text(
@@ -170,14 +190,19 @@ def write_distribution_assets(
         render_promotion_brief(index_path, limit=min(limit, 10)),
         encoding="utf-8",
     )
+    sitemap_path.write_text(
+        render_sitemap(index_path, site_url=channel_url, limit=limit),
+        encoding="utf-8",
+    )
     _write_distribution_manifest(
         manifest_path,
         index_path=index_path,
         output_dir=output_dir,
-        asset_paths=[feed_path, brief_path, manifest_path],
+        asset_paths=[feed_path, sitemap_path, brief_path, manifest_path],
     )
     return {
         "feed": feed_path,
+        "sitemap": sitemap_path,
         "promotion_brief": brief_path,
         "manifest": manifest_path,
     }
@@ -211,6 +236,33 @@ def _quality(entry: dict[str, Any]) -> dict[str, Any]:
     if isinstance(quality, dict):
         return quality
     return {}
+
+
+def _append_sitemap_url(
+    urlset: Element,
+    loc: str,
+    lastmod: datetime,
+    seen_urls: set[str],
+) -> None:
+    normalized = loc.rstrip("/") if loc != "/" else loc
+    if not normalized or normalized in seen_urls:
+        return
+    seen_urls.add(normalized)
+    item = SubElement(urlset, "url")
+    SubElement(item, "loc").text = loc
+    SubElement(item, "lastmod").text = lastmod.date().isoformat()
+
+
+def _parse_iso_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _write_distribution_manifest(

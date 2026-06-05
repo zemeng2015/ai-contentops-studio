@@ -142,10 +142,12 @@ jobs:
     assert receipt_payload["content_assets_status"] == "generated"
     assert payload["content_assets_files"] == [
         "feed.xml",
+        "sitemap.xml",
         "promotion-brief.md",
         "content-distribution-manifest.json",
     ]
     assert (site_dir / "feed.xml").exists()
+    assert (site_dir / "sitemap.xml").exists()
     assert (site_dir / "promotion-brief.md").exists()
     assert (site_dir / "content-distribution-manifest.json").exists()
     content_distribution = json.loads(

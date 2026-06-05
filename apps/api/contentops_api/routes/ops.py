@@ -679,6 +679,13 @@ def build_ops_router(
         return _content_asset_response(settings, "feed.xml", "application/rss+xml")
 
     @router.get(
+        "/content-assets/sitemap",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_content_sitemap() -> FileResponse:
+        return _content_asset_response(settings, "sitemap.xml", "application/xml")
+
+    @router.get(
         "/content-assets/promotion-brief",
         dependencies=[Depends(require_read_access)],
     )

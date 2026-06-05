@@ -1194,7 +1194,11 @@ def content_catalog(
 def content_assets(
     output_dir: Annotated[
         Path | None,
-        typer.Option("--output-dir", "-o", help="Directory for feed.xml and promotion brief."),
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="Directory for feed.xml, sitemap.xml, promotion brief, and manifest.",
+        ),
     ] = None,
     index_path: Annotated[
         Path | None,
@@ -1222,6 +1226,7 @@ def content_assets(
         limit=limit,
     )
     typer.echo(f"Feed: {assets['feed']}")
+    typer.echo(f"Sitemap: {assets['sitemap']}")
     typer.echo(f"Promotion brief: {assets['promotion_brief']}")
     typer.echo(f"Manifest: {assets['manifest']}")
 

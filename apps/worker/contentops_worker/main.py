@@ -65,7 +65,7 @@ def run_pipeline(
     skip_content_assets: Annotated[
         bool,
         typer.Option(
-            help="Skip post-publish RSS, promotion brief, and distribution manifest output."
+            help="Skip post-publish RSS, sitemap, promotion brief, and manifest output."
         ),
     ] = False,
     skip_delivery_summary: Annotated[

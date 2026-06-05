@@ -455,6 +455,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     content_response = client.get("/content?limit=5")
     content_assets_response = client.post("/content-assets?title=API%20Feed")
     feed_response = client.get("/content-assets/feed")
+    sitemap_response = client.get("/content-assets/sitemap")
     promotion_brief_response = client.get("/content-assets/promotion-brief")
     distribution_manifest_response = client.get("/content-assets/manifest")
     dashboard_response = client.get("/dashboard")
@@ -592,12 +593,15 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert any(item["run_id"] == run["id"] for item in content_response.json()["items"])
     assert content_assets_response.status_code == 200
     assert content_assets_response.json()["feed"].endswith("feed.xml")
+    assert content_assets_response.json()["sitemap"].endswith("sitemap.xml")
     assert content_assets_response.json()["promotion_brief"].endswith("promotion-brief.md")
     assert content_assets_response.json()["manifest"].endswith(
         "content-distribution-manifest.json"
     )
     assert feed_response.status_code == 200
     assert b"API Feed" in feed_response.content
+    assert sitemap_response.status_code == 200
+    assert b"sitemap" in sitemap_response.content
     assert promotion_brief_response.status_code == 200
     assert b"Promotion Brief" in promotion_brief_response.content
     assert distribution_manifest_response.status_code == 200
@@ -759,7 +763,7 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     report.release_evidence_files = ["summary.json", "homepage_handoffs.json"]
     report.content_assets_path = str(tmp_path / "site")
     report.content_assets_status = "generated"
-    report.content_assets_files = ["feed.xml", "promotion-brief.md"]
+    report.content_assets_files = ["feed.xml", "sitemap.xml", "promotion-brief.md"]
     report.delivery_summary_path = str(tmp_path / "delivery-summary.json")
     report.delivery_summary_markdown_path = str(tmp_path / "delivery-summary.md")
     write_job_execution_report(report, job_execution_dir(settings.artifact_root))

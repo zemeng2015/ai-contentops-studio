@@ -111,22 +111,22 @@ The static-site and homepage publishers also upsert `contentops-publish-index.js
 target. The index is a machine-readable content catalog with run ids, public URLs, provider names,
 timestamps, and evaluation scores, giving downstream automation a stable contract for homepage
 aggregation, search indexing, RSS generation, or social promotion without scraping HTML.
-The CLI command `contentops content-assets` consumes that index and writes `feed.xml` plus
-`promotion-brief.md`, separating publishing from distribution so operators can review or automate
-RSS, newsletter, search, and social workflows independently.
+The CLI command `contentops content-assets` consumes that index and writes `feed.xml`,
+`sitemap.xml`, and `promotion-brief.md`, separating publishing from distribution so operators can
+review or automate RSS, search indexing, newsletter, and social workflows independently.
 It also writes `content-distribution-manifest.json` with asset hashes, git repository metadata, and
 suggested commit commands, making distribution files part of the same auditable site release loop
 as generated posts and evaluation reports.
 The same distribution workflow is available through `POST /content-assets` and the dashboard
-Published Content section, with read endpoints for the RSS feed, promotion brief, and distribution
-manifest.
+Published Content section, with read endpoints for the RSS feed, sitemap, promotion brief, and
+distribution manifest.
 Release evidence indexes generated `content-distribution-manifest.json` files in
 `content_distribution.json`, including manifest digests, asset counts, and git status, so CI/CD
 reviews can prove distribution assets were generated and are ready to commit or deploy.
 The release gate includes a `content_distribution` check. It passes for empty sites, warns when
 published content lacks distribution evidence or distribution files are still dirty in git, and
-fails when recorded manifests do not include the expected feed, promotion brief, and manifest
-assets.
+fails when recorded manifests do not include the expected feed, sitemap, promotion brief, and
+manifest assets.
 It also includes `scheduled_review_packages`: verification failures block deployment, while
 verified manifests without archive ZIPs warn so teams can finish audit packaging before promotion.
 Publish verification reads the current target files and compares their hashes against the publish

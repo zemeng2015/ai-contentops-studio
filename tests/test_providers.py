@@ -31,6 +31,40 @@ from contentops_providers.research import (
     enrich_source,
 )
 from contentops_publishing.homepage import HomepagePublisher
+from contentops_publishing.publish_index import render_sitemap
+
+
+def test_publish_index_renders_sitemap_urls(tmp_path: Path) -> None:
+    index_path = tmp_path / "contentops-publish-index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "entries": [
+                    {
+                        "run_id": "run-sitemap",
+                        "title": "Sitemap Ready",
+                        "url": "https://example.com/posts/sitemap-ready.html",
+                        "published_at": "2026-06-05T00:00:00Z",
+                    },
+                    {
+                        "run_id": "run-duplicate",
+                        "title": "Duplicate",
+                        "url": "https://example.com/posts/sitemap-ready.html",
+                        "published_at": "2026-06-04T00:00:00Z",
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    sitemap = render_sitemap(index_path, site_url="https://example.com")
+
+    assert "https://example.com</loc>" in sitemap
+    assert "https://example.com/posts/sitemap-ready.html</loc>" in sitemap
+    assert sitemap.count("<url>") == 2
+    assert "<lastmod>2026-06-05</lastmod>" in sitemap
 
 
 def test_hybrid_research_includes_url_and_local_context(monkeypatch: pytest.MonkeyPatch) -> None:

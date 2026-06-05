@@ -449,12 +449,13 @@ def _content_distribution_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
             },
             remediation_steps=[
                 "Run `contentops content-assets --output-dir <site-output>` after publishing.",
-                "Review `promotion-brief.md` and deploy `feed.xml` with the site.",
+                "Review `promotion-brief.md` and deploy `feed.xml` plus "
+                "`sitemap.xml` with the site.",
                 "Regenerate release evidence so `content_distribution.json` is populated.",
             ],
         )
     incomplete = [
-        item.manifest_path for item in distribution.items if item.asset_count < 3
+        item.manifest_path for item in distribution.items if item.asset_count < 4
     ]
     dirty = [
         item.manifest_path
@@ -481,7 +482,7 @@ def _content_distribution_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
             if status == "pass"
             else [
                 "Regenerate distribution assets with `contentops content-assets`.",
-                "Confirm feed, promotion brief, and distribution manifest are present.",
+                "Confirm feed, sitemap, promotion brief, and distribution manifest are present.",
                 "Commit or intentionally stage distribution asset changes before deployment.",
             ]
         ),
