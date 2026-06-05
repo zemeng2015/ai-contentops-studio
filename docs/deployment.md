@@ -106,6 +106,8 @@ Run `contentops content-assets --output-dir <site-output>` after approved publis
 `feed.xml` and `promotion-brief.md` from the same index. Deploy `feed.xml` with the site if RSS or
 search discovery matters, and archive the promotion brief with release evidence when a reviewer
 needs to approve external distribution copy.
+The command also writes `content-distribution-manifest.json`, which records file hashes, git
+status, and suggested commit commands for the generated distribution assets.
 
 For ECS or Lambda workers, set `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` so each local artifact
 write is mirrored to S3 under:

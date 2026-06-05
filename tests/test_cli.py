@@ -240,10 +240,21 @@ def test_cli_approve_then_publish(
     assert content_assets_result.exit_code == 0
     assert "feed.xml" in content_assets_result.output
     assert "promotion-brief.md" in content_assets_result.output
+    assert "content-distribution-manifest.json" in content_assets_result.output
     assert "Zack AI Notes" in (content_assets_dir / "feed.xml").read_text(encoding="utf-8")
     assert "CLI approval publish" in (content_assets_dir / "promotion-brief.md").read_text(
         encoding="utf-8"
     )
+    distribution_manifest = json.loads(
+        (content_assets_dir / "content-distribution-manifest.json").read_text(encoding="utf-8")
+    )
+    assert distribution_manifest["manifest_type"] == "content_distribution"
+    assert {asset["relative_path"] for asset in distribution_manifest["assets"]} == {
+        "feed.xml",
+        "promotion-brief.md",
+        "content-distribution-manifest.json",
+    }
+    assert "git -C" in distribution_manifest["suggested_commands"][0]
     assert rollback_result.exit_code == 0
     assert '"deleted_files"' in rollback_result.output
     assert audit_result.exit_code == 0

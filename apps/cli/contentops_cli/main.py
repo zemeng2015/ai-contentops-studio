@@ -740,6 +740,7 @@ def content_assets(
     )
     typer.echo(f"Feed: {assets['feed']}")
     typer.echo(f"Promotion brief: {assets['promotion_brief']}")
+    typer.echo(f"Manifest: {assets['manifest']}")
 
 
 @app.command("scorecards")

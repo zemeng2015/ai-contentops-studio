@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from hashlib import sha256
 from html import escape
 from pathlib import Path
+from subprocess import run
 from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
@@ -153,6 +155,7 @@ def write_distribution_assets(
     output_dir.mkdir(parents=True, exist_ok=True)
     feed_path = output_dir / "feed.xml"
     brief_path = output_dir / "promotion-brief.md"
+    manifest_path = output_dir / "content-distribution-manifest.json"
     feed_path.write_text(
         render_rss_feed(
             index_path,
@@ -167,7 +170,17 @@ def write_distribution_assets(
         render_promotion_brief(index_path, limit=min(limit, 10)),
         encoding="utf-8",
     )
-    return {"feed": feed_path, "promotion_brief": brief_path}
+    _write_distribution_manifest(
+        manifest_path,
+        index_path=index_path,
+        output_dir=output_dir,
+        asset_paths=[feed_path, brief_path, manifest_path],
+    )
+    return {
+        "feed": feed_path,
+        "promotion_brief": brief_path,
+        "manifest": manifest_path,
+    }
 
 
 def _read_index(index_path: Path) -> dict[str, object]:
@@ -198,6 +211,87 @@ def _quality(entry: dict[str, Any]) -> dict[str, Any]:
     if isinstance(quality, dict):
         return quality
     return {}
+
+
+def _write_distribution_manifest(
+    manifest_path: Path,
+    *,
+    index_path: Path,
+    output_dir: Path,
+    asset_paths: list[Path],
+) -> None:
+    relative_paths = [_relative_path(path, output_dir) for path in asset_paths]
+    add_paths = " ".join(relative_paths)
+    quoted_dir = str(output_dir).replace('"', '\\"')
+    payload = {
+        "manifest_type": "content_distribution",
+        "schema_version": 1,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "publish_index": str(index_path),
+        "output_dir": str(output_dir),
+        "assets": [
+            {
+                "name": path.name,
+                "path": str(path),
+                "relative_path": _relative_path(path, output_dir),
+                "sha256": _file_sha256(path) if path.exists() else None,
+            }
+            for path in asset_paths
+        ],
+        "git": _git_metadata(output_dir),
+        "suggested_commands": [
+            f'git -C "{quoted_dir}" status --short',
+            f'git -C "{quoted_dir}" add {add_paths}',
+            f'git -C "{quoted_dir}" commit -m "Publish content distribution assets"',
+            f'git -C "{quoted_dir}" push',
+        ],
+    }
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _file_sha256(path: Path) -> str:
+    return sha256(path.read_bytes()).hexdigest()
+
+
+def _relative_path(path: Path, root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(root.resolve())).replace("\\", "/")
+    except ValueError:
+        return path.name
+
+
+def _git_metadata(repo: Path) -> dict[str, object]:
+    if not (repo / ".git").exists():
+        return {
+            "is_repository": False,
+            "branch": None,
+            "commit": None,
+            "dirty": None,
+            "status_entries": [],
+        }
+    branch = _git_output(repo, "branch", "--show-current")
+    commit = _git_output(repo, "rev-parse", "--short", "HEAD")
+    status = _git_output(repo, "status", "--short")
+    status_entries = [line for line in status.splitlines() if line]
+    return {
+        "is_repository": True,
+        "branch": branch or "detached",
+        "commit": commit or None,
+        "dirty": bool(status_entries),
+        "status_entries": status_entries,
+    }
+
+
+def _git_output(repo: Path, *args: str) -> str:
+    result = run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
 
 
 def _rss_date(value: object) -> str | None:

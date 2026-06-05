@@ -341,7 +341,9 @@ machine-readable catalog records published article URLs, run ids, providers, tim
 quality scores so a homepage, search indexer, RSS generator, or promotion workflow can consume
 published content without scraping HTML.
 Run `contentops content-assets` after publishing to turn that catalog into `feed.xml` and
-`promotion-brief.md` for newsletters, search indexing, or social promotion.
+`promotion-brief.md` for newsletters, search indexing, or social promotion. The command also
+writes `content-distribution-manifest.json` with asset hashes, git status, and suggested
+`git add`, `commit`, and `push` commands for the site repository.
 The search provider records its planned query variants, selected URLs, result counts, and
 enrichment mode in `research.json`, which makes recurring web research easier to audit.
 

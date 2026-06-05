@@ -114,6 +114,9 @@ aggregation, search indexing, RSS generation, or social promotion without scrapi
 The CLI command `contentops content-assets` consumes that index and writes `feed.xml` plus
 `promotion-brief.md`, separating publishing from distribution so operators can review or automate
 RSS, newsletter, search, and social workflows independently.
+It also writes `content-distribution-manifest.json` with asset hashes, git repository metadata, and
+suggested commit commands, making distribution files part of the same auditable site release loop
+as generated posts and evaluation reports.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,
