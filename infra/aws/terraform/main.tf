@@ -550,7 +550,7 @@ resource "aws_iam_role_policy" "scheduler_run_worker" {
         Action = [
           "ecs:RunTask"
         ]
-        Effect   = "Allow"
+        Effect = "Allow"
         Resource = [
           aws_ecs_task_definition.worker.arn,
           aws_ecs_task_definition.worker_alert_notifier.arn
