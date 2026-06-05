@@ -48,7 +48,7 @@ Status: complete.
 
 ## Phase 4: Live Provider And Scheduled Operations
 
-Status: active.
+Status: complete.
 
 - Keep the manual Integration Smoke workflow dry-run by default.
 - Run live provider smoke checks only with explicit `workflow_dispatch` and configured secrets.
@@ -57,6 +57,8 @@ Status: active.
   review packages to every scheduled automation run.
 
 ## Phase 5: Release And Deployment Readiness
+
+Status: active.
 
 - Require a passing release gate report before production deployment.
 - Require a matching release approval record for protected deployment environments.

@@ -120,6 +120,14 @@ jobs:
         run: python scripts/check_security_baseline.py --output security-baseline/security-baseline.json
       - name: Operations policy baseline
         run: python scripts/check_operations_policy.py --output security-baseline/operations-policy.json
+      - name: Release evidence comparison smoke
+        run: |
+          python scripts/generate_release_evidence.py --output-dir security-baseline/release-evidence-base
+          cp -R security-baseline/release-evidence-base security-baseline/release-evidence-candidate
+          python scripts/compare_release_evidence.py \
+            --base-dir security-baseline/release-evidence-base \
+            --candidate-dir security-baseline/release-evidence-candidate \
+            --output security-baseline/release-evidence-comparison.json
       - name: Python dependency audit
         run: |
           mkdir -p security-baseline

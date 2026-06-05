@@ -110,6 +110,8 @@ def test_ci_validates_terraform() -> None:
     assert "scripts/check_security_baseline.py" in workflow
     assert "Operations policy baseline" in workflow
     assert "scripts/check_operations_policy.py" in workflow
+    assert "Release evidence comparison smoke" in workflow
+    assert "scripts/compare_release_evidence.py" in workflow
     assert "python -m pip_audit --skip-editable" in workflow
     assert "security-baseline" in workflow
 
@@ -129,6 +131,11 @@ def test_long_term_ci_plan_documents_quality_roadmap() -> None:
     assert "Terraform security checks" in plan
     assert "workflow_dispatch" in plan
     assert "scheduled ContentOps artifacts" in plan
+    assert "Release And Deployment Readiness" in plan
+    assert (
+        "Release evidence from the candidate commit" in plan
+        or "release evidence from the candidate commit" in plan
+    )
     assert "docs/ci-plan.md" in readme
 
 
@@ -168,6 +175,24 @@ def test_phase_four_operations_policy_exists() -> None:
     assert "scheduled:review-only-execution" in operations_policy
     assert "scheduled:publish-intent-guarded" in operations_policy
     assert "--review-only" in scheduled
+
+
+def test_phase_five_release_readiness_workflow_exists() -> None:
+    workflow = Path(".github/workflows/release-readiness.yml").read_text(encoding="utf-8")
+    comparison = Path("scripts/compare_release_evidence.py").read_text(encoding="utf-8")
+
+    assert "name: Release Readiness" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "environment: ${{ inputs.environment_name }}" in workflow
+    assert "require_approval" in workflow
+    assert "scripts/generate_deployment_check.py" in workflow
+    assert "scripts/generate_release_evidence.py" in workflow
+    assert "scripts/check_release_evidence_regression.py" in workflow
+    assert "scripts/compare_release_evidence.py" in workflow
+    assert "--strict" in workflow
+    assert "actions/upload-artifact@v7" in workflow
+    assert "ReleaseEvidenceComparison" in comparison
+    assert "missing_from_candidate" in comparison
 
 
 def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
