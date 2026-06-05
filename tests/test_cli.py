@@ -56,6 +56,18 @@ def test_cli_doctor_reports_system_status(
     config_audit_result = runner.invoke(app, ["config-audit", "--json"])
     provider_health_result = runner.invoke(app, ["provider-health", "--json"])
     smoke_plan_result = runner.invoke(app, ["integration-smoke-plan", "--json"])
+    smoke_run_output = tmp_path / "smoke-run.json"
+    smoke_run_result = runner.invoke(
+        app,
+        [
+            "integration-smoke-run",
+            "--selector",
+            "openai",
+            "--output",
+            str(smoke_run_output),
+            "--json",
+        ],
+    )
     manifest_result = runner.invoke(app, ["deployment-manifest"])
     deployment_check_result = runner.invoke(app, ["deployment-check", "--json"])
     release_result = runner.invoke(app, ["release-readiness", "--json"])
@@ -64,10 +76,13 @@ def test_cli_doctor_reports_system_status(
     assert config_audit_result.exit_code == 0
     assert provider_health_result.exit_code == 0
     assert smoke_plan_result.exit_code == 0
+    assert smoke_run_result.exit_code == 0
+    assert smoke_run_output.exists()
     payload = json.loads(result.output)
     config_payload = json.loads(config_audit_result.output)
     provider_payload = json.loads(provider_health_result.output)
     smoke_payload = json.loads(smoke_plan_result.output)
+    smoke_run_payload = json.loads(smoke_run_result.output)
     assert config_payload["redacted"] is True
     assert "items" in config_payload
     assert {item["category"] for item in provider_payload["items"]} >= {
@@ -81,6 +96,8 @@ def test_cli_doctor_reports_system_status(
         item["name"] == "feed" and "CONTENTOPS_RUN_INTEGRATION" in item["missing_env"]
         for item in smoke_payload["items"]
     )
+    assert smoke_run_payload["items"][0]["name"] == "openai"
+    assert smoke_run_payload["items"][0]["status"] == "skip"
     assert payload["status"] in {"ok", "degraded"}
     assert {check["name"] for check in payload["checks"]} >= {
         "database",

@@ -257,6 +257,9 @@ cache configuration, and provider-specific warnings.
 Use `contentops integration-smoke-plan --json` or `GET /integration-smoke-plan` to see which
 optional live provider smoke tests are ready to run, which environment variables are missing, and
 the exact pytest selector for each provider path.
+Use `contentops integration-smoke-run --output artifacts/integration-smoke/report.json --json`
+after setting live credentials to execute those provider checks and keep a JSON evidence report
+with per-provider exit codes and output tails.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.

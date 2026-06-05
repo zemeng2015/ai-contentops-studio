@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 from contentops_core.config_templates import render_env_template
@@ -12,6 +15,8 @@ from contentops_core.models import (
     DeploymentManifest,
     IntegrationSmokePlanItem,
     IntegrationSmokePlanReport,
+    IntegrationSmokeRunItem,
+    IntegrationSmokeRunReport,
     OperationsSummary,
     ProviderHealthItem,
     ProviderHealthReport,
@@ -113,6 +118,116 @@ def integration_smoke_plan(settings: Settings) -> IntegrationSmokePlanReport:
     )
 
 
+def run_integration_smoke(
+    settings: Settings,
+    *,
+    selected: list[str] | None = None,
+    output_path: Path | None = None,
+    dry_run: bool = False,
+    force: bool = False,
+) -> IntegrationSmokeRunReport:
+    plan = integration_smoke_plan(settings)
+    selected_names = [name.strip() for name in selected or [] if name.strip()]
+    selected_items = [
+        item for item in plan.items if not selected_names or item.name in selected_names
+    ]
+    unknown = sorted(set(selected_names) - {item.name for item in plan.items})
+    items: list[IntegrationSmokeRunItem] = []
+    started = time.monotonic()
+
+    for name in unknown:
+        items.append(
+            IntegrationSmokeRunItem(
+                name=name,
+                category="unknown",
+                status="fail",
+                command="",
+                missing_env=[],
+                stderr_tail=f"Unknown integration smoke selector: {name}",
+            )
+        )
+
+    for item in selected_items:
+        if dry_run:
+            items.append(
+                IntegrationSmokeRunItem(
+                    name=item.name,
+                    category=item.category,
+                    status="planned",
+                    command=item.command,
+                    missing_env=item.missing_env,
+                )
+            )
+            continue
+        if item.missing_env and not force:
+            items.append(
+                IntegrationSmokeRunItem(
+                    name=item.name,
+                    category=item.category,
+                    status="skip",
+                    command=item.command,
+                    missing_env=item.missing_env,
+                    stderr_tail="Missing required environment variables.",
+                )
+            )
+            continue
+        command = [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-m",
+            "integration",
+            "tests/test_integration_smoke.py",
+            "-k",
+            item.name,
+        ]
+        item_started = time.monotonic()
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        duration = round(time.monotonic() - item_started, 3)
+        status = "pass" if completed.returncode == 0 else "fail"
+        items.append(
+            IntegrationSmokeRunItem(
+                name=item.name,
+                category=item.category,
+                status=status,
+                command=" ".join(command),
+                exit_code=completed.returncode,
+                duration_seconds=duration,
+                missing_env=item.missing_env,
+                stdout_tail=_tail(completed.stdout),
+                stderr_tail=_tail(completed.stderr),
+            )
+        )
+
+    summary = {
+        "pass": sum(1 for item in items if item.status == "pass"),
+        "fail": sum(1 for item in items if item.status == "fail"),
+        "skip": sum(1 for item in items if item.status == "skip"),
+        "planned": sum(1 for item in items if item.status == "planned"),
+    }
+    status = "fail" if summary["fail"] else "warn" if summary["skip"] else "pass"
+    report = IntegrationSmokeRunReport(
+        status=status,
+        integration_enabled=plan.integration_enabled,
+        dry_run=dry_run,
+        force=force,
+        selected=selected_names,
+        items=items,
+        summary=summary,
+        total_duration_seconds=round(time.monotonic() - started, 3),
+        artifact_path=str(output_path) if output_path else None,
+    )
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    return report
+
+
 def deployment_manifest(
     settings: Settings,
     repository: RunRepository,
@@ -203,6 +318,13 @@ def _integration_smoke_item(
         missing_env=missing,
         notes=notes,
     )
+
+
+def _tail(value: str, limit: int = 4000) -> str:
+    value = value.strip()
+    if len(value) <= limit:
+        return value
+    return value[-limit:]
 
 
 def _database_check(repository: RunRepository) -> ComponentCheck:

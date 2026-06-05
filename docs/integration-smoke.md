@@ -14,22 +14,27 @@ The same report is available from `GET /integration-smoke-plan`. It lists each p
 selector, the required environment variables, and any missing values before an operator opts into
 the live pytest run.
 
-Run all live smoke tests:
+Run all live smoke tests and persist a machine-readable report:
 
 ```powershell
 $env:CONTENTOPS_RUN_INTEGRATION="1"
 $env:CONTENTOPS_OPENAI_API_KEY="..."
 $env:CONTENTOPS_RESEARCH_SEARCH_API_KEY="..."
 $env:CONTENTOPS_HOMEPAGE_REPO_PATH="C:\path\to\zack-ai-homepage"
-pytest -m integration tests/test_integration_smoke.py
+contentops integration-smoke-run --output artifacts/integration-smoke/report.json --json
 ```
 
 Run only the public feed smoke test:
 
 ```powershell
 $env:CONTENTOPS_RUN_INTEGRATION="1"
-pytest -m integration tests/test_integration_smoke.py -k feed
+contentops integration-smoke-run --selector feed --output artifacts/integration-smoke/feed.json
 ```
+
+The runner executes each provider smoke path separately and records status, command, exit code,
+duration, missing environment variables, and stdout/stderr tails. Use `--dry-run` to write the
+planned commands without executing pytest, or `--force` to run pytest even when the planner sees
+missing environment variables.
 
 Environment variables:
 

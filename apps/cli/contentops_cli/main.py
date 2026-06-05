@@ -14,6 +14,7 @@ from contentops_core.diagnostics import (
     integration_smoke_plan,
     provider_health,
     release_readiness,
+    run_integration_smoke,
     system_status,
 )
 from contentops_core.factory import build_pipeline, build_review_service
@@ -254,6 +255,51 @@ def show_integration_smoke_plan(
         typer.echo(f"- {item.category}/{item.name}: {item.status} -> {item.command}")
         if item.missing_env:
             typer.echo(f"  missing env: {', '.join(item.missing_env)}")
+    raise typer.Exit(0 if report.status != "fail" else 1)
+
+
+@app.command("integration-smoke-run")
+def integration_smoke_run(
+    selector: Annotated[
+        list[str] | None,
+        typer.Option("--selector", "-k", help="Provider smoke name to run. Repeatable."),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Optional JSON report path."),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(help="Only report selected smoke commands without executing pytest."),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option(help="Run pytest even when required smoke environment variables are missing."),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    report = run_integration_smoke(
+        Settings(),
+        selected=selector,
+        output_path=output,
+        dry_run=dry_run,
+        force=force,
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.status != "fail" else 1)
+    typer.echo(f"Status: {report.status}")
+    if report.artifact_path:
+        typer.echo(f"Report: {report.artifact_path}")
+    for item in report.items:
+        typer.echo(f"- {item.category}/{item.name}: {item.status} -> {item.command}")
+        if item.missing_env:
+            typer.echo(f"  missing env: {', '.join(item.missing_env)}")
+        if item.exit_code is not None:
+            typer.echo(f"  exit code: {item.exit_code}")
     raise typer.Exit(0 if report.status != "fail" else 1)
 
 

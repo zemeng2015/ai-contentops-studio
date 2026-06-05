@@ -667,6 +667,31 @@ class IntegrationSmokePlanReport(BaseModel):
     summary: dict[str, int] = Field(default_factory=dict)
 
 
+class IntegrationSmokeRunItem(BaseModel):
+    name: str
+    category: str
+    status: str
+    command: str
+    exit_code: int | None = None
+    duration_seconds: float = 0.0
+    missing_env: list[str] = Field(default_factory=list)
+    stdout_tail: str = ""
+    stderr_tail: str = ""
+
+
+class IntegrationSmokeRunReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    integration_enabled: bool
+    dry_run: bool = False
+    force: bool = False
+    selected: list[str] = Field(default_factory=list)
+    items: list[IntegrationSmokeRunItem]
+    summary: dict[str, int] = Field(default_factory=dict)
+    total_duration_seconds: float = 0.0
+    artifact_path: str | None = None
+
+
 class SystemStatus(BaseModel):
     status: str
     checks: list[ComponentCheck]

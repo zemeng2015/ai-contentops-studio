@@ -11,6 +11,7 @@ from contentops_core.diagnostics import (
     deployment_manifest,
     integration_smoke_plan,
     provider_health,
+    run_integration_smoke,
     system_status,
 )
 from contentops_core.factory import build_pipeline, build_review_service
@@ -804,6 +805,29 @@ def test_integration_smoke_plan_reports_missing_live_credentials(
     assert search.status == "warn"
     assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in search.missing_env
     assert "pytest -m integration" in search.command
+
+
+def test_run_integration_smoke_writes_skip_report_for_missing_credentials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CONTENTOPS_RUN_INTEGRATION", raising=False)
+    monkeypatch.delenv("CONTENTOPS_OPENAI_API_KEY", raising=False)
+    output_path = tmp_path / "smoke" / "report.json"
+
+    report = run_integration_smoke(
+        Settings(artifact_root=tmp_path / "artifacts"),
+        selected=["openai"],
+        output_path=output_path,
+    )
+
+    assert report.status == "warn"
+    assert report.summary["skip"] == 1
+    assert report.items[0].name == "openai"
+    assert "CONTENTOPS_OPENAI_API_KEY" in report.items[0].missing_env
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["artifact_path"] == str(output_path)
+    assert payload["items"][0]["status"] == "skip"
 
 
 def test_system_status_reports_static_publishing_readiness(tmp_path: Path) -> None:
