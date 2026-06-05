@@ -2189,7 +2189,10 @@ def _retention_archives_html(
     archives: RetentionArchiveListResponse | RetentionArchiveEvidence | None,
 ) -> str:
     if archives is None or not archives.items:
-        return "<p>No retention archives recorded.</p>"
+        return (
+            "<p>No retention archives recorded. "
+            "S3 mirror status appears after archive creation.</p>"
+        )
     rows = "".join(
         f"""
         <tr>
