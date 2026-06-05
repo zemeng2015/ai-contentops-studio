@@ -71,7 +71,51 @@ def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
     assert report.latest_release_approval.approval_id == approval.approval_id
     assert report.config_audit is not None
     assert report.config_audit.redacted is True
-    assert "configuration_audit" in {check.name for check in report.checks}
+    check_names = {check.name for check in report.checks}
+    assert "configuration_audit" in check_names
+    assert "content_distribution" in check_names
+
+
+def test_release_gate_warns_for_dirty_distribution_assets(tmp_path: Path) -> None:
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=site_dir,
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    _write_distribution_manifest(site_dir, dirty=True)
+    approve_release(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        request=ReleaseApprovalRequest(
+            decision=ReleaseApprovalDecision.APPROVED,
+            approver="zack",
+            notes="Distribution evidence reviewed.",
+        ),
+        git_sha="release-sha",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="release-sha",
+    )
+
+    distribution_check = next(
+        check for check in report.checks if check.name == "content_distribution"
+    )
+    assert report.status == "warn"
+    assert report.can_deploy is False
+    assert distribution_check.status == "warn"
+    assert distribution_check.evidence["dirty_git_manifests"] == [
+        "content-distribution-manifest.json"
+    ]
+    assert "content-assets" in distribution_check.remediation_steps[0]
 
 
 def test_release_gate_fails_when_approval_git_sha_does_not_match(tmp_path: Path) -> None:
@@ -228,6 +272,27 @@ def _write_source_review(run_dir: Path, decision: str) -> None:
                     "decided_at": "2026-06-05T00:00:00Z",
                 }
             ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_distribution_manifest(site_dir: Path, dirty: bool) -> None:
+    (site_dir / "content-distribution-manifest.json").write_text(
+        json.dumps(
+            {
+                "manifest_type": "content_distribution",
+                "output_dir": str(site_dir),
+                "assets": [
+                    {"relative_path": "feed.xml", "sha256": "feed-sha"},
+                    {"relative_path": "promotion-brief.md", "sha256": "brief-sha"},
+                    {
+                        "relative_path": "content-distribution-manifest.json",
+                        "sha256": "manifest-sha",
+                    },
+                ],
+                "git": {"is_repository": True, "branch": "main", "dirty": dirty},
+            }
         ),
         encoding="utf-8",
     )

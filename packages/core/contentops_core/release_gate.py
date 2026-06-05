@@ -42,6 +42,7 @@ def release_gate(
     checks = [
         _release_readiness_check(bundle),
         _source_review_governance_check(bundle),
+        _content_distribution_check(bundle),
         _deployment_preflight_check(bundle),
         _configuration_audit_check(audit),
         _approval_check(bundle, require_approval),
@@ -181,6 +182,69 @@ def _source_review_governance_check(bundle: ReleaseEvidenceBundle) -> ReleaseGat
             "total_decisions": source_reviews.total_decisions,
             "needs_review_count": source_reviews.needs_review_count,
         },
+    )
+
+
+def _content_distribution_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    distribution = bundle.content_distribution
+    published_count = bundle.operations_summary.published_count
+    if distribution.total == 0:
+        if published_count == 0:
+            return ReleaseGateItem(
+                name="content_distribution",
+                status="pass",
+                message="No published content requires distribution assets.",
+                evidence={
+                    "published_count": published_count,
+                    "distribution_manifest_count": distribution.total,
+                },
+            )
+        return ReleaseGateItem(
+            name="content_distribution",
+            status="warn",
+            message="Published content has no recorded distribution assets.",
+            evidence={
+                "published_count": published_count,
+                "distribution_manifest_count": distribution.total,
+            },
+            remediation_steps=[
+                "Run `contentops content-assets --output-dir <site-output>` after publishing.",
+                "Review `promotion-brief.md` and deploy `feed.xml` with the site.",
+                "Regenerate release evidence so `content_distribution.json` is populated.",
+            ],
+        )
+    incomplete = [
+        item.manifest_path for item in distribution.items if item.asset_count < 3
+    ]
+    dirty = [
+        item.manifest_path
+        for item in distribution.items
+        if item.git.get("is_repository") and item.git.get("dirty")
+    ]
+    status = "fail" if incomplete else "warn" if dirty else "pass"
+    return ReleaseGateItem(
+        name="content_distribution",
+        status=status,
+        message=(
+            "Content distribution assets are recorded and clean."
+            if status == "pass"
+            else "Content distribution assets need operator review before deployment."
+        ),
+        evidence={
+            "published_count": published_count,
+            "distribution_manifest_count": distribution.total,
+            "incomplete_manifests": incomplete,
+            "dirty_git_manifests": dirty,
+        },
+        remediation_steps=(
+            []
+            if status == "pass"
+            else [
+                "Regenerate distribution assets with `contentops content-assets`.",
+                "Confirm feed, promotion brief, and distribution manifest are present.",
+                "Commit or intentionally stage distribution asset changes before deployment.",
+            ]
+        ),
     )
 
 

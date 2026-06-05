@@ -123,6 +123,10 @@ manifest.
 Release evidence indexes generated `content-distribution-manifest.json` files in
 `content_distribution.json`, including manifest digests, asset counts, and git status, so CI/CD
 reviews can prove distribution assets were generated and are ready to commit or deploy.
+The release gate includes a `content_distribution` check. It passes for empty sites, warns when
+published content lacks distribution evidence or distribution files are still dirty in git, and
+fails when recorded manifests do not include the expected feed, promotion brief, and manifest
+assets.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,

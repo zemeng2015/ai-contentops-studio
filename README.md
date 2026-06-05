@@ -217,9 +217,9 @@ deployment is approved.
 Release approval records capture the approver, decision, notes, force flag, release/deployment
 status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 `release-gate` combines readiness, deployment preflight, redacted configuration audit, approval
-state, and git SHA matching into a single CI/CD pass/fail report. Each check includes
-`remediation_steps`, giving operators concrete next actions when approval, configuration, source
-governance, or deployment preflight blocks a release.
+state, content distribution readiness, and git SHA matching into a single CI/CD pass/fail report.
+Each check includes `remediation_steps`, giving operators concrete next actions when approval,
+configuration, source governance, content distribution, or deployment preflight blocks a release.
 CI uploads `release-gate/release-gate.json` as a non-blocking report; deployment jobs can rerun the
 same command with `--strict` after an approval exists.
 Use `--record` to store local gate history under `artifacts/release-gates`, which is also exposed

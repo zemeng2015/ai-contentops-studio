@@ -113,6 +113,9 @@ calling `POST /content-assets`, then download them from `/content-assets/feed`,
 `/content-assets/promotion-brief`, and `/content-assets/manifest`.
 The next release evidence run will include `content_distribution.json`; confirm it lists the
 expected manifest hash and git status before shipping a site update.
+If `contentops release-gate` reports `content_distribution=warn`, commit or intentionally stage the
+generated feed, promotion brief, and manifest before deployment. If it reports `fail`, regenerate
+distribution assets because the manifest is incomplete.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when
