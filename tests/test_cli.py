@@ -408,6 +408,7 @@ def test_cli_queue_and_manifest_commands(
         ["incident-reports", "--query", "searchable", "--json"],
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
+    operations_console_result = runner.invoke(app, ["operations-console", "--days", "7", "--json"])
     ops_brief_result = runner.invoke(app, ["ops-brief", "--days", "7", "--json"])
     ops_brief_notify_result = runner.invoke(app, ["ops-brief-notify", "--days", "7"])
     ops_brief_notifications_result = runner.invoke(app, ["ops-brief-notifications"])
@@ -470,6 +471,14 @@ def test_cli_queue_and_manifest_commands(
     ops_summary_payload = json.loads(ops_summary_result.output)
     assert ops_summary_payload["total_runs"] == 1
     assert ops_summary_payload["review_queue_depth"] == 1
+    assert operations_console_result.exit_code == 0
+    operations_console_payload = json.loads(operations_console_result.output)
+    assert operations_console_payload["summary"]["status"] in {"pass", "warn", "fail"}
+    assert operations_console_payload["summary"]["release_gate_status"] in {
+        "pass",
+        "warn",
+        "fail",
+    }
     assert ops_brief_result.exit_code == 0
     ops_brief_payload = json.loads(ops_brief_result.output)
     assert ops_brief_payload["days"] == 7
@@ -495,6 +504,9 @@ def test_cli_queue_and_manifest_commands(
     assert release_evidence_result.exit_code == 0
     release_evidence_payload = json.loads(release_evidence_result.output)
     assert release_evidence_payload["summary"]["can_release"] is True
+    assert release_evidence_payload["operations_console"]["summary"]["release_gate_status"] == (
+        "not_evaluated"
+    )
     assert release_evidence_payload["operations_summary"]["total_runs"] == 1
     assert release_evidence_payload["ops_brief"]["summary"]["total_runs"] == 1
     assert release_evidence_payload["ops_brief_deliveries"]
@@ -508,6 +520,7 @@ def test_cli_queue_and_manifest_commands(
     assert release_evidence_payload["worker_execution_trends"]["summary"]["execution_count"] >= 0
     assert (release_evidence_dir / "summary.json").exists()
     assert (release_evidence_dir / "content_distribution.json").exists()
+    assert (release_evidence_dir / "operations_console.json").exists()
     assert (release_evidence_dir / "publish_recovery_executions.json").exists()
     assert (release_evidence_dir / "publish_verifications.json").exists()
     assert (release_evidence_dir / "deployment_check.json").exists()

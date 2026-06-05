@@ -9,7 +9,9 @@ from typing import Annotated
 from contentops_core.config_audit import config_audit
 from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.jobs import (
+    JobExecutionAlertReport,
     JobExecutionReport,
+    JobExecutionTrendReport,
     JobRunner,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -29,12 +31,14 @@ from contentops_core.models import (
     ArtifactMirrorRecord,
     ReleaseApprovalDecision,
     ReleaseApprovalRequest,
+    ReleaseGateReport,
     RunMetrics,
     RunRequest,
     RunStatus,
     SourceReviewDecision,
     SourceReviewRequest,
 )
+from contentops_core.operations_console import build_operations_console
 from contentops_core.ops_brief import (
     build_ops_brief,
     notify_ops_brief,
@@ -366,31 +370,12 @@ def build_dashboard_router(
         window_size: int = Query(default=100, ge=1, le=500),
         api_key: str = Query(default=""),
     ) -> HTMLResponse:
-        operations_summary = review_service.operations_summary(window_size=window_size)
-        ops_brief = build_ops_brief(
-            settings=settings,
-            review_service=review_service,
-            days=days,
-            window_size=window_size,
-        )
-        worker_trends = job_execution_trends(
-            job_execution_dir(settings.artifact_root),
-            days=days,
-        )
-        worker_alerts = job_execution_alert_report(
-            job_execution_dir(settings.artifact_root),
-            days=days,
-        )
-        retention_report = review_service.retention_report()
-        retention_archives = review_service.retention_archives(limit=5)
-        gate = release_gate(
+        report = build_operations_console(
             settings=settings,
             repository=repository,
             review_service=review_service,
-            require_approval=False,
-        )
-        retention_gate = next(
-            check for check in gate.checks if check.name == "retention_archive_governance"
+            days=days,
+            window_size=window_size,
         )
         return HTMLResponse(
             _page(
@@ -405,28 +390,32 @@ def build_dashboard_router(
                   </p>
                   <div class="metrics">
                     <div>
-                      <strong>{escape(ops_brief.status)}</strong><span>Brief status</span>
+                      <strong>{escape(report.summary.brief_status)}</strong>
+                      <span>Brief status</span>
                     </div>
                     <div>
-                      <strong>{operations_summary.review_queue_depth}</strong>
+                      <strong>{report.summary.review_queue_depth}</strong>
                       <span>Review queue</span>
                     </div>
                     <div>
-                      <strong>{operations_summary.action_required_incidents}</strong>
+                      <strong>{report.summary.action_required_incidents}</strong>
                       <span>Incidents</span>
                     </div>
                     <div>
-                      <strong>{escape(gate.status)}</strong><span>Release gate</span>
+                      <strong>{escape(report.summary.release_gate_status)}</strong>
+                      <span>Release gate</span>
                     </div>
                     <div>
-                      <strong>{escape(retention_gate.status)}</strong><span>Retention gate</span>
+                      <strong>{escape(report.summary.retention_gate_status)}</strong>
+                      <span>Retention gate</span>
                     </div>
                     <div>
-                      <strong>{worker_trends.summary.success_rate:.0%}</strong>
+                      <strong>{report.summary.worker_success_rate:.0%}</strong>
                       <span>Worker success</span>
                     </div>
                   </div>
                   <p>
+                    <a href="/operations-console">Operations console JSON</a> |
                     <a href="/dashboard/ops-brief">Ops brief</a> |
                     <a href="/dashboard/ops-trends">Operations trends</a> |
                     <a href="/dashboard/job-execution-trends">Worker health</a> |
@@ -437,25 +426,29 @@ def build_dashboard_router(
                 </section>
                 <section class="hero compact">
                   <h2>Operations Summary</h2>
-                  {_operations_summary_html(operations_summary)}
+                  {_operations_summary_html(report.operations_summary)}
                 </section>
                 <section class="hero compact">
                   <h2>Daily Brief</h2>
-                  {_ops_brief_html(ops_brief)}
+                  {_ops_brief_html(report.ops_brief)}
                 </section>
                 <section class="hero compact">
                   <h2>Worker Automation</h2>
-                  {_job_execution_trends_html(worker_trends)}
+                  {_job_execution_trends_html(
+                    JobExecutionTrendReport.model_validate(report.worker_execution_trends)
+                  )}
                   <h2>Worker Alerts</h2>
-                  {_job_execution_alerts_html(worker_alerts)}
+                  {_job_execution_alerts_html(
+                    JobExecutionAlertReport.model_validate(report.worker_execution_alerts)
+                  )}
                 </section>
                 <section class="hero compact">
                   <h2>Release Gate</h2>
-                  {_release_gate_html(gate)}
+                  {_release_gate_html(ReleaseGateReport.model_validate(report.release_gate))}
                 </section>
                 <section class="hero compact">
                   <h2>Retention Governance</h2>
-                  {_retention_report_html(retention_report, retention_archives)}
+                  {_retention_report_html(report.retention_report, report.retention_archives)}
                 </section>
                 """,
             )

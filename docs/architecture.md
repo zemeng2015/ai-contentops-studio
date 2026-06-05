@@ -158,6 +158,11 @@ top risks, and recommended actions through `/ops-brief`, `contentops ops-brief`,
 Operators can also deliver the brief through `contentops ops-brief-notify` or
 `POST /ops-brief/notify`. Each attempt writes `ops-brief-notification-log.json`, and release
 evidence indexes those receipts in `ops_brief_deliveries.json` for auditability.
+The operations console is the operator-facing rollup above the brief. It combines the operations
+summary, daily brief, worker execution trends, worker alerts, release gate, retention report, and
+recent archive receipts into one machine-readable report exposed through `/operations-console`,
+`contentops operations-console`, `/dashboard/operations`, and release evidence
+`operations_console.json`.
 The deployment manifest reuses readiness checks and adds redacted runtime, security, operations,
 and capability evidence. It is intended for release reviews, interview walkthroughs, and
 automation that needs to understand deployment posture without exposing secrets.

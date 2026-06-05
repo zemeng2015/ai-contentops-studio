@@ -44,6 +44,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "deployment_manifest.json",
         "evidence_manifest.json",
         "homepage_handoffs.json",
+        "operations_console.json",
         "operations_summary.json",
         "ops_brief.json",
         "ops_brief_deliveries.json",
@@ -99,6 +100,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
         (output_dir / "provider_health.json").read_text(encoding="utf-8")
     )
     ops_brief = json.loads((output_dir / "ops_brief.json").read_text(encoding="utf-8"))
+    operations_console = json.loads(
+        (output_dir / "operations_console.json").read_text(encoding="utf-8")
+    )
     ops_brief_deliveries = json.loads(
         (output_dir / "ops_brief_deliveries.json").read_text(encoding="utf-8")
     )
@@ -134,10 +138,13 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.publish_verifications.total == 0
     assert bundle.publish_recovery_executions.total == 0
     assert bundle.provider_health.status in {"pass", "warn", "fail"}
+    assert operations_console["summary"]["status"] in {"pass", "warn", "fail"}
+    assert operations_console["summary"]["release_gate_status"] == "not_evaluated"
     assert ops_brief["status"] in {"pass", "warn", "fail"}
     assert ops_brief_deliveries == []
     assert retention_archives["total"] == 0
     assert bundle.ops_brief.status in {"pass", "warn", "fail"}
+    assert bundle.operations_console.summary.release_gate_status == "not_evaluated"
     assert bundle.ops_brief.recommended_actions
     assert bundle.ops_brief_deliveries == []
     assert bundle.retention_archives.total == 0

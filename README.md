@@ -137,6 +137,7 @@ contentops content-assets --output-dir site
 contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
+contentops operations-console --days 14 --json
 contentops provider-health --json
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
@@ -154,8 +155,12 @@ contentops retention-archives
 `release-evidence` writes system status, deployment preflight, release gates, homepage handoff
 inventory, content distribution manifests, publish verification summaries, publish recovery
 execution summaries, source review summaries, worker execution trends, the daily operations brief,
-retention archive receipts, and `evidence_manifest.json` with SHA-256 hashes and file metadata for
-every evidence artifact, so CI output can be archived and compared during deployment reviews.
+the machine-readable operations console, retention archive receipts, and `evidence_manifest.json`
+with SHA-256 hashes and file metadata for every evidence artifact, so CI output can be archived and
+compared during deployment reviews.
+The operations console combines the daily brief, worker health, release gate, retention
+governance, and review queue into one JSON report for dashboards, CI checks, and external operator
+automation.
 The operations brief rolls provider health, worker alerts, run incidents, quality, budget, and
 review queue pressure into a headline, top risks, and recommended actions for daily triage.
 `contentops ops-brief-notify` sends that brief to the configured notification webhook and records
@@ -195,6 +200,7 @@ GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/publish-recovery-plan
 POST /runs/{run_id}/publish-recovery
 GET  /runs/{run_id}/homepage-handoff
+GET  /operations-console
 GET  /ops-summary
 GET  /ops-brief
 POST /ops-brief/notify

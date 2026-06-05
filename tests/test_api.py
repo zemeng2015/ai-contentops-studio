@@ -405,6 +405,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     incident_report_response = client.get(f"/runs/{run['id']}/incident-report")
     incident_reports_response = client.get("/incident-reports?limit=5")
     ops_summary_response = client.get("/ops-summary")
+    operations_console_response = client.get("/operations-console?days=7")
     ops_brief_response = client.get("/ops-brief?days=7")
     ops_brief_notify_response = client.post("/ops-brief/notify?days=7")
     ops_brief_notifications_response = client.get("/ops-brief/notifications")
@@ -480,6 +481,13 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert ops_summary_response.status_code == 200
     assert ops_summary_response.json()["total_runs"] >= 1
     assert "needs_review" in ops_summary_response.json()["status_counts"]
+    assert operations_console_response.status_code == 200
+    assert operations_console_response.json()["summary"]["status"] in {"pass", "warn", "fail"}
+    assert operations_console_response.json()["summary"]["release_gate_status"] in {
+        "pass",
+        "warn",
+        "fail",
+    }
     assert ops_brief_response.status_code == 200
     assert ops_brief_response.json()["days"] == 7
     assert ops_brief_response.json()["summary"]["total_runs"] >= 1
@@ -506,6 +514,10 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert release_evidence_payload["summary"]["release_status"] in {"pass", "warn", "fail"}
     assert release_evidence_payload["release_readiness"]["operations"]["total_runs"] >= 1
     assert "deployment_manifest" in release_evidence_payload
+    assert "operations_console" in release_evidence_payload
+    assert release_evidence_payload["operations_console"]["summary"]["release_gate_status"] == (
+        "not_evaluated"
+    )
     assert "ops_brief" in release_evidence_payload
     assert "ops_brief_deliveries" in release_evidence_payload
     assert "retention_archives" in release_evidence_payload
@@ -1182,6 +1194,21 @@ def test_dashboard_operations_console_renders() -> None:
     assert "Worker Automation" in response.text
     assert "Retention Governance" in response.text
     assert "Retention lifecycle" in response.text
+
+
+def test_operations_console_endpoint_renders_machine_readable_report() -> None:
+    client = TestClient(app)
+
+    response = client.get("/operations-console?days=7&window_size=100")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["status"] in {"pass", "warn", "fail"}
+    assert payload["summary"]["brief_status"] in {"pass", "warn", "fail"}
+    assert payload["summary"]["release_gate_status"] in {"pass", "warn", "fail"}
+    assert "ops_brief" in payload
+    assert "worker_execution_trends" in payload
+    assert "retention_report" in payload
 
 
 def test_dashboard_retention_lifecycle_renders() -> None:

@@ -50,6 +50,7 @@ from contentops_core.models import (
     WorkerDeliverySummaryEvidence,
     WorkerDeliverySummaryEvidenceItem,
 )
+from contentops_core.operations_console import build_operations_console
 from contentops_core.ops_brief import build_ops_brief, ops_brief_notification_log
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
@@ -69,6 +70,13 @@ def build_release_evidence(
     providers = provider_health(settings)
     manifest = deployment_manifest(settings, repository)
     operations = review_service.operations_summary(window_size=window_size)
+    operations_console = build_operations_console(
+        settings=settings,
+        repository=repository,
+        review_service=review_service,
+        window_size=window_size,
+        include_release_gate=False,
+    )
     ops_brief = build_ops_brief(
         settings=settings,
         review_service=review_service,
@@ -124,6 +132,7 @@ def build_release_evidence(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "operations_console.json",
         "ops_brief.json",
         "ops_brief_deliveries.json",
         "provider_health.json",
@@ -152,6 +161,7 @@ def build_release_evidence(
         summary=summary,
         doctor=doctor,
         provider_health=providers,
+        operations_console=operations_console,
         ops_brief=ops_brief,
         ops_brief_deliveries=ops_brief_deliveries,
         deployment_manifest=manifest,
@@ -190,6 +200,7 @@ def write_release_evidence(
         "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
+        "operations_console": bundle.operations_console.model_dump(mode="json"),
         "ops_brief": bundle.ops_brief.model_dump(mode="json"),
         "ops_brief_deliveries": [
             delivery.model_dump(mode="json") for delivery in bundle.ops_brief_deliveries

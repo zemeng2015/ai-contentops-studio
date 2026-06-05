@@ -572,6 +572,36 @@ class RetentionArchiveListResponse(BaseModel):
     offset: int = Field(ge=0)
 
 
+class OperationsConsoleSummary(BaseModel):
+    status: str
+    action_required: bool
+    brief_status: str
+    release_gate_status: str
+    retention_gate_status: str
+    worker_alert_severity: str
+    review_queue_depth: int = Field(ge=0)
+    action_required_incidents: int = Field(ge=0)
+    archive_candidate_count: int = Field(ge=0)
+    archive_receipt_count: int = Field(ge=0)
+    worker_success_rate: float = Field(ge=0, le=1)
+    top_risk_count: int = Field(ge=0)
+    recommended_action_count: int = Field(ge=0)
+
+
+class OperationsConsoleReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    days: int = Field(ge=1)
+    window_size: int = Field(ge=1)
+    summary: OperationsConsoleSummary
+    operations_summary: OperationsSummary
+    ops_brief: OpsBriefReport
+    worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
+    worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
+    release_gate: dict[str, Any] = Field(default_factory=dict)
+    retention_report: RetentionReport
+    retention_archives: RetentionArchiveListResponse
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str
@@ -788,6 +818,7 @@ class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
     provider_health: ProviderHealthReport
+    operations_console: OperationsConsoleReport
     ops_brief: OpsBriefReport
     ops_brief_deliveries: list[OpsBriefDelivery] = Field(default_factory=list)
     deployment_manifest: DeploymentManifest

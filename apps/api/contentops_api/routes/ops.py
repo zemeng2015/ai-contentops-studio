@@ -48,6 +48,7 @@ from contentops_core.models import (
     IncidentReportListResponse,
     JobExecutionPublishRequest,
     JobExecutionReviewRequest,
+    OperationsConsoleReport,
     OperationsSummary,
     OpsBriefDelivery,
     OpsBriefReport,
@@ -69,6 +70,7 @@ from contentops_core.models import (
     ScorecardListResponse,
     SystemStatus,
 )
+from contentops_core.operations_console import build_operations_console
 from contentops_core.ops_brief import (
     build_ops_brief,
     notify_ops_brief,
@@ -669,6 +671,23 @@ def build_ops_router(
             retention_days=days,
             limit=limit,
             dry_run=dry_run,
+        )
+
+    @router.get(
+        "/operations-console",
+        response_model=OperationsConsoleReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_operations_console(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> OperationsConsoleReport:
+        return build_operations_console(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            days=days,
+            window_size=window_size,
         )
 
     @router.get(

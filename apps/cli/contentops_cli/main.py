@@ -44,6 +44,7 @@ from contentops_core.models import (
     SourceReviewDecision,
     SourceReviewRequest,
 )
+from contentops_core.operations_console import build_operations_console
 from contentops_core.ops_brief import (
     build_ops_brief,
     notify_ops_brief,
@@ -452,6 +453,42 @@ def release_gates(
             f"{report.generated_at.isoformat()}  {report.status:5}  "
             f"can_deploy={str(report.can_deploy).lower()}  git_sha={report.git_sha or 'n/a'}"
         )
+
+
+@app.command("operations-console")
+def operations_console(
+    days: Annotated[
+        int,
+        typer.Option(help="Number of recent calendar days to include."),
+    ] = 14,
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to scan."),
+    ] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report = build_operations_console(
+        settings=settings,
+        repository=RunRepository(settings.database_url),
+        review_service=build_review_service(settings),
+        days=days,
+        window_size=window_size,
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    typer.echo(f"Status: {report.summary.status}")
+    typer.echo(f"Action required: {str(report.summary.action_required).lower()}")
+    typer.echo(f"Brief: {report.summary.brief_status}")
+    typer.echo(f"Release gate: {report.summary.release_gate_status}")
+    typer.echo(f"Retention gate: {report.summary.retention_gate_status}")
+    typer.echo(f"Worker success: {report.summary.worker_success_rate:.0%}")
+    typer.echo(f"Review queue: {report.summary.review_queue_depth}")
+    typer.echo(f"Archive candidates: {report.summary.archive_candidate_count}")
 
 
 @app.command("ops-summary")

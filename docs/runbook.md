@@ -300,6 +300,7 @@ contentops audit-events --json
 contentops retention-report --days 90 --json
 contentops retention-archive --days 90
 contentops retention-archives
+contentops operations-console --days 14 --json
 contentops ops-summary --json
 contentops ops-trends --days 14 --json
 contentops release-readiness --json
@@ -317,6 +318,7 @@ GET /retention-report?days=90&limit=100
 POST /retention-archives?days=90&limit=100
 GET /retention-archives?limit=20&offset=0
 GET /incident-reports?limit=20&offset=0
+GET /operations-console?days=14&window_size=100
 GET /ops-summary?window_size=100
 GET /ops-trends?days=14&window_size=500
 GET /deployment-manifest
@@ -325,8 +327,10 @@ GET /release-readiness?window_size=100
 
 Use it to review shipped URLs, providers, publish timestamps, evaluation scores, pass rates,
 latency SLOs, and source-count SLOs.
-Use operations trends when you need a daily view of publishing throughput, failed runs, quality
-rate, budget posture, and action-required incidents.
+Use the operations console when you need one machine-readable report covering the daily brief,
+worker automation alerts, release gate status, retention governance, and queue pressure. Use
+operations trends when you need a daily view of publishing throughput, failed runs, quality rate,
+budget posture, and action-required incidents.
 Use the retention report to estimate artifact storage usage and identify runs old enough for
 manual archive or cleanup review. Use retention archives to create a non-destructive zip plus
 JSON receipt before any cleanup; release evidence includes recent archive receipts in
