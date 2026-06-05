@@ -290,6 +290,8 @@ contentops scorecards --json
 contentops cost-reports --json
 contentops audit-events --json
 contentops retention-report --days 90 --json
+contentops retention-archive --days 90
+contentops retention-archives
 contentops ops-summary --json
 contentops ops-trends --days 14 --json
 contentops release-readiness --json
@@ -304,6 +306,8 @@ GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
 GET /audit-events?limit=20&offset=0
 GET /retention-report?days=90&limit=100
+POST /retention-archives?days=90&limit=100
+GET /retention-archives?limit=20&offset=0
 GET /incident-reports?limit=20&offset=0
 GET /ops-summary?window_size=100
 GET /ops-trends?days=14&window_size=500
@@ -316,7 +320,9 @@ latency SLOs, and source-count SLOs.
 Use operations trends when you need a daily view of publishing throughput, failed runs, quality
 rate, budget posture, and action-required incidents.
 Use the retention report to estimate artifact storage usage and identify runs old enough for
-manual archive or cleanup review.
+manual archive or cleanup review. Use retention archives to create a non-destructive zip plus
+JSON receipt before any cleanup; release evidence includes recent archive receipts in
+`retention_archives.json`.
 Cost reports prefer provider usage tokens from `generation-receipt.json`. When usage is missing,
 they fall back to artifact-based estimates; use those estimates as a budget guardrail and
 correlate with provider billing dashboards for financial reporting.

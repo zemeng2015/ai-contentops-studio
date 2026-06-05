@@ -41,6 +41,7 @@ from contentops_core.models import (
     PublishVerificationEvidenceItem,
     ReleaseEvidenceBundle,
     ReleaseEvidenceSummary,
+    RetentionArchiveEvidence,
     RunStatus,
     SourceReviewDecision,
     SourceReviewEvidence,
@@ -84,6 +85,7 @@ def build_release_evidence(
         settings.artifact_root,
         extra_paths=worker_delivery_summary_paths,
     )
+    retention_archives = _retention_archive_evidence(review_service)
     source_reviews = _source_review_evidence(settings.artifact_root)
     has_publish_drift = (
         publish_verifications.drift_count > 0
@@ -128,6 +130,7 @@ def build_release_evidence(
         "publish_recovery_executions.json",
         "publish_verifications.json",
         "release_readiness.json",
+        "retention_archives.json",
         "source_reviews.json",
         "summary.json",
         "worker_execution_alert_deliveries.json",
@@ -161,6 +164,7 @@ def build_release_evidence(
         publish_recovery_executions=publish_recovery_executions,
         source_reviews=source_reviews,
         worker_delivery_summaries=worker_delivery_summaries,
+        retention_archives=retention_archives,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
         worker_execution_alert_deliveries=[
             delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
@@ -196,6 +200,7 @@ def write_release_evidence(
         ),
         "publish_verifications": bundle.publish_verifications.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
+        "retention_archives": bundle.retention_archives.model_dump(mode="json"),
         "source_reviews": bundle.source_reviews.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
         "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
@@ -492,6 +497,11 @@ def _worker_delivery_summary_evidence(
         if (item := _worker_delivery_summary_item(artifact_root, path)) is not None
     ]
     return WorkerDeliverySummaryEvidence(total=len(paths), items=items)
+
+
+def _retention_archive_evidence(review_service: ReviewService) -> RetentionArchiveEvidence:
+    archives = review_service.retention_archives(limit=20)
+    return RetentionArchiveEvidence(total=archives.total, items=archives.items)
 
 
 def _worker_delivery_summary_item(

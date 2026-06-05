@@ -418,6 +418,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     release_readiness_response = client.get("/release-readiness")
     release_evidence_response = client.get("/release-evidence")
     retention_response = client.get("/retention-report?days=3650")
+    retention_archive_response = client.post("/retention-archives?days=0")
+    retention_archives_response = client.get("/retention-archives")
     generation_receipt_response = client.get(f"/runs/{run['id']}/generation-receipt")
     rerun_response = client.post(f"/runs/{run['id']}/rerun")
     blocked_publish_response = client.post(f"/runs/{run['id']}/publish")
@@ -506,6 +508,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "deployment_manifest" in release_evidence_payload
     assert "ops_brief" in release_evidence_payload
     assert "ops_brief_deliveries" in release_evidence_payload
+    assert "retention_archives" in release_evidence_payload
     assert "worker_execution_trends" in release_evidence_payload
     assert "worker_execution_alerts" in release_evidence_payload
     assert "worker_execution_alert_deliveries" in release_evidence_payload
@@ -516,6 +519,11 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert retention_response.status_code == 200
     assert retention_response.json()["total_runs_scanned"] >= 1
     assert retention_response.json()["total_size_bytes"] > 0
+    assert retention_archive_response.status_code == 200
+    assert retention_archive_response.json()["candidate_count"] >= 1
+    assert run["id"] in retention_archive_response.json()["run_ids"]
+    assert retention_archives_response.status_code == 200
+    assert retention_archives_response.json()["total"] >= 1
     assert generation_receipt_response.status_code == 200
     assert generation_receipt_response.json()["provider"] == "template"
     assert generation_receipt_response.json()["total_tokens"] > 0
@@ -1152,6 +1160,7 @@ def test_dashboard_renders() -> None:
     assert "Release evidence dashboard" in response.text
     assert "Audit Events" in response.text
     assert "Artifact Retention" in response.text
+    assert "Create archive" in response.text
     assert "Worker Job Catalog" in response.text
 
 
@@ -1233,6 +1242,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Release Evidence" in response.text
     assert "Operations Brief" in response.text
     assert "Ops Brief Notifications" in response.text
+    assert "Retention Archives" in response.text
     assert "Deployment Gate" in response.text
     assert "Deployment Preflight" in response.text
     assert "Release Gate Checks" in response.text

@@ -550,6 +550,25 @@ class RetentionReport(BaseModel):
     candidates: list[RetentionCandidate] = Field(default_factory=list)
 
 
+class RetentionArchiveRecord(BaseModel):
+    archive_id: str = Field(default_factory=lambda: uuid4().hex[:12])
+    retention_days: int = Field(ge=0)
+    run_ids: list[str] = Field(default_factory=list)
+    candidate_count: int = Field(ge=0)
+    archived_size_bytes: int = Field(ge=0)
+    archive_path: str
+    sha256: str
+    dry_run: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class RetentionArchiveListResponse(BaseModel):
+    items: list[RetentionArchiveRecord] = Field(default_factory=list)
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+
+
 class ComponentCheck(BaseModel):
     name: str
     status: str
@@ -756,6 +775,12 @@ class WorkerDeliverySummaryEvidence(BaseModel):
     items: list[WorkerDeliverySummaryEvidenceItem] = Field(default_factory=list)
 
 
+class RetentionArchiveEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    items: list[RetentionArchiveRecord] = Field(default_factory=list)
+
+
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
@@ -772,6 +797,7 @@ class ReleaseEvidenceBundle(BaseModel):
     publish_recovery_executions: PublishRecoveryExecutionEvidence
     source_reviews: SourceReviewEvidence
     worker_delivery_summaries: WorkerDeliverySummaryEvidence
+    retention_archives: RetentionArchiveEvidence
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alert_deliveries: list[dict[str, Any]] = Field(default_factory=list)

@@ -152,6 +152,10 @@ def build_dashboard_router(
         incident_reports = review_service.incident_reports(limit=5)
         audit_events = review_service.audit_events(limit=5)
         retention_report = review_service.retention_report()
+        retention_archives = review_service.retention_archives(limit=5)
+        retention_archive_action = (
+            f"/dashboard/retention-archives{_api_key_query(api_key)}"
+        )
         operations_summary = review_service.operations_summary()
         ops_brief = build_ops_brief(
             settings=settings,
@@ -257,7 +261,12 @@ def build_dashboard_router(
                   <p>
                     Storage hygiene report for old run artifacts that can be archived or pruned.
                   </p>
-                  {_retention_report_html(retention_report)}
+                  <form method="post" action="{retention_archive_action}">
+                    <input name="days" value="90" placeholder="Retention days">
+                    <input name="limit" value="100" placeholder="Scan limit">
+                    <button type="submit">Create archive</button>
+                  </form>
+                  {_retention_report_html(retention_report, retention_archives)}
                 </section>
                 <section class="hero compact">
                   <h2>Audit Events</h2>
@@ -331,6 +340,19 @@ def build_dashboard_router(
             channel_description=description,
             channel_url=_publisher_public_url(settings),
         )
+        return RedirectResponse(f"/dashboard{_api_key_query(api_key)}", status_code=303)
+
+
+    @router.post(
+        "/dashboard/retention-archives",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_create_retention_archive(
+        days: Annotated[int, Form()] = 90,
+        limit: Annotated[int, Form()] = 100,
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        review_service.retention_archive(retention_days=days, limit=limit)
         return RedirectResponse(f"/dashboard{_api_key_query(api_key)}", status_code=303)
 
 

@@ -146,13 +146,16 @@ contentops ops-brief --days 14 --json
 contentops ops-brief-notify --days 14
 contentops ops-brief-notifications
 contentops ops-trends --days 14 --json
+contentops retention-report --days 90 --json
+contentops retention-archive --days 90
+contentops retention-archives
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, homepage handoff
 inventory, content distribution manifests, publish verification summaries, publish recovery
 execution summaries, source review summaries, worker execution trends, the daily operations brief,
-and `evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence artifact, so
-CI output can be archived and compared during deployment reviews.
+retention archive receipts, and `evidence_manifest.json` with SHA-256 hashes and file metadata for
+every evidence artifact, so CI output can be archived and compared during deployment reviews.
 The operations brief rolls provider health, worker alerts, run incidents, quality, budget, and
 review queue pressure into a headline, top risks, and recommended actions for daily triage.
 `contentops ops-brief-notify` sends that brief to the configured notification webhook and records
@@ -202,6 +205,9 @@ GET  /content-assets/promotion-brief
 GET  /content-assets/manifest
 GET  /config-audit
 GET  /provider-health
+GET  /retention-report
+POST /retention-archives
+GET  /retention-archives
 GET  /deployment-manifest
 GET  /deployment-check
 GET  /deployment-env-template

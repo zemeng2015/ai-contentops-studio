@@ -61,6 +61,8 @@ from contentops_core.models import (
     ReleaseGateListResponse,
     ReleaseGateReport,
     ReleaseReadinessReport,
+    RetentionArchiveListResponse,
+    RetentionArchiveRecord,
     RetentionReport,
     ReviewBatchResult,
     RunStatus,
@@ -641,6 +643,33 @@ def build_ops_router(
         limit: int = Query(default=100, ge=1, le=1000),
     ) -> RetentionReport:
         return review_service.retention_report(retention_days=days, limit=limit)
+
+    @router.get(
+        "/retention-archives",
+        response_model=RetentionArchiveListResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_retention_archives(
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> RetentionArchiveListResponse:
+        return review_service.retention_archives(limit=limit, offset=offset)
+
+    @router.post(
+        "/retention-archives",
+        response_model=RetentionArchiveRecord,
+        dependencies=[Depends(require_operator)],
+    )
+    def create_retention_archive(
+        days: int = Query(default=90, ge=0, le=3650),
+        limit: int = Query(default=100, ge=1, le=1000),
+        dry_run: bool = Query(default=False),
+    ) -> RetentionArchiveRecord:
+        return review_service.retention_archive(
+            retention_days=days,
+            limit=limit,
+            dry_run=dry_run,
+        )
 
     @router.get(
         "/ops-summary",

@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from typing import TypeVar
+from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from contentops_publishing.static_site import Publisher
@@ -43,6 +44,8 @@ from contentops_core.models import (
     PublishVerificationItem,
     PublishVerificationReport,
     ResearchPacket,
+    RetentionArchiveListResponse,
+    RetentionArchiveRecord,
     RetentionCandidate,
     RetentionReport,
     ReviewActionResult,
@@ -79,6 +82,7 @@ class ReviewService:
         min_source_count: int = 1,
         token_budget_per_run: int = 12000,
         model: str = "template",
+        artifact_root: Path | None = None,
     ) -> None:
         self.repository = repository
         self.publisher = publisher
@@ -87,6 +91,7 @@ class ReviewService:
         self.min_source_count = min_source_count
         self.token_budget_per_run = token_budget_per_run
         self.model = model
+        self.artifact_root = artifact_root or Path("artifacts")
         self.metrics_service = MetricsService()
 
     def list_artifacts(self, run_id: str) -> list[str]:
@@ -824,6 +829,82 @@ class ReviewService:
             candidate_count=len(candidates),
             candidate_size_bytes=sum(item.size_bytes for item in candidates),
             candidates=candidates,
+        )
+
+    def retention_archive(
+        self,
+        retention_days: int = 90,
+        limit: int = 100,
+        output_dir: Path | None = None,
+        dry_run: bool = False,
+    ) -> RetentionArchiveRecord:
+        report = self.retention_report(retention_days=retention_days, limit=limit)
+        target_dir = output_dir or self.artifact_root / "retention-archives"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        archive_id = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
+        archive_path = target_dir / f"retention-{archive_id}.zip"
+        manifest = {
+            "archive_id": archive_id,
+            "retention_report": report.model_dump(mode="json"),
+            "dry_run": dry_run,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        if not dry_run:
+            with ZipFile(archive_path, "w", compression=ZIP_DEFLATED) as archive:
+                archive.writestr(
+                    "retention-archive-manifest.json",
+                    json.dumps(manifest, indent=2),
+                )
+                for candidate in report.candidates:
+                    artifact_dir = Path(candidate.artifact_dir)
+                    for path in sorted(artifact_dir.rglob("*")):
+                        if not path.is_file():
+                            continue
+                        relative_path = path.relative_to(artifact_dir)
+                        archive.write(path, f"runs/{candidate.run_id}/{relative_path.as_posix()}")
+            archive_sha = sha256(archive_path.read_bytes()).hexdigest()
+        else:
+            archive_path = target_dir / f"retention-{archive_id}-dry-run.json"
+            archive_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            archive_sha = sha256(archive_path.read_bytes()).hexdigest()
+        record = RetentionArchiveRecord(
+            archive_id=archive_id,
+            retention_days=report.retention_days,
+            run_ids=[candidate.run_id for candidate in report.candidates],
+            candidate_count=report.candidate_count,
+            archived_size_bytes=report.candidate_size_bytes,
+            archive_path=str(archive_path),
+            sha256=archive_sha,
+            dry_run=dry_run,
+        )
+        record_path = target_dir / f"{archive_id}-retention-archive.json"
+        record_path.write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        return record
+
+    def retention_archives(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> RetentionArchiveListResponse:
+        limit = max(1, limit)
+        offset = max(0, offset)
+        archive_dir = self.artifact_root / "retention-archives"
+        records: list[RetentionArchiveRecord] = []
+        for path in sorted(archive_dir.glob("*-retention-archive.json"), reverse=True):
+            try:
+                records.append(
+                    RetentionArchiveRecord.model_validate_json(
+                        path.read_text(encoding="utf-8")
+                    )
+                )
+            except ValueError:
+                continue
+        page = records[offset : offset + limit]
+        return RetentionArchiveListResponse(
+            items=page,
+            total=len(records),
+            limit=limit,
+            offset=offset,
         )
 
     def _ops_trend_bucket(self, date_key: str, runs: list[RunRecord]) -> OpsTrendBucket:

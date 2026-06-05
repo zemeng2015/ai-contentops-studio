@@ -418,6 +418,18 @@ def test_cli_queue_and_manifest_commands(
         ["release-evidence", "--output-dir", str(release_evidence_dir)],
     )
     retention_result = runner.invoke(app, ["retention-report", "--days", "3650", "--json"])
+    retention_archive_dir = tmp_path / "retention-archives"
+    retention_archive_result = runner.invoke(
+        app,
+        [
+            "retention-archive",
+            "--days",
+            "0",
+            "--output-dir",
+            str(retention_archive_dir),
+        ],
+    )
+    retention_archives_result = runner.invoke(app, ["retention-archives"])
     generation_receipt_result = runner.invoke(app, ["generation-receipt", run_id])
     manifest_result = runner.invoke(app, ["manifest", run_id])
     mirror_log_result = runner.invoke(app, ["s3-mirror-log", run_id])
@@ -485,6 +497,7 @@ def test_cli_queue_and_manifest_commands(
     assert release_evidence_payload["operations_summary"]["total_runs"] == 1
     assert release_evidence_payload["ops_brief"]["summary"]["total_runs"] == 1
     assert release_evidence_payload["ops_brief_deliveries"]
+    assert "retention_archives" in release_evidence_payload
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
     assert release_evidence_payload["content_distribution"]["total"] >= 0
     assert release_evidence_payload["publish_recovery_executions"]["total"] >= 0
@@ -502,6 +515,7 @@ def test_cli_queue_and_manifest_commands(
     assert (release_evidence_dir / "worker_execution_trends.json").exists()
     assert (release_evidence_dir / "ops_brief.json").exists()
     assert (release_evidence_dir / "ops_brief_deliveries.json").exists()
+    assert (release_evidence_dir / "retention_archives.json").exists()
     assert (release_evidence_dir / "evidence_manifest.json").exists()
     assert (release_evidence_dir / "release_readiness.json").exists()
     evidence_manifest = json.loads(
@@ -512,6 +526,12 @@ def test_cli_queue_and_manifest_commands(
     retention_payload = json.loads(retention_result.output)
     assert retention_payload["total_runs_scanned"] == 1
     assert retention_payload["total_size_bytes"] > 0
+    assert retention_archive_result.exit_code == 0
+    retention_archive_payload = json.loads(retention_archive_result.output)
+    assert retention_archive_payload["candidate_count"] == 1
+    assert retention_archive_payload["run_ids"] == [run_id]
+    assert Path(retention_archive_payload["archive_path"]).exists()
+    assert retention_archives_result.exit_code == 0
     assert generation_receipt_result.exit_code == 0
     generation_receipt_payload = json.loads(generation_receipt_result.output)
     assert generation_receipt_payload["provider"] == "template"

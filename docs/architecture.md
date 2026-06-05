@@ -179,6 +179,9 @@ success or failure is recorded without blocking the operator workflow.
 Artifact retention reports scan recent run artifact directories, estimate file counts and storage
 bytes, and identify runs older than a configured retention window. The report is intentionally
 read-only so archive and cleanup decisions can be reviewed before any destructive operation.
+Retention archives turn those candidates into a non-destructive zip plus JSON receipt through
+`contentops retention-archive` and `POST /retention-archives`; release evidence indexes recent
+archive receipts in `retention_archives.json`.
 Published runs are projected into a content catalog exposed through `/content`, `contentops content`,
 and the dashboard. The catalog combines run metadata, publish receipts, URLs, providers, publish
 timestamps, and evaluation scores so the platform can be reviewed as a content inventory instead

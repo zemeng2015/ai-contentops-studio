@@ -39,6 +39,8 @@ from contentops_core.models import (
     ReleaseEvidenceBundle,
     ReleaseGateListResponse,
     ReleaseGateReport,
+    RetentionArchiveEvidence,
+    RetentionArchiveListResponse,
     RetentionReport,
     RunComparison,
     RunCostReport,
@@ -1810,12 +1812,18 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <strong>{len(bundle.ops_brief_deliveries)}</strong>
           <span>Ops brief deliveries</span>
         </div>
+        <div>
+          <strong>{bundle.retention_archives.total}</strong>
+          <span>Retention archives</span>
+        </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
       <h2>Operations Brief</h2>
       {_ops_brief_html(bundle.ops_brief)}
       <h2>Ops Brief Notifications</h2>
       {_ops_brief_deliveries_html(bundle.ops_brief_deliveries)}
+      <h2>Retention Archives</h2>
+      {_retention_archives_html(bundle.retention_archives)}
       <h2>Provider Health</h2>
       <table>
         <thead>
@@ -2132,15 +2140,21 @@ def _audit_events_html(events: AuditEventListResponse) -> str:
     """
 
 
-def _retention_report_html(report: RetentionReport) -> str:
+def _retention_report_html(
+    report: RetentionReport,
+    archives: RetentionArchiveListResponse | None = None,
+) -> str:
+    archive_html = _retention_archives_html(archives) if archives is not None else ""
     if not report.candidates:
         return f"""
           <p>
             <a href="/retention-report">Retention report JSON</a> |
+            <a href="/retention-archives">Retention archives JSON</a> |
             Scanned <strong>{report.total_runs_scanned}</strong> runs |
             Total size: <strong>{report.total_size_bytes}</strong> bytes |
             No candidates older than <strong>{report.retention_days}</strong> day(s).
           </p>
+          {archive_html}
         """
     rows = "".join(
         f"""
@@ -2157,12 +2171,42 @@ def _retention_report_html(report: RetentionReport) -> str:
     return f"""
       <p>
         <a href="/retention-report">Retention report JSON</a> |
+        <a href="/retention-archives">Retention archives JSON</a> |
         Candidates: <strong>{report.candidate_count}</strong> |
         Candidate size: <strong>{report.candidate_size_bytes}</strong> bytes
       </p>
       <table>
         <thead>
           <tr><th>Run</th><th>Status</th><th>Artifacts</th><th>Bytes</th><th>Updated</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+      {archive_html}
+    """
+
+
+def _retention_archives_html(
+    archives: RetentionArchiveListResponse | RetentionArchiveEvidence | None,
+) -> str:
+    if archives is None or not archives.items:
+        return "<p>No retention archives recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.archive_id)}</td>
+          <td>{item.candidate_count}</td>
+          <td>{item.archived_size_bytes}</td>
+          <td>{escape(str(item.dry_run).lower())}</td>
+          <td>{escape(item.created_at.isoformat())}</td>
+        </tr>
+        """
+        for item in archives.items
+    )
+    return f"""
+      <h2>Recent Archives</h2>
+      <table>
+        <thead>
+          <tr><th>Archive</th><th>Candidates</th><th>Bytes</th><th>Dry run</th><th>Created</th></tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>

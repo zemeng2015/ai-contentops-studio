@@ -1146,6 +1146,42 @@ def retention_report(
         )
 
 
+@app.command("retention-archive")
+def retention_archive(
+    days: Annotated[
+        int,
+        typer.Option(help="Archive candidates older than this many days."),
+    ] = 90,
+    limit: Annotated[int, typer.Option(help="Number of recent runs to scan.")] = 100,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(help="Directory where archive receipts and zip files are written."),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(help="Write a dry-run manifest instead of a zip archive."),
+    ] = False,
+) -> None:
+    service = build_review_service(Settings())
+    record = service.retention_archive(
+        retention_days=days,
+        limit=limit,
+        output_dir=output_dir,
+        dry_run=dry_run,
+    )
+    typer.echo(record.model_dump_json(indent=2))
+
+
+@app.command("retention-archives")
+def retention_archives(
+    limit: Annotated[int, typer.Option(help="Number of archive receipts to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of archive receipts to skip.")] = 0,
+) -> None:
+    service = build_review_service(Settings())
+    response = service.retention_archives(limit=limit, offset=offset)
+    typer.echo(response.model_dump_json(indent=2))
+
+
 @app.command("incident-report")
 def incident_report(run_id: str) -> None:
     service = build_review_service(Settings())

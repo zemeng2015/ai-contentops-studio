@@ -153,6 +153,7 @@ def build_review_service(settings: Settings | None = None) -> ReviewService:
         min_source_count=settings.min_source_count,
         token_budget_per_run=settings.token_budget_per_run,
         model=settings.openai_model if settings.generator_provider == "openai" else "template",
+        artifact_root=settings.artifact_root,
     )
 
 
