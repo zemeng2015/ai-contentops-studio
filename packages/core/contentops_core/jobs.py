@@ -469,6 +469,49 @@ class JobRecoveryPlan(BaseModel):
         )
 
 
+class JobRecoveryAttempt(BaseModel):
+    execution_id: str
+    name: str
+    completed_at: datetime
+    total: int = Field(ge=0)
+    succeeded: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    status: str
+    actor: str | None = None
+    notes: str | None = None
+    recovered_job_names: list[str] = Field(default_factory=list)
+    failed_job_names: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class JobRecoveryLineageItem(BaseModel):
+    source_execution_id: str
+    source_execution_name: str
+    source_completed_at: datetime
+    source_failed_count: int = Field(ge=0)
+    recovery_attempt_count: int = Field(ge=0)
+    recovered_job_count: int = Field(ge=0)
+    unresolved_job_count: int = Field(ge=0)
+    latest_recovery_status: str
+    latest_recovery_execution_id: str | None = None
+    latest_recovery_at: datetime | None = None
+    attempts: list[JobRecoveryAttempt] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+
+
+class JobRecoveryLineageReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    days: int = Field(ge=1)
+    total_failed_executions: int = Field(ge=0)
+    recovered_execution_count: int = Field(ge=0)
+    unrecovered_execution_count: int = Field(ge=0)
+    recovery_attempt_count: int = Field(ge=0)
+    successful_recovery_attempt_count: int = Field(ge=0)
+    failed_recovery_attempt_count: int = Field(ge=0)
+    action_required: bool = False
+    items: list[JobRecoveryLineageItem] = Field(default_factory=list)
+
+
 class JobRunner:
     def __init__(self, pipeline: ContentOpsPipeline) -> None:
         self.pipeline = pipeline
@@ -1830,6 +1873,150 @@ def job_recovery_plan(
         blocked_reason=blocked_reason,
         jobs=failed_jobs,
     )
+
+
+def job_recovery_lineage(receipt_dir: Path, days: int = 14) -> JobRecoveryLineageReport:
+    if days < 1:
+        raise ValueError("days must be at least 1.")
+    today = datetime.now(UTC).date()
+    start = today - timedelta(days=days - 1)
+    reports = [
+        report
+        for report in (
+            _read_job_execution_report(path) for path in _job_execution_receipt_paths(receipt_dir)
+        )
+        if report.completed_at.date() >= start
+    ]
+    attempts_by_source: dict[str, list[JobRecoveryAttempt]] = {}
+    for report in reports:
+        for source_execution_id, results in _recovery_results_by_source(report).items():
+            attempts_by_source.setdefault(source_execution_id, []).append(
+                _job_recovery_attempt(report, results)
+            )
+    items = [
+        _job_recovery_lineage_item(report, attempts_by_source.get(report.execution_id, []))
+        for report in reports
+        if report.failed > 0 and not report.dry_run
+    ]
+    items.sort(key=lambda item: item.source_completed_at, reverse=True)
+    recovery_attempts = [attempt for item in items for attempt in item.attempts]
+    return JobRecoveryLineageReport(
+        days=days,
+        total_failed_executions=len(items),
+        recovered_execution_count=sum(
+            1 for item in items if item.latest_recovery_status == "recovered"
+        ),
+        unrecovered_execution_count=sum(
+            1 for item in items if item.latest_recovery_status != "recovered"
+        ),
+        recovery_attempt_count=len(recovery_attempts),
+        successful_recovery_attempt_count=sum(
+            1 for attempt in recovery_attempts if attempt.status == "succeeded"
+        ),
+        failed_recovery_attempt_count=sum(
+            1 for attempt in recovery_attempts if attempt.status != "succeeded"
+        ),
+        action_required=any(item.unresolved_job_count > 0 for item in items),
+        items=items,
+    )
+
+
+def _recovery_results_by_source(
+    report: JobExecutionReport,
+) -> dict[str, list[JobRunResult]]:
+    results_by_source: dict[str, list[JobRunResult]] = {}
+    for result in report.results:
+        source_execution_id = result.metadata.get("recovery_source_execution_id")
+        if not source_execution_id:
+            continue
+        results_by_source.setdefault(source_execution_id, []).append(result)
+    return results_by_source
+
+
+def _job_recovery_attempt(
+    report: JobExecutionReport,
+    results: list[JobRunResult],
+) -> JobRecoveryAttempt:
+    first_metadata = results[0].metadata if results else {}
+    failed_results = [
+        result
+        for result in results
+        if result.error is not None or str(result.status) == "failed"
+    ]
+    succeeded_results = [result for result in results if result not in failed_results]
+    return JobRecoveryAttempt(
+        execution_id=report.execution_id,
+        name=report.name,
+        completed_at=report.completed_at,
+        total=len(results),
+        succeeded=len(succeeded_results),
+        failed=len(failed_results),
+        status="succeeded" if not failed_results and results else "failed",
+        actor=first_metadata.get("recovery_actor"),
+        notes=first_metadata.get("recovery_notes"),
+        recovered_job_names=[result.job_name for result in succeeded_results],
+        failed_job_names=[result.job_name for result in failed_results],
+        errors=[
+            str(result.error or result.homepage_handoff_error)
+            for result in failed_results
+            if result.error or result.homepage_handoff_error
+        ],
+    )
+
+
+def _job_recovery_lineage_item(
+    report: JobExecutionReport,
+    attempts: list[JobRecoveryAttempt],
+) -> JobRecoveryLineageItem:
+    attempts = sorted(attempts, key=lambda attempt: attempt.completed_at, reverse=True)
+    recovered_job_names = {
+        job_name for attempt in attempts for job_name in attempt.recovered_job_names
+    }
+    recovered_count = min(len(recovered_job_names), report.failed)
+    unresolved_count = max(report.failed - recovered_count, 0)
+    latest = attempts[0] if attempts else None
+    if not attempts:
+        status = "not_started"
+    elif unresolved_count == 0 and latest and latest.status == "succeeded":
+        status = "recovered"
+    else:
+        status = "partial"
+    return JobRecoveryLineageItem(
+        source_execution_id=report.execution_id,
+        source_execution_name=report.name,
+        source_completed_at=report.completed_at,
+        source_failed_count=report.failed,
+        recovery_attempt_count=len(attempts),
+        recovered_job_count=recovered_count,
+        unresolved_job_count=unresolved_count,
+        latest_recovery_status=status,
+        latest_recovery_execution_id=latest.execution_id if latest else None,
+        latest_recovery_at=latest.completed_at if latest else None,
+        attempts=attempts,
+        recommended_actions=_job_recovery_lineage_actions(report, status, unresolved_count),
+    )
+
+
+def _job_recovery_lineage_actions(
+    report: JobExecutionReport,
+    status: str,
+    unresolved_count: int,
+) -> list[str]:
+    if status == "recovered":
+        return [
+            "Review the recovery execution receipt and attach it to release evidence.",
+            "Continue monitoring worker execution alerts for repeated failures.",
+        ]
+    plan_command = f"contentops job-recovery-plan {report.execution_id}"
+    if status == "not_started":
+        return [
+            f"Generate a recovery plan with `{plan_command} --output recovery.yaml`.",
+            f"Run recovery with `{plan_command} --run --actor <name> --notes <reason>`.",
+        ]
+    return [
+        f"Resolve the remaining {unresolved_count} failed recovery job(s).",
+        f"Run `{plan_command} --run --actor <name> --notes <reason>` after fixes.",
+    ]
 
 
 def _recovery_metadata(*, actor: str | None, notes: str | None) -> dict[str, str]:

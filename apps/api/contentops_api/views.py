@@ -10,6 +10,8 @@ from contentops_core.jobs import (
     JobExecutionAlertReport,
     JobExecutionReport,
     JobExecutionTrendReport,
+    JobRecoveryLineageItem,
+    JobRecoveryLineageReport,
     JobRecoveryPlan,
     ScheduledWorkflowReviewPackageItem,
     WorkerDeliverySummaryDelivery,
@@ -512,6 +514,7 @@ def _scheduled_review_archive_action(
 def _job_execution_detail_html(
     report: JobExecutionReport,
     recovery_plan: JobRecoveryPlan | None = None,
+    recovery_lineage_item: JobRecoveryLineageItem | None = None,
     api_key: str = "",
 ) -> str:
     release_evidence = report.release_evidence_path or "not recorded"
@@ -596,7 +599,56 @@ def _job_execution_detail_html(
         </thead>
         <tbody>{rows}</tbody>
       </table>
+      {_job_recovery_lineage_item_html(recovery_lineage_item)}
       {_job_recovery_preview_html(recovery_plan)}
+    """
+
+
+def _job_recovery_lineage_item_html(item: JobRecoveryLineageItem | None) -> str:
+    if item is None:
+        return ""
+    attempt_rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/job-executions/{escape(attempt.execution_id)}">
+            {escape(attempt.execution_id)}
+          </a></td>
+          <td>{escape(attempt.status)}</td>
+          <td>{attempt.succeeded}/{attempt.total}</td>
+          <td>{escape(attempt.actor or "n/a")}</td>
+          <td>{escape(attempt.completed_at.isoformat())}</td>
+          <td>{escape("; ".join(attempt.errors) or "none")}</td>
+        </tr>
+        """
+        for attempt in item.attempts
+    )
+    if not attempt_rows:
+        attempt_rows = """
+        <tr>
+          <td colspan="6">
+            <span class="muted">No recovery execution has been recorded yet.</span>
+          </td>
+        </tr>
+        """
+    return f"""
+      <h3>Recovery Lineage</h3>
+      <div class="metrics">
+        <div><strong>{escape(item.latest_recovery_status)}</strong><span>Status</span></div>
+        <div><strong>{item.recovery_attempt_count}</strong><span>Attempts</span></div>
+        <div><strong>{item.recovered_job_count}</strong><span>Recovered jobs</span></div>
+        <div><strong>{item.unresolved_job_count}</strong><span>Unresolved jobs</span></div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Recovery execution</th><th>Status</th><th>Jobs</th>
+            <th>Actor</th><th>Completed</th><th>Errors</th>
+          </tr>
+        </thead>
+        <tbody>{attempt_rows}</tbody>
+      </table>
+      <h4>Recommended Actions</h4>
+      {_remediation_list_html(item.recommended_actions)}
     """
 
 
@@ -1182,6 +1234,66 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     """
 
 
+def _job_recovery_lineage_html(report: JobRecoveryLineageReport) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>
+            <a href="/dashboard/job-executions/{escape(item.source_execution_id)}">
+              {escape(item.source_execution_id)}
+            </a>
+          </td>
+          <td>{escape(item.source_execution_name)}</td>
+          <td>{escape(item.latest_recovery_status)}</td>
+          <td>{item.recovery_attempt_count}</td>
+          <td>{item.recovered_job_count}/{item.source_failed_count}</td>
+          <td>{item.unresolved_job_count}</td>
+          <td>{escape(item.latest_recovery_execution_id or "n/a")}</td>
+          <td>{_remediation_list_html(item.recommended_actions)}</td>
+        </tr>
+        """
+        for item in report.items
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="8">
+            <span class="muted">No failed worker executions in this window.</span>
+          </td>
+        </tr>
+        """
+    return f"""
+      <p><a href="/job-executions/recovery-lineage">Worker recovery lineage JSON</a></p>
+      <div class="metrics">
+        <div><strong>{report.total_failed_executions}</strong><span>Failed executions</span></div>
+        <div><strong>{report.recovered_execution_count}</strong><span>Recovered</span></div>
+        <div><strong>{report.unrecovered_execution_count}</strong><span>Unresolved</span></div>
+        <div><strong>{report.recovery_attempt_count}</strong><span>Recovery attempts</span></div>
+        <div>
+          <strong>{report.successful_recovery_attempt_count}</strong>
+          <span>Successful attempts</span>
+        </div>
+        <div>
+          <strong>{report.failed_recovery_attempt_count}</strong>
+          <span>Failed attempts</span>
+        </div>
+        <div>
+          <strong>{str(report.action_required).lower()}</strong>
+          <span>Action required</span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Source execution</th><th>Name</th><th>Status</th><th>Attempts</th>
+            <th>Recovered</th><th>Unresolved</th><th>Latest recovery</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
 def _job_execution_alerts_html(report: JobExecutionAlertReport) -> str:
     signal_rows = "".join(
         f"""
@@ -1592,6 +1704,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     can_deploy = str(bundle.deployment_check.can_deploy).lower()
     worker_alerts = bundle.worker_execution_alerts
     worker_alert_deliveries = bundle.worker_execution_alert_deliveries
+    worker_recovery = bundle.worker_recovery_lineage
     worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
     worker_buckets = bundle.worker_execution_trends.get("buckets", [])
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
@@ -1877,6 +1990,31 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="5"><span class="muted">No worker alert notifications recorded.</span></td>
         </tr>
         """
+    worker_recovery_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(str(item.get("source_execution_id", "n/a")))}</td>
+          <td>{escape(str(item.get("source_execution_name", "n/a")))}</td>
+          <td>{escape(str(item.get("latest_recovery_status", "n/a")))}</td>
+          <td>{escape(str(item.get("recovery_attempt_count", 0)))}</td>
+          <td>
+            {escape(str(item.get("recovered_job_count", 0)))}/
+            {escape(str(item.get("source_failed_count", 0)))}
+          </td>
+          <td>{escape(str(item.get("unresolved_job_count", 0)))}</td>
+          <td>{escape(str(item.get("latest_recovery_execution_id") or "n/a"))}</td>
+          <td>{_remediation_list_html(_dict_string_list(item.get("recommended_actions")))}</td>
+        </tr>
+        """
+        for item in worker_recovery.get("items", [])
+        if isinstance(item, dict)
+    )
+    if not worker_recovery_rows:
+        worker_recovery_rows = """
+        <tr>
+          <td colspan="8"><span class="muted">No worker recovery lineage recorded.</span></td>
+        </tr>
+        """
     return f"""
       <p>
         <a href="/release-evidence/bundle">Download evidence bundle</a> |
@@ -1932,6 +2070,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <div>
           <strong>{escape(str(worker_trends_summary.get("action_required", 0)))}</strong>
           <span>Worker actions</span>
+        </div>
+        <div>
+          <strong>{escape(str(worker_recovery.get("unrecovered_execution_count", 0)))}</strong>
+          <span>Recovery backlog</span>
         </div>
         <div>
           <strong>{len(bundle.ops_brief_deliveries)}</strong>
@@ -2080,6 +2222,34 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </tr>
         </thead>
         <tbody>{worker_alert_signal_rows}</tbody>
+      </table>
+      <h2>Worker Recovery Lineage</h2>
+      <div class="metrics">
+        <div>
+          <strong>{escape(str(worker_recovery.get("total_failed_executions", 0)))}</strong>
+          <span>Failed executions</span>
+        </div>
+        <div>
+          <strong>{escape(str(worker_recovery.get("recovered_execution_count", 0)))}</strong>
+          <span>Recovered executions</span>
+        </div>
+        <div>
+          <strong>{escape(str(worker_recovery.get("unrecovered_execution_count", 0)))}</strong>
+          <span>Unresolved executions</span>
+        </div>
+        <div>
+          <strong>{escape(str(worker_recovery.get("recovery_attempt_count", 0)))}</strong>
+          <span>Recovery attempts</span>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Source execution</th><th>Name</th><th>Status</th><th>Attempts</th>
+            <th>Recovered</th><th>Unresolved</th><th>Latest recovery</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>{worker_recovery_rows}</tbody>
       </table>
       <h2>Worker Alert Notifications</h2>
       <table>

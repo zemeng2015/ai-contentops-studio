@@ -25,6 +25,7 @@ from contentops_core.jobs import (
     job_execution_dir,
     job_execution_run_ids,
     job_execution_trends,
+    job_recovery_lineage,
     job_recovery_plan,
     list_job_execution_reports,
     list_scheduled_workflow_review_packages,
@@ -83,6 +84,7 @@ from contentops_api.views import (
     _job_execution_detail_html,
     _job_execution_trends_html,
     _job_executions_html,
+    _job_recovery_lineage_html,
     _notification_log_html,
     _operations_summary_html,
     _ops_brief_deliveries_html,
@@ -748,6 +750,10 @@ def build_dashboard_router(
     ) -> HTMLResponse:
         report = job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
         alerts = job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
+        recovery_lineage = job_recovery_lineage(
+            job_execution_dir(settings.artifact_root),
+            days=days,
+        )
         deliveries = job_execution_alert_notification_log(job_execution_dir(settings.artifact_root))
         summary_deliveries = worker_delivery_summary_notification_log(
             job_execution_dir(settings.artifact_root)
@@ -776,6 +782,8 @@ def build_dashboard_router(
                   {_job_execution_alert_deliveries_html(deliveries)}
                   <h2>Delivery Summary Notifications</h2>
                   {_worker_delivery_summary_deliveries_html(summary_deliveries)}
+                  <h2>Recovery Lineage</h2>
+                  {_job_recovery_lineage_html(recovery_lineage)}
                   {_job_execution_trends_html(report)}
                 </section>
                 """,
@@ -967,6 +975,18 @@ def build_dashboard_router(
             job_execution_dir(settings.artifact_root),
             execution_id,
         )
+        recovery_lineage = job_recovery_lineage(
+            job_execution_dir(settings.artifact_root),
+            days=90,
+        )
+        recovery_lineage_item = next(
+            (
+                item
+                for item in recovery_lineage.items
+                if item.source_execution_id == report.execution_id
+            ),
+            None,
+        )
         execution_run_ids = job_execution_run_ids(report)
         execution_review_forms = ""
         if execution_run_ids:
@@ -1013,7 +1033,12 @@ def build_dashboard_router(
                 f"""
                 <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
                 <section class="hero">
-                  {_job_execution_detail_html(report, recovery_plan, api_key)}
+                  {_job_execution_detail_html(
+                    report,
+                    recovery_plan,
+                    recovery_lineage_item,
+                    api_key,
+                  )}
                   {execution_review_forms}
                   {recovery_form}
                   <h3>S3 Mirror Log</h3>

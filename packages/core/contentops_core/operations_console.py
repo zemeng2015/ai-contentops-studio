@@ -4,6 +4,7 @@ from contentops_core.jobs import (
     job_execution_alert_report,
     job_execution_dir,
     job_execution_trends,
+    job_recovery_lineage,
 )
 from contentops_core.models import OperationsConsoleReport, OperationsConsoleSummary
 from contentops_core.ops_brief import build_ops_brief
@@ -33,6 +34,10 @@ def build_operations_console(
         days=days,
     )
     worker_alerts = job_execution_alert_report(
+        job_execution_dir(settings.artifact_root),
+        days=days,
+    )
+    worker_recovery = job_recovery_lineage(
         job_execution_dir(settings.artifact_root),
         days=days,
     )
@@ -97,6 +102,7 @@ def build_operations_console(
         ops_brief=ops_brief,
         worker_execution_trends=worker_trends.model_dump(mode="json"),
         worker_execution_alerts=worker_alerts.model_dump(mode="json"),
+        worker_recovery_lineage=worker_recovery.model_dump(mode="json"),
         release_gate=release_gate_payload,
         retention_report=retention_report,
         retention_archives=retention_archives,

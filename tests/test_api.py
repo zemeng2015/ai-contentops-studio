@@ -988,6 +988,11 @@ def test_job_execution_recovery_can_be_run_from_api_and_dashboard(
             data={"actor": "dashboard-operator", "notes": "Retry from dashboard."},
             follow_redirects=False,
         )
+        lineage_response = client.get("/job-executions/recovery-lineage?days=1")
+        dashboard_trends_response = client.get("/dashboard/job-execution-trends?days=1")
+        source_dashboard_response = client.get(
+            f"/dashboard/job-executions/{failed.execution_id}"
+        )
         dashboard_execution_id = dashboard_response.headers["location"].rsplit("/", 1)[-1]
         dashboard_detail = client.get(f"/job-executions/{dashboard_execution_id}")
     finally:
@@ -1012,6 +1017,21 @@ def test_job_execution_recovery_can_be_run_from_api_and_dashboard(
     dashboard_metadata = dashboard_detail.json()["results"][0]["metadata"]
     assert dashboard_metadata["recovery_actor"] == "dashboard-operator"
     assert dashboard_metadata["recovery_notes"] == "Retry from dashboard."
+    assert lineage_response.status_code == 200
+    lineage_payload = lineage_response.json()
+    assert lineage_payload["recovery_attempt_count"] == 2
+    lineage_item = next(
+        item
+        for item in lineage_payload["items"]
+        if item["source_execution_id"] == failed.execution_id
+    )
+    assert lineage_item["latest_recovery_status"] == "recovered"
+    assert lineage_item["recovered_job_count"] == 1
+    assert dashboard_trends_response.status_code == 200
+    assert "Recovery Lineage" in dashboard_trends_response.text
+    assert source_dashboard_response.status_code == 200
+    assert "Recovery Lineage" in source_dashboard_response.text
+    assert "dashboard-operator" in source_dashboard_response.text
 
 
 def test_dry_run_job_execution_recovery_is_blocked(tmp_path: Path) -> None:

@@ -597,6 +597,7 @@ class OperationsConsoleReport(BaseModel):
     ops_brief: OpsBriefReport
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
+    worker_recovery_lineage: dict[str, Any] = Field(default_factory=dict)
     release_gate: dict[str, Any] = Field(default_factory=dict)
     retention_report: RetentionReport
     retention_archives: RetentionArchiveListResponse
@@ -928,6 +929,7 @@ class ReleaseEvidenceBundle(BaseModel):
     )
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
+    worker_recovery_lineage: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alert_deliveries: list[dict[str, Any]] = Field(default_factory=list)
     worker_delivery_summary_deliveries: list[dict[str, Any]] = Field(default_factory=list)
     latest_release_approval: ReleaseApprovalRecord | None = None

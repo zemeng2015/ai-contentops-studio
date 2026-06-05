@@ -1125,6 +1125,7 @@ def test_cli_job_recovery_plan_can_run_failed_jobs(
             "Retry provider timeout.",
         ],
     )
+    lineage_result = runner.invoke(app, ["job-recovery-lineage", "--days", "1"])
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
@@ -1136,6 +1137,15 @@ def test_cli_job_recovery_plan_can_run_failed_jobs(
     )
     assert payload["results"][0]["metadata"]["recovery_actor"] == "zack"
     assert payload["results"][0]["metadata"]["recovery_notes"] == "Retry provider timeout."
+    assert lineage_result.exit_code == 0
+    lineage_payload = json.loads(lineage_result.output)
+    assert lineage_payload["recovery_attempt_count"] == 1
+    lineage_item = next(
+        item
+        for item in lineage_payload["items"]
+        if item["source_execution_id"] == failed.execution_id
+    )
+    assert lineage_item["latest_recovery_status"] == "recovered"
 
 
 def test_cli_worker_jobs_command(

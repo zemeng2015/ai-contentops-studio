@@ -21,6 +21,7 @@ from contentops_core.jobs import (
     job_execution_alert_report,
     job_execution_summary,
     job_execution_trends,
+    job_recovery_lineage,
     job_recovery_plan,
     list_job_execution_reports,
     list_scheduled_workflow_review_packages,
@@ -786,6 +787,69 @@ def test_job_recovery_plan_blocks_dry_run_receipts(tmp_path: Path) -> None:
     assert plan.failed_count == 0
     assert plan.jobs == []
     assert "Dry-run" in (plan.blocked_reason or "")
+
+
+def test_job_recovery_lineage_tracks_failed_execution_recovery(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    failed = JobExecutionReport(
+        name="daily-calendar",
+        total=2,
+        succeeded=0,
+        failed=2,
+        results=[
+            JobRunResult(job_name="source-timeout", topic="Timeout", status="failed", error="504"),
+            JobRunResult(job_name="source-error", topic="Error", status="failed", error="500"),
+        ],
+    )
+    recovered = JobExecutionReport(
+        name="daily-calendar-recovery",
+        total=2,
+        succeeded=1,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="source-timeout",
+                topic="Timeout",
+                status="needs_review",
+                run_id="run-recovered",
+                metadata={
+                    "recovery_source_execution_id": failed.execution_id,
+                    "recovery_actor": "zack",
+                    "recovery_notes": "Retry provider timeout.",
+                },
+            ),
+            JobRunResult(
+                job_name="source-error",
+                topic="Error",
+                status="failed",
+                error="still failing",
+                metadata={"recovery_source_execution_id": failed.execution_id},
+            ),
+        ],
+    )
+    write_job_execution_report(failed, receipt_dir)
+    write_job_execution_report(recovered, receipt_dir)
+
+    lineage = job_recovery_lineage(receipt_dir, days=1)
+
+    assert lineage.total_failed_executions == 2
+    assert lineage.recovery_attempt_count == 1
+    assert lineage.failed_recovery_attempt_count == 1
+    source_item = next(
+        item for item in lineage.items if item.source_execution_id == failed.execution_id
+    )
+    recovery_item = next(
+        item for item in lineage.items if item.source_execution_id == recovered.execution_id
+    )
+    assert source_item.latest_recovery_status == "partial"
+    assert source_item.recovery_attempt_count == 1
+    assert source_item.recovered_job_count == 1
+    assert source_item.unresolved_job_count == 1
+    assert source_item.attempts[0].actor == "zack"
+    assert source_item.attempts[0].notes == "Retry provider timeout."
+    assert "Resolve the remaining 1 failed recovery job" in source_item.recommended_actions[0]
+    assert recovery_item.latest_recovery_status == "not_started"
+    assert lineage.action_required is True
 
 
 def test_missing_job_execution_history_is_empty(tmp_path: Path) -> None:

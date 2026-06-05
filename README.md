@@ -233,6 +233,7 @@ GET  /release-gates
 GET  /worker-jobs
 GET  /job-executions
 GET  /job-executions/trends
+GET  /job-executions/recovery-lineage
 GET  /job-executions/{execution_id}/summary
 POST /job-executions/{execution_id}/approve-runs
 POST /job-executions/{execution_id}/publish-runs
@@ -445,6 +446,7 @@ Failed worker executions can produce recovery YAML:
 ```powershell
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 contentops job-recovery-plan <execution_id> --run --actor zack --notes "Retry provider timeout"
+contentops job-recovery-lineage --days 14
 ```
 
 The API and dashboard can also run the recovery plan directly with
@@ -452,7 +454,10 @@ The API and dashboard can also run the recovery plan directly with
 executions write normal worker receipts and preserve `recovery_source_execution_id`,
 `recovery_actor`, and `recovery_notes` metadata so reruns remain auditable. Recovery plans expose
 `runnable`, `blocked_reason`, and `source_dry_run`; dashboard previews show the jobs that will be
-retried, and dry-run receipts are blocked from recovery execution.
+retried, and dry-run receipts are blocked from recovery execution. Recovery lineage is available
+through `GET /job-executions/recovery-lineage`, the worker execution trends dashboard, and
+`worker_recovery_lineage.json` in release evidence so operators can see which failed executions
+were recovered, partially recovered, or still waiting for action.
 
 ## Configuration
 

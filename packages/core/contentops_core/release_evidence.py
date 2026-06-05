@@ -28,6 +28,7 @@ from contentops_core.jobs import (
     job_execution_alert_report,
     job_execution_dir,
     job_execution_trends,
+    job_recovery_lineage,
     list_scheduled_workflow_review_packages,
     worker_delivery_summary_notification_log,
 )
@@ -125,6 +126,10 @@ def build_release_evidence(
         job_execution_dir(settings.artifact_root),
         days=14,
     )
+    worker_recovery_lineage = job_recovery_lineage(
+        job_execution_dir(settings.artifact_root),
+        days=14,
+    )
     worker_alert_deliveries = job_execution_alert_notification_log(
         job_execution_dir(settings.artifact_root)
     )
@@ -155,6 +160,7 @@ def build_release_evidence(
         "summary.json",
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
+        "worker_recovery_lineage.json",
         "worker_execution_trends.json",
         "worker_delivery_summary_deliveries.json",
         "worker_delivery_summaries.json",
@@ -190,6 +196,7 @@ def build_release_evidence(
         retention_archives=retention_archives,
         scheduled_review_packages=scheduled_review_packages,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
+        worker_recovery_lineage=worker_recovery_lineage.model_dump(mode="json"),
         worker_execution_alert_deliveries=[
             delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
         ],
@@ -233,6 +240,7 @@ def write_release_evidence(
         "summary": bundle.summary.model_dump(mode="json"),
         "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
         "worker_execution_alerts": bundle.worker_execution_alerts,
+        "worker_recovery_lineage": bundle.worker_recovery_lineage,
         "worker_execution_trends": bundle.worker_execution_trends,
         "worker_delivery_summary_deliveries": bundle.worker_delivery_summary_deliveries,
         "worker_delivery_summaries": bundle.worker_delivery_summaries.model_dump(mode="json"),

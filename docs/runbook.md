@@ -124,10 +124,10 @@ handoff failures, release evidence failures, dry-run receipts, and generic recov
 Use the failure `category` field in job execution trends and release evidence to separate
 provider, publishing, content distribution, delivery summary, homepage handoff, and release
 evidence failures before choosing a recovery path.
-The same trend, alert, and notification payloads are written to release evidence as
-`worker_execution_trends.json`, `worker_execution_alerts.json`, and
-`worker_execution_alert_deliveries.json`, so compare the dashboard with the latest CI evidence
-bundle when investigating scheduled automation regressions.
+The same trend, alert, recovery lineage, and notification payloads are written to release evidence
+as `worker_execution_trends.json`, `worker_execution_alerts.json`,
+`worker_recovery_lineage.json`, and `worker_execution_alert_deliveries.json`, so compare the
+dashboard with the latest CI evidence bundle when investigating scheduled automation regressions.
 Release evidence also writes `scheduled_review_packages.json`, which records recent scheduled
 review manifest status, verification failures, archive readiness, ZIP hashes, S3 mirror status,
 and action-required state for audit handoff.
@@ -235,7 +235,9 @@ run only failed jobs and write a new audited worker receipt. Recovery job metada
 `recovery_source_execution_id`, `recovery_actor`, and `recovery_notes`. Recovery plans expose
 `runnable`, `blocked_reason`, and `source_dry_run`; use the dashboard preview to confirm which jobs
 will rerun. Dry-run receipts are schedule previews and are intentionally blocked from recovery
-execution.
+execution. Use `contentops job-recovery-lineage --days 14`,
+`GET /job-executions/recovery-lineage`, or `/dashboard/job-execution-trends` to verify whether the
+failed execution is recovered, partially recovered, or still waiting for a recovery attempt.
 
 ## 3. CloudWatch Operations
 
@@ -339,6 +341,7 @@ The same catalog is available from:
 ```text
 GET /content?limit=20&offset=0
 GET /job-executions/{execution_id}/recovery-plan
+GET /job-executions/recovery-lineage
 GET /scorecards?limit=20&offset=0
 GET /cost-reports?limit=20&offset=0
 GET /audit-events?limit=20&offset=0

@@ -21,6 +21,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobExecutionSummary,
     JobExecutionTrendReport,
+    JobRecoveryLineageReport,
     JobRecoveryPlan,
     JobRunner,
     ScheduledWorkflowReviewPackageItem,
@@ -37,6 +38,7 @@ from contentops_core.jobs import (
     job_execution_run_ids,
     job_execution_summary,
     job_execution_trends,
+    job_recovery_lineage,
     job_recovery_plan,
     list_job_execution_reports,
     list_scheduled_workflow_review_packages,
@@ -446,6 +448,16 @@ def build_ops_router(
         days: int = Query(default=14, ge=1, le=90),
     ) -> JobExecutionTrendReport:
         return job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
+
+    @router.get(
+        "/job-executions/recovery-lineage",
+        response_model=JobRecoveryLineageReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_job_recovery_lineage(
+        days: int = Query(default=14, ge=1, le=90),
+    ) -> JobRecoveryLineageReport:
+        return job_recovery_lineage(job_execution_dir(settings.artifact_root), days=days)
 
     @router.get(
         "/job-executions/alerts",

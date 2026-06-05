@@ -71,6 +71,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "summary.json",
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
+        "worker_recovery_lineage.json",
         "worker_execution_trends.json",
         "worker_delivery_summary_deliveries.json",
         "worker_delivery_summaries.json",
@@ -92,6 +93,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     worker_alerts = json.loads(
         (output_dir / "worker_execution_alerts.json").read_text(encoding="utf-8")
     )
+    worker_recovery = json.loads(
+        (output_dir / "worker_recovery_lineage.json").read_text(encoding="utf-8")
+    )
     worker_alert_deliveries = json.loads(
         (output_dir / "worker_execution_alert_deliveries.json").read_text(encoding="utf-8")
     )
@@ -104,6 +108,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
     source_reviews = json.loads(
         (output_dir / "source_reviews.json").read_text(encoding="utf-8")
     )
+    assert worker_recovery["total_failed_executions"] >= 0
     scheduled_review_packages = json.loads(
         (output_dir / "scheduled_review_packages.json").read_text(encoding="utf-8")
     )
@@ -512,8 +517,10 @@ def test_release_evidence_includes_worker_execution_trends(
     assert trends["summary"]["published_runs"] == 1
     assert trends["summary"]["top_failure_reasons"] == []
     assert bundle.worker_execution_alerts["action_required"] is False
+    assert bundle.worker_recovery_lineage["total_failed_executions"] == 0
     assert "worker_execution_trends.json" in bundle.summary.artifact_files
     assert "worker_execution_alerts.json" in bundle.summary.artifact_files
+    assert "worker_recovery_lineage.json" in bundle.summary.artifact_files
     assert "worker_execution_alert_deliveries.json" in bundle.summary.artifact_files
     assert evidence_manifest["artifacts"]["worker_execution_trends.json"]["media_type"] == (
         "application/json"
