@@ -21,3 +21,4 @@ Future evaluator upgrades:
 - factuality checks against retrieved snippets
 - writing style regression tests
 - project implication coverage by portfolio project
+- provider-metadata review for query planning and repository maturity signals

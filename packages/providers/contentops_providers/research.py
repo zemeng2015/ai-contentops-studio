@@ -423,6 +423,7 @@ class SearchResult:
     url: str | None
     snippet: str
     publisher: str
+    query: str = ""
 
 
 class SearchResearchProvider:
@@ -457,7 +458,8 @@ class SearchResearchProvider:
         )
 
     def collect(self, request: RunRequest) -> ResearchPacket:
-        results = self._search(request.topic)
+        planned_queries = self._planned_queries(request.topic)
+        results = self._search_queries(planned_queries)
         selected = results[: self.max_sources]
         sources = dedupe_sources(self._sources_from_results(selected), topic=request.topic)
         claims = [
@@ -485,6 +487,14 @@ class SearchResearchProvider:
                 "Use search provider credentials in deployed workers for daily AI monitoring.",
                 "Persist search metadata so review and evaluation stay auditable.",
             ],
+            provider_metadata={
+                "provider": "search",
+                "planned_queries": planned_queries,
+                "result_count": len(results),
+                "selected_count": len(selected),
+                "selected_urls": [result.url for result in selected if result.url],
+                "enrich_results": self.enrich_results,
+            },
         )
 
     def _sources_from_results(self, results: list[SearchResult]) -> list[Source]:
@@ -508,6 +518,23 @@ class SearchResearchProvider:
         )
 
     def _search(self, topic: str) -> list[SearchResult]:
+        return self._search_queries(self._planned_queries(topic))
+
+    def _search_queries(self, queries: list[str]) -> list[SearchResult]:
+        results: list[SearchResult] = []
+        seen_urls: set[str] = set()
+        for query in queries:
+            for result in self._search_one(query):
+                key = _normalize_url(result.url) or f"{result.publisher}:{result.title}".lower()
+                if key in seen_urls:
+                    continue
+                seen_urls.add(key)
+                results.append(result)
+                if len(results) >= self.max_sources:
+                    return results
+        return results
+
+    def _search_one(self, query: str) -> list[SearchResult]:
         try:
             with httpx.Client(
                 timeout=self.timeout_seconds,
@@ -521,7 +548,7 @@ class SearchResearchProvider:
                 response = _get_with_retries(
                     client,
                     self.endpoint,
-                    params={"q": topic, "count": self.max_sources},
+                    params={"q": query, "count": self.max_sources},
                     retry_attempts=self.retry_attempts,
                     retry_backoff_seconds=self.retry_backoff_seconds,
                 )
@@ -529,16 +556,32 @@ class SearchResearchProvider:
         except Exception as exc:
             return [
                 SearchResult(
-                    title=f"Search failed for: {topic}",
+                    title=f"Search failed for: {query}",
                     url=self.endpoint,
                     snippet=f"Search provider request failed: {exc}",
                     publisher=_publisher_from_url(self.endpoint),
+                    query=query,
                 )
             ]
-        return self._parse_results(payload)
+        return self._parse_results(payload, query=query)
 
     @staticmethod
-    def _parse_results(payload: object) -> list[SearchResult]:
+    def _planned_queries(topic: str) -> list[str]:
+        normalized_topic = re.sub(r"\s+", " ", topic).strip()
+        if not normalized_topic:
+            return ["AI engineering production systems"]
+        lower_topic = normalized_topic.casefold()
+        variants = [normalized_topic]
+        if not any(term in lower_topic for term in ("production", "architecture")):
+            variants.append(f"{normalized_topic} production architecture")
+        if not any(term in lower_topic for term in ("evaluation", "observability", "eval")):
+            variants.append(f"{normalized_topic} evaluation observability")
+        if not any(term in lower_topic for term in ("aws", "cloud", "deployment")):
+            variants.append(f"{normalized_topic} AWS deployment workflow")
+        return variants[:4]
+
+    @staticmethod
+    def _parse_results(payload: object, query: str = "") -> list[SearchResult]:
         if not isinstance(payload, dict):
             return []
         raw_results = _search_result_items(payload)
@@ -555,6 +598,7 @@ class SearchResearchProvider:
                     url=url,
                     snippet=snippet,
                     publisher=_publisher_from_url(url or ""),
+                    query=query,
                 )
             )
         return results
@@ -626,11 +670,13 @@ class GitHubResearchProvider:
                     extraction_quality=0.2,
                 )
             ]
+            project_intelligence: list[dict[str, object]] = []
         else:
             sources = dedupe_sources(
                 [source for repo_ref in refs for source in self._collect_repo_sources(repo_ref)],
                 topic=request.topic,
             )
+            project_intelligence = self._project_intelligence(refs, sources)
         claims = [
             Claim(
                 text=f"{source.title} provides repository evidence for {request.topic}.",
@@ -670,7 +716,55 @@ class GitHubResearchProvider:
                 ),
                 "Configure worker jobs with repository source_urls for repeatable product updates.",
             ],
+            provider_metadata={
+                "provider": "github",
+                "requested_repositories": [repo_ref.full_name for repo_ref in refs],
+                "resolved_repositories": [
+                    item["repository"]
+                    for item in project_intelligence
+                    if item.get("failed") is False
+                ],
+                "source_count": len(sources),
+                "project_intelligence": project_intelligence,
+            },
         )
+
+    @staticmethod
+    def _project_intelligence(
+        refs: list[GitHubRepositoryRef],
+        sources: list[Source],
+    ) -> list[dict[str, object]]:
+        intelligence: list[dict[str, object]] = []
+        for repo_ref in refs:
+            repo_sources = [
+                source for source in sources if repo_ref.full_name in source.title
+            ]
+            evidence_types = sorted({source.extraction_status for source in repo_sources})
+            failed = any(source.extraction_status == "failed" for source in repo_sources)
+            has_readme = any(source.extraction_status == "github_readme" for source in repo_sources)
+            has_issues = any(source.extraction_status == "github_issues" for source in repo_sources)
+            has_pull_requests = any(
+                source.extraction_status == "github_pull_requests" for source in repo_sources
+            )
+            maturity_signals: list[str] = []
+            if has_readme:
+                maturity_signals.append("README evidence available")
+            if has_issues:
+                maturity_signals.append("open issue activity available")
+            if has_pull_requests:
+                maturity_signals.append("open pull request activity available")
+            intelligence.append(
+                {
+                    "repository": repo_ref.full_name,
+                    "source_count": len(repo_sources),
+                    "evidence_types": evidence_types,
+                    "has_readme": has_readme,
+                    "has_activity": has_issues or has_pull_requests,
+                    "failed": failed,
+                    "maturity_signals": maturity_signals,
+                }
+            )
+        return intelligence
 
     def _collect_repo_sources(self, repo_ref: GitHubRepositoryRef) -> list[Source]:
         try:

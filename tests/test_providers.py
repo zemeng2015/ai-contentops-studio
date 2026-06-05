@@ -400,6 +400,16 @@ def test_search_research_parses_brave_style_results(
     assert packet.sources[0].extraction_status == "search_enriched"
     assert packet.sources[0].extraction_quality > 0.68
     assert packet.sources[0].publisher == "example.com"
+    assert packet.provider_metadata["provider"] == "search"
+    assert packet.provider_metadata["planned_queries"] == [
+        "Agent evaluation",
+        "Agent evaluation production architecture",
+        "Agent evaluation AWS deployment workflow",
+    ]
+    assert packet.provider_metadata["selected_urls"] == [
+        "https://example.com/agents?ref=search",
+        "https://example.com/releases",
+    ]
 
 
 def test_search_research_falls_back_when_enrichment_fails(
@@ -455,6 +465,94 @@ def test_search_research_falls_back_when_enrichment_fails(
     assert packet.sources[0].title == "Workflow reliability"
     assert packet.sources[0].extraction_status == "search"
     assert packet.sources[0].summary.startswith("Search snippet")
+    assert packet.provider_metadata["result_count"] == 1
+    assert packet.provider_metadata["enrich_results"] is True
+
+
+def test_search_research_plans_multiple_queries_and_dedupes_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        headers = {"content-type": "application/json"}
+        text = ""
+        encoding = "utf-8"
+
+        def __init__(self, query: str) -> None:
+            self.query = query
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            if self.query.endswith("production architecture"):
+                return {
+                    "web": {
+                        "results": [
+                            {
+                                "title": "Duplicate agent system",
+                                "url": "https://example.com/agent-system?ref=2",
+                                "description": "Duplicate result about agent workflow systems.",
+                            },
+                            {
+                                "title": "Agent architecture guide",
+                                "url": "https://example.com/architecture",
+                                "description": (
+                                    "Production architecture for AI agent workflow systems, "
+                                    "evaluation gates, and operational reliability."
+                                ),
+                            },
+                        ]
+                    }
+                }
+            return {
+                "web": {
+                    "results": [
+                        {
+                            "title": "Duplicate agent system",
+                            "url": "https://example.com/agent-system?ref=1",
+                            "description": "Agent system overview.",
+                        }
+                    ]
+                }
+            }
+
+    class FakeClient:
+        queries: list[str] = []
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str, params: dict[str, object] | None = None) -> FakeResponse:
+            assert params is not None
+            query = str(params["q"])
+            FakeClient.queries.append(query)
+            return FakeResponse(query)
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+
+    packet = SearchResearchProvider(
+        endpoint="https://search.example.com",
+        api_key="secret",
+        max_sources=2,
+        enrich_results=False,
+    ).collect(RunRequest(topic="Agent workflow"))
+
+    assert FakeClient.queries == [
+        "Agent workflow",
+        "Agent workflow production architecture",
+    ]
+    assert [source.canonical_url for source in packet.sources] == [
+        "https://example.com/agent-system",
+        "https://example.com/architecture",
+    ]
+    assert packet.provider_metadata["result_count"] == 2
+    assert packet.provider_metadata["selected_count"] == 2
 
 
 def test_github_research_collects_repository_readme_and_activity(
@@ -551,6 +649,14 @@ def test_github_research_collects_repository_readme_and_activity(
     readme_source = next(source for source in packet.sources if source.title.startswith("README"))
     assert readme_source.extraction_status == "github_readme"
     assert "production-minded content operations platform" in readme_source.summary
+    intelligence = packet.provider_metadata["project_intelligence"][0]
+    assert intelligence["repository"] == "zemeng2015/ai-contentops-studio"
+    assert intelligence["has_readme"] is True
+    assert intelligence["has_activity"] is True
+    assert "README evidence available" in intelligence["maturity_signals"]
+    assert packet.provider_metadata["resolved_repositories"] == [
+        "zemeng2015/ai-contentops-studio"
+    ]
 
 
 def test_github_research_reports_missing_repository_urls() -> None:
@@ -558,6 +664,8 @@ def test_github_research_reports_missing_repository_urls() -> None:
 
     assert packet.sources[0].extraction_status == "missing_input"
     assert "source_urls" in packet.sources[0].summary
+    assert packet.provider_metadata["provider"] == "github"
+    assert packet.provider_metadata["requested_repositories"] == []
 
 
 def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch) -> None:

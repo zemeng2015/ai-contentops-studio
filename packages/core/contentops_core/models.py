@@ -54,6 +54,7 @@ class ResearchPacket(BaseModel):
     engineering_signals: list[str]
     risks: list[str]
     project_implications: list[str]
+    provider_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class SourceAssessment(BaseModel):
