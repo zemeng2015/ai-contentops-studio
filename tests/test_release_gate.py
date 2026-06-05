@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from contentops_core.factory import build_pipeline, build_review_service
@@ -74,6 +74,7 @@ def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
     check_names = {check.name for check in report.checks}
     assert "configuration_audit" in check_names
     assert "content_distribution" in check_names
+    assert "retention_archive_governance" in check_names
 
 
 def test_release_gate_warns_for_dirty_distribution_assets(tmp_path: Path) -> None:
@@ -257,6 +258,64 @@ def test_release_gate_fails_with_pending_source_reviews(tmp_path: Path) -> None:
     assert source_review_check.evidence["needs_review_count"] == 1
     assert "source review dashboard" in source_review_check.remediation_steps[0]
     assert report.release_evidence.can_release is False
+
+
+def test_release_gate_warns_when_retention_candidates_lack_archive(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    result = build_pipeline(settings).run(RunRequest(topic="Old retention candidate"))
+    result.run.updated_at = datetime.now(UTC) - timedelta(days=120)
+    repository.save(result.run)
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="retention-warn-sha",
+        require_approval=False,
+    )
+
+    retention_check = next(
+        check for check in report.checks if check.name == "retention_archive_governance"
+    )
+    assert retention_check.status == "warn"
+    assert retention_check.evidence["candidate_count"] == 1
+    assert retention_check.evidence["archive_receipt_count"] == 0
+    assert "retention-archive" in retention_check.remediation_steps[0]
+
+
+def test_release_gate_passes_when_retention_archive_exists(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    result = build_pipeline(settings).run(RunRequest(topic="Archived retention candidate"))
+    result.run.updated_at = datetime.now(UTC) - timedelta(days=120)
+    repository.save(result.run)
+    service.retention_archive(retention_days=90)
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="retention-pass-sha",
+        require_approval=False,
+    )
+
+    retention_check = next(
+        check for check in report.checks if check.name == "retention_archive_governance"
+    )
+    assert retention_check.status == "pass"
+    assert retention_check.evidence["candidate_count"] == 1
+    assert retention_check.evidence["non_dry_run_archive_count"] == 1
 
 
 def test_release_gate_reports_can_be_persisted_and_listed(tmp_path: Path) -> None:

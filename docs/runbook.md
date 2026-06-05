@@ -170,6 +170,10 @@ distribution assets because the manifest is incomplete.
 If the gate reports `publish_verification=fail`, run `contentops verify-publish <run_id>` for each
 drifting run in `publish_verifications.json`, then restore the expected target files, republish the
 approved content, or roll the run back before regenerating release evidence.
+If the gate reports `retention_archive_governance=warn`, run
+`contentops retention-archive --days 90` before cleanup and regenerate release evidence. If it
+reports `fail`, inspect the archive `s3-mirror-log.json` and fix S3 bucket, IAM, or network
+configuration before rerunning the archive.
 Use `contentops publish-recovery-plan <run_id>` or
 `GET /runs/{id}/publish-recovery-plan` before changing files. The plan writes
 `publish-recovery-plan.json` and classifies each target file as `ok`, `missing`, or `mismatch` with

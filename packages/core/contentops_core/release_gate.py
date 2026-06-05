@@ -44,6 +44,7 @@ def release_gate(
         _source_review_governance_check(bundle),
         _publish_verification_check(bundle),
         _content_distribution_check(bundle),
+        _retention_archive_governance_check(bundle, review_service),
         _deployment_preflight_check(bundle),
         _configuration_audit_check(audit),
         _approval_check(bundle, require_approval),
@@ -309,6 +310,56 @@ def _publish_verification_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
             "drift_count": verifications.drift_count,
             "missing_receipt_count": verifications.missing_receipt_count,
         },
+    )
+
+
+def _retention_archive_governance_check(
+    bundle: ReleaseEvidenceBundle,
+    review_service: ReviewService,
+) -> ReleaseGateItem:
+    retention_report = review_service.retention_report()
+    archives = bundle.retention_archives
+    failed_mirrors = [
+        item.archive_id for item in archives.items if item.s3_mirror_status == "failed"
+    ]
+    non_dry_run_archives = [item for item in archives.items if not item.dry_run]
+    evidence = {
+        "retention_days": retention_report.retention_days,
+        "candidate_count": retention_report.candidate_count,
+        "candidate_size_bytes": retention_report.candidate_size_bytes,
+        "archive_receipt_count": archives.total,
+        "non_dry_run_archive_count": len(non_dry_run_archives),
+        "failed_s3_mirror_archive_ids": failed_mirrors,
+    }
+    if failed_mirrors:
+        return ReleaseGateItem(
+            name="retention_archive_governance",
+            status="fail",
+            message="Retention archive receipts include failed S3 mirror attempts.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `retention_archives.json` and the archive `s3-mirror-log.json`.",
+                "Fix S3 bucket, IAM, or network configuration for archive mirroring.",
+                "Rerun `contentops retention-archive --days 90` and regenerate release evidence.",
+            ],
+        )
+    if retention_report.candidate_count and not non_dry_run_archives:
+        return ReleaseGateItem(
+            name="retention_archive_governance",
+            status="warn",
+            message="Old artifact candidates exist without a non-dry-run archive receipt.",
+            evidence=evidence,
+            remediation_steps=[
+                "Run `contentops retention-archive --days 90` before artifact cleanup.",
+                "Review the generated zip and JSON receipt under `retention-archives`.",
+                "Regenerate release evidence so `retention_archives.json` includes the receipt.",
+            ],
+        )
+    return ReleaseGateItem(
+        name="retention_archive_governance",
+        status="pass",
+        message="Artifact retention archive evidence is sufficient for the current window.",
+        evidence=evidence,
     )
 
 

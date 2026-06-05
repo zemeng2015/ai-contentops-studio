@@ -182,6 +182,8 @@ read-only so archive and cleanup decisions can be reviewed before any destructiv
 Retention archives turn those candidates into a non-destructive zip plus JSON receipt through
 `contentops retention-archive` and `POST /retention-archives`; release evidence indexes recent
 archive receipts in `retention_archives.json`.
+The release gate includes `retention_archive_governance`: it warns when old artifact candidates
+exist without a non-dry-run archive receipt and fails when recorded archive S3 mirroring failed.
 Published runs are projected into a content catalog exposed through `/content`, `contentops content`,
 and the dashboard. The catalog combines run metadata, publish receipts, URLs, providers, publish
 timestamps, and evaluation scores so the platform can be reviewed as a content inventory instead
