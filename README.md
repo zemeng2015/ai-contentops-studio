@@ -140,6 +140,7 @@ contentops release-evidence --output-dir release-evidence
 contentops operations-console --days 14 --json
 contentops provider-health --json
 contentops content-calendar --json
+contentops content-calendar-run --workflow daily-ai-roundup --job production-llm-systems
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
@@ -235,6 +236,7 @@ GET  /release-gate
 GET  /release-gates
 GET  /worker-jobs
 GET  /content-calendar
+POST /content-calendar/runs
 GET  /job-executions
 GET  /job-executions/trends
 GET  /job-executions/recovery-lineage
@@ -253,6 +255,10 @@ database, and publishing-provider risks.
 `content-calendar` and `GET /content-calendar` summarize planned YAML campaigns, publish/review
 intent, homepage handoff coverage, recent worker success rate, tag coverage, risks, and recommended
 next actions. This gives operators a planning view before scheduled automation creates new runs.
+Operators can turn a planned item into a real run through
+`contentops content-calendar-run --workflow <name> --job <name>`, `POST /content-calendar/runs`,
+or the dashboard Content Calendar page. The created run keeps workflow, job, tag, publish intent,
+and calendar item metadata in `request.json` and `workflow-context.json`.
 `config-audit` exposes a redacted runtime and secret posture report, so production operators can
 verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or

@@ -7,6 +7,7 @@ from subprocess import run
 import pytest
 from contentops_api.main import app, settings
 from contentops_api.routes.dashboard import build_dashboard_router
+from contentops_api.routes.ops import build_ops_router
 from contentops_api.routes.runs import build_runs_router
 from contentops_core.diagnostics import integration_smoke_dir, run_integration_smoke
 from contentops_core.factory import build_pipeline, build_review_service
@@ -1153,6 +1154,91 @@ jobs:
     assert payload["next_items"][0]["job_name"] == "api-launch"
 
 
+def test_content_calendar_run_endpoint_creates_lineaged_run(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: api-calendar
+jobs:
+  - name: api-launch
+    topic: API launch content operations
+    publish: false
+    source_urls:
+      - https://example.com/source
+    tags: [api, launch]
+""",
+        encoding="utf-8",
+    )
+    local_settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        pipeline_dir=pipeline_dir,
+        site_output_dir=tmp_path / "site",
+    )
+    local_pipeline = build_pipeline(local_settings)
+    local_repository = RunRepository(local_settings.database_url)
+    local_review_service = build_review_service(local_settings)
+    local_app = FastAPI()
+
+    async def allow_read(_request: Request) -> None:
+        return None
+
+    async def allow_operator(_request: Request) -> None:
+        return None
+
+    def parse_status(status: str) -> RunStatus | None:
+        if not status:
+            return None
+        return RunStatus(status)
+
+    local_app.include_router(
+        build_ops_router(
+            settings=local_settings,
+            pipeline=local_pipeline,
+            repository=local_repository,
+            review_service=local_review_service,
+            require_read_access=allow_read,
+            require_operator=allow_operator,
+            parse_status_filter=parse_status,
+        )
+    )
+    local_app.include_router(
+        build_dashboard_router(
+            settings=local_settings,
+            pipeline=local_pipeline,
+            repository=local_repository,
+            review_service=local_review_service,
+            require_read_access=allow_read,
+            require_operator=allow_operator,
+            parse_status_filter=parse_status,
+        )
+    )
+    client = TestClient(local_app)
+
+    response = client.post(
+        "/content-calendar/runs",
+        params={"workflow_name": "api-calendar", "job_name": "api-launch"},
+    )
+    dashboard_response = client.post(
+        "/dashboard/content-calendar/runs",
+        data={"workflow_name": "api-calendar", "job_name": "api-launch"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["topic"] == "API launch content operations"
+    request_payload = json.loads(
+        (Path(payload["artifact_dir"]) / "request.json").read_text(encoding="utf-8")
+    )
+    assert request_payload["metadata"]["contentops_calendar_item_key"] == (
+        "api-calendar/api-launch"
+    )
+    assert dashboard_response.status_code == 303
+    assert "/dashboard/runs/" in dashboard_response.headers["location"]
+
+
 def test_dashboard_worker_jobs_shows_content_calendar(tmp_path: Path) -> None:
     client = TestClient(app)
     original_pipeline_dir = settings.pipeline_dir
@@ -1200,6 +1286,7 @@ jobs:
     assert "ready" in calendar_response.text
     assert "github-project-update" in calendar_response.text
     assert "Homepage handoffs" in calendar_response.text
+    assert "Create run" in calendar_response.text
     assert "review first" in calendar_response.text
     assert "github.com/zemeng2015/ai-contentops-studio" in calendar_response.text
     assert "research_provider=github" in calendar_response.text

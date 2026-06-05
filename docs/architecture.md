@@ -245,6 +245,11 @@ publish intent, topics, tags, and invalid YAML before EventBridge or a manual ru
 catalog. The brief combines planned workflows, publish/review intent, homepage handoff coverage,
 tag coverage, recent worker execution success rate, risks, and recommended actions so teams can
 decide what to run, review, or fix next without reading every YAML file or receipt.
+Operators can promote a planned item into an actual run with
+`contentops content-calendar-run --workflow <name> --job <name>`, `POST /content-calendar/runs`,
+or the dashboard. The resulting `RunRequest` keeps `contentops_calendar_source`,
+`contentops_calendar_item_key`, workflow name, job name, tags, and publish intent metadata, so the
+run detail page and artifacts retain lineage back to the content calendar.
 
 Every worker invocation writes a job execution receipt under `artifact_root/job-executions` by
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,

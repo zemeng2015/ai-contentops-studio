@@ -32,6 +32,7 @@ from contentops_core.jobs import (
     WorkerJobReadinessResponse,
     archive_scheduled_workflow_review_package,
     content_calendar_brief,
+    content_calendar_run_request,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
@@ -81,6 +82,7 @@ from contentops_core.models import (
     RetentionArchiveRecord,
     RetentionReport,
     ReviewBatchResult,
+    RunRecord,
     RunStatus,
     ScorecardListResponse,
     SystemStatus,
@@ -357,6 +359,28 @@ def build_ops_router(
         if report.action_required:
             response.status_code = 409
         return report
+
+    @router.post(
+        "/content-calendar/runs",
+        response_model=RunRecord,
+        dependencies=[Depends(require_operator)],
+    )
+    def create_content_calendar_run(
+        workflow_name: str,
+        job_name: str,
+        publish: bool | None = Query(default=None),
+    ) -> RunRecord:
+        try:
+            request = content_calendar_run_request(
+                settings.pipeline_dir,
+                workflow_name=workflow_name,
+                job_name=job_name,
+                publish=publish,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        result = pipeline.run(request)
+        return result.run
 
     @router.get(
         "/job-executions",

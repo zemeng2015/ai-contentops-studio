@@ -454,6 +454,7 @@ class WorkerJobReadinessResponse(BaseModel):
 
 
 class ContentCalendarPlanItem(BaseModel):
+    item_key: str
     workflow_name: str
     job_name: str
     topic: str
@@ -732,6 +733,36 @@ def content_calendar_brief(
     )
 
 
+def content_calendar_run_request(
+    pipeline_dir: Path,
+    *,
+    workflow_name: str,
+    job_name: str,
+    publish: bool | None = None,
+) -> RunRequest:
+    for item in list_worker_job_catalog(pipeline_dir).items:
+        if item.name != workflow_name or not item.valid:
+            continue
+        for job in item.jobs:
+            if job.name != job_name:
+                continue
+            request = job.to_request(workflow_name=workflow_name)
+            request.metadata["contentops_calendar_source"] = "content_calendar"
+            request.metadata["contentops_calendar_item_key"] = _calendar_item_key(
+                workflow_name,
+                job_name,
+            )
+            request.metadata["contentops_calendar_workflow_path"] = item.path
+            if publish is not None:
+                request.publish = publish
+                request.metadata["contentops_publish_intent"] = (
+                    "publish" if publish else "review"
+                )
+                request.metadata["contentops_calendar_publish_override"] = "true"
+            return request
+    raise ValueError(f"Content calendar item not found: {workflow_name}/{job_name}")
+
+
 def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) -> Path:
     receipt_dir.mkdir(parents=True, exist_ok=True)
     path = (
@@ -884,6 +915,7 @@ def _calendar_plan_items(items: list[WorkerJobCatalogItem]) -> list[ContentCalen
         for job in item.jobs:
             plan_items.append(
                 ContentCalendarPlanItem(
+                    item_key=_calendar_item_key(item.name, job.name),
                     workflow_name=item.name,
                     job_name=job.name,
                     topic=job.topic,
@@ -909,6 +941,10 @@ def _calendar_plan_items(items: list[WorkerJobCatalogItem]) -> list[ContentCalen
             plan.job_name,
         ),
     )
+
+
+def _calendar_item_key(workflow_name: str, job_name: str) -> str:
+    return f"{workflow_name}/{job_name}"
 
 
 def _calendar_priority(job: ContentJob) -> int:

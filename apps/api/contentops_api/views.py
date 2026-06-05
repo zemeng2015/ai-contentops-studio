@@ -840,7 +840,10 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
     """
 
 
-def _content_calendar_brief_html(report: ContentCalendarBrief) -> str:
+def _content_calendar_brief_html(
+    report: ContentCalendarBrief,
+    api_key: str = "",
+) -> str:
     tag_rows = "".join(
         f"<tr><td>{escape(tag)}</td><td>{count}</td></tr>"
         for tag, count in report.tag_coverage.items()
@@ -857,6 +860,13 @@ def _content_calendar_brief_html(report: ContentCalendarBrief) -> str:
           <td>{escape(item.schedule_cron or "manual")}</td>
           <td>{escape(", ".join(item.tags) or "none")}</td>
           <td>{escape(item.rationale)}</td>
+          <td>
+            <form method="post" action="/dashboard/content-calendar/runs{_api_key_query(api_key)}">
+              <input type="hidden" name="workflow_name" value="{escape(item.workflow_name)}">
+              <input type="hidden" name="job_name" value="{escape(item.job_name)}">
+              <button type="submit">Create run</button>
+            </form>
+          </td>
         </tr>
         """
         for item in report.next_items
@@ -883,6 +893,7 @@ def _content_calendar_brief_html(report: ContentCalendarBrief) -> str:
           <tr>
             <th>Priority</th><th>Workflow</th><th>Job</th><th>Intent</th>
             <th>Status</th><th>Topic</th><th>Schedule</th><th>Tags</th><th>Rationale</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>{item_rows}</tbody>

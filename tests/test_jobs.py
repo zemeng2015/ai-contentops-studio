@@ -16,6 +16,7 @@ from contentops_core.jobs import (
     JobRunner,
     JobRunResult,
     content_calendar_brief,
+    content_calendar_run_request,
     create_scheduled_workflow_review_archive,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -258,6 +259,45 @@ jobs:
     assert brief.next_items[0].owner == "zack"
     assert any("failed execution" in risk for risk in brief.risks)
     assert any("job recovery plan" in action for action in brief.recommended_actions)
+
+
+def test_content_calendar_run_request_preserves_lineage(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: launch-calendar
+jobs:
+  - name: launch-post
+    topic: Launch post from calendar
+    publish: true
+    homepage_handoff: true
+    source_urls:
+      - https://example.com/source
+    tags: [launch, portfolio]
+    metadata:
+      owner: zack
+""",
+        encoding="utf-8",
+    )
+
+    request = content_calendar_run_request(
+        pipeline_dir,
+        workflow_name="launch-calendar",
+        job_name="launch-post",
+        publish=False,
+    )
+
+    assert request.topic == "Launch post from calendar"
+    assert request.source_urls == ["https://example.com/source"]
+    assert request.publish is False
+    assert request.metadata["contentops_job_name"] == "launch-post"
+    assert request.metadata["contentops_workflow_name"] == "launch-calendar"
+    assert request.metadata["contentops_job_tags"] == "launch,portfolio"
+    assert request.metadata["contentops_calendar_source"] == "content_calendar"
+    assert request.metadata["contentops_calendar_item_key"] == "launch-calendar/launch-post"
+    assert request.metadata["contentops_calendar_workflow_path"] == "calendar.yaml"
+    assert request.metadata["contentops_calendar_publish_override"] == "true"
 
 
 def test_job_execution_receipts_can_be_listed_and_loaded(tmp_path: Path) -> None:

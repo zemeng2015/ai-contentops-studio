@@ -204,6 +204,53 @@ jobs:
     assert payload["next_items"][0]["job_name"] == "ai-launch"
 
 
+def test_cli_content_calendar_run_creates_lineaged_run(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: cli-calendar
+jobs:
+  - name: ai-launch
+    topic: AI launch content operations
+    publish: false
+    source_urls:
+      - https://example.com/source
+    tags: [launch]
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(pipeline_dir))
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "content-calendar-run",
+            "--workflow",
+            "cli-calendar",
+            "--job",
+            "ai-launch",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Calendar: cli-calendar/ai-launch" in result.output
+    artifact_dirs = list((tmp_path / "artifacts").glob("*"))
+    assert artifact_dirs
+    request_json = next(path for path in artifact_dirs[0].glob("request.json"))
+    request_payload = json.loads(request_json.read_text(encoding="utf-8"))
+    assert request_payload["metadata"]["contentops_calendar_item_key"] == (
+        "cli-calendar/ai-launch"
+    )
+
+
 def test_cli_release_approval_records_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

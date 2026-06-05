@@ -19,6 +19,7 @@ from contentops_core.jobs import (
     JobRunner,
     archive_scheduled_workflow_review_package,
     content_calendar_brief,
+    content_calendar_run_request,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
@@ -874,7 +875,7 @@ def build_dashboard_router(
                     update jobs should stay in review mode until a human approves the generated
                     article.
                   </p>
-                  {_content_calendar_brief_html(calendar_brief)}
+                  {_content_calendar_brief_html(calendar_brief, api_key)}
                   {_worker_job_readiness_html(readiness)}
                   {_worker_jobs_html(worker_jobs.items)}
                 </section>
@@ -1175,6 +1176,30 @@ def build_dashboard_router(
             RunRequest(topic=topic, source_urls=parsed_source_urls, publish=publish)
         )
         return RedirectResponse(f"/dashboard/runs/{result.run.id}", status_code=303)
+
+
+    @router.post(
+        "/dashboard/content-calendar/runs",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_create_content_calendar_run(
+        workflow_name: Annotated[str, Form()],
+        job_name: Annotated[str, Form()],
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        try:
+            request = content_calendar_run_request(
+                settings.pipeline_dir,
+                workflow_name=workflow_name,
+                job_name=job_name,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        result = pipeline.run(request)
+        return RedirectResponse(
+            f"/dashboard/runs/{result.run.id}{_api_key_query(api_key)}",
+            status_code=303,
+        )
     
     
     @router.get(

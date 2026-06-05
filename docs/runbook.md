@@ -32,6 +32,9 @@ Expected result:
   schedule is enabled.
 - `content-calendar` reports the planned publish/review mix, homepage handoff coverage, risks, and
   recommended actions before the next worker window.
+- Use `contentops content-calendar-run --workflow <name> --job <name>` or the dashboard Content
+  Calendar action when an operator wants to create a reviewable run from a planned item outside the
+  normal schedule.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 

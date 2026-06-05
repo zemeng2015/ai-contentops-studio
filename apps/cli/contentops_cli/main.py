@@ -24,6 +24,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobRunner,
     content_calendar_brief,
+    content_calendar_run_request,
     create_scheduled_workflow_review_archive,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -921,6 +922,43 @@ def content_calendar_command(
     for action in report.recommended_actions:
         typer.echo(f"next: {action}")
     raise typer.Exit(0 if not report.action_required else 1)
+
+
+@app.command("content-calendar-run")
+def content_calendar_run_command(
+    workflow: Annotated[
+        str,
+        typer.Option(help="Content calendar workflow name."),
+    ],
+    job: Annotated[
+        str,
+        typer.Option(help="Content calendar job name."),
+    ],
+    publish: Annotated[
+        bool | None,
+        typer.Option(help="Override publish intent for the created run."),
+    ] = None,
+    pipeline_dir: Annotated[
+        Path | None,
+        typer.Option(help="Directory or YAML file containing worker job definitions."),
+    ] = None,
+) -> None:
+    settings = Settings()
+    try:
+        request = content_calendar_run_request(
+            pipeline_dir or settings.pipeline_dir,
+            workflow_name=workflow,
+            job_name=job,
+            publish=publish,
+        )
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    result = build_pipeline(settings).run(request)
+    typer.echo(f"Run: {result.run.id}")
+    typer.echo(f"Status: {result.run.status.value}")
+    typer.echo(f"Topic: {result.run.topic}")
+    typer.echo(f"Calendar: {workflow}/{job}")
+    typer.echo(f"Artifacts: {result.run.artifact_dir}")
 
 
 @app.command("scheduled-workflow-summary")
