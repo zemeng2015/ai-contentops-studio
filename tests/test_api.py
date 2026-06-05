@@ -963,10 +963,28 @@ def test_dashboard_run_detail_shows_source_review() -> None:
 
     create_response = client.post("/runs", json={"topic": "Dashboard source review"})
     run = create_response.json()
+    research_path = Path(run["artifact_dir"]) / "research.json"
+    research_payload = json.loads(research_path.read_text(encoding="utf-8"))
+    research_payload["provider_metadata"] = {
+        "provider": "search",
+        "planned_queries": [
+            "Dashboard source review",
+            "Dashboard source review production architecture",
+        ],
+        "result_count": 3,
+        "selected_count": 2,
+        "selected_urls": ["https://example.com/research"],
+    }
+    research_path.write_text(json.dumps(research_payload), encoding="utf-8")
     detail_response = client.get(f"/dashboard/runs/{run['id']}")
 
     assert detail_response.status_code == 200
     assert "Source Review" in detail_response.text
+    assert "Research Provider" in detail_response.text
+    assert "Query Plan" in detail_response.text
+    assert "Dashboard source review production architecture" in detail_response.text
+    assert "Selected URLs" in detail_response.text
+    assert "https://example.com/research" in detail_response.text
     assert "Publish Plan" in detail_response.text
     assert "Approval" in detail_response.text
     assert "Publish Receipt" in detail_response.text

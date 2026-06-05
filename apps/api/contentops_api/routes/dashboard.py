@@ -71,6 +71,7 @@ from contentops_api.views import (
     _release_evidence_html,
     _release_gate_history_html,
     _release_gate_html,
+    _research_provider_metadata_html,
     _retention_report_html,
     _s3_mirror_log_html,
     _scorecard_html,
@@ -627,8 +628,11 @@ def build_dashboard_router(
         except (FileNotFoundError, ValueError):
             plan_html = "<p>Publish plan unavailable.</p>"
         source_rows = ""
+        research_provider_html = ""
         if "research.json" in artifacts:
-            source_rows = _source_review_rows(review_service.read_artifact(run_id, "research.json"))
+            research_json = review_service.read_artifact(run_id, "research.json")
+            source_rows = _source_review_rows(research_json)
+            research_provider_html = _research_provider_metadata_html(research_json)
         source_audit_html = ""
         if "source-audit.json" in artifacts:
             source_audit_html = _source_audit_html(
@@ -758,6 +762,8 @@ def build_dashboard_router(
                 </section>
                 <section class="hero">
                   <h3>Source Review</h3>
+                  <h4>Research Provider</h4>
+                  {research_provider_html}
                   {source_audit_html}
                   <table>
                     <thead>

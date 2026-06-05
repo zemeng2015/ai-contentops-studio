@@ -1935,6 +1935,82 @@ def _source_review_rows(research_json: str) -> str:
     return "\n".join(rows)
 
 
+def _research_provider_metadata_html(research_json: str) -> str:
+    data = json.loads(research_json)
+    metadata = data.get("provider_metadata")
+    if not isinstance(metadata, dict) or not metadata:
+        return "<p>No provider metadata recorded for this run.</p>"
+    provider = escape(str(metadata.get("provider", "unknown")))
+    planned_queries = metadata.get("planned_queries")
+    selected_urls = metadata.get("selected_urls")
+    project_intelligence = metadata.get("project_intelligence")
+    summary_items = [
+        ("Provider", provider),
+        ("Results", escape(str(metadata.get("result_count", "n/a")))),
+        ("Selected", escape(str(metadata.get("selected_count", "n/a")))),
+        ("Sources", escape(str(metadata.get("source_count", "n/a")))),
+    ]
+    summary = "".join(
+        f"<div><strong>{value}</strong><span>{escape(label)}</span></div>"
+        for label, value in summary_items
+        if value != "n/a"
+    )
+    sections = [
+        f'<div class="metrics">{summary}</div>' if summary else "",
+    ]
+    if isinstance(planned_queries, list) and planned_queries:
+        sections.append(
+            "<h4>Query Plan</h4><ul>"
+            + "".join(f"<li>{escape(str(query))}</li>" for query in planned_queries)
+            + "</ul>"
+        )
+    if isinstance(selected_urls, list) and selected_urls:
+        sections.append(
+            "<h4>Selected URLs</h4><ul>"
+            + "".join(
+                f'<li><a href="{escape(str(url))}">{escape(str(url))}</a></li>'
+                for url in selected_urls
+            )
+            + "</ul>"
+        )
+    if isinstance(project_intelligence, list) and project_intelligence:
+        rows = []
+        for item in project_intelligence:
+            if not isinstance(item, dict):
+                continue
+            signals = item.get("maturity_signals")
+            signal_text = (
+                ", ".join(str(signal) for signal in signals)
+                if isinstance(signals, list)
+                else ""
+            )
+            rows.append(
+                f"""
+                <tr>
+                  <td>{escape(str(item.get("repository", "unknown")))}</td>
+                  <td>{escape(str(item.get("source_count", "0")))}</td>
+                  <td>{escape("yes" if item.get("has_readme") else "no")}</td>
+                  <td>{escape("yes" if item.get("has_activity") else "no")}</td>
+                  <td>{escape(signal_text or "No maturity signals recorded.")}</td>
+                </tr>
+                """
+            )
+        if rows:
+            sections.append(
+                """
+                <h4>Project Intelligence</h4>
+                <table>
+                  <thead>
+                    <tr><th>Repository</th><th>Sources</th><th>README</th><th>Activity</th><th>Signals</th></tr>
+                  </thead>
+                  <tbody>
+                """
+                + "\n".join(rows)
+                + "</tbody></table>"
+            )
+    return "\n".join(section for section in sections if section)
+
+
 def _source_audit_html(run_id: str, source_audit_json: str) -> str:
     report = SourceAuditReport.model_validate_json(source_audit_json)
     return f"""
