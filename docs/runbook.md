@@ -130,6 +130,9 @@ bundle when investigating scheduled automation regressions.
 Release evidence also writes `scheduled_review_packages.json`, which records recent scheduled
 review manifest status, verification failures, archive readiness, ZIP hashes, and action-required
 state for audit handoff.
+The release gate fails when any package verification status is `fail`, and warns when verified
+manifests do not yet have an archive ZIP. Use `/dashboard/scheduled-reviews` to inspect the package
+and rerun `contentops scheduled-workflow-archive` before promotion.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced

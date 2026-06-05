@@ -127,6 +127,8 @@ The release gate includes a `content_distribution` check. It passes for empty si
 published content lacks distribution evidence or distribution files are still dirty in git, and
 fails when recorded manifests do not include the expected feed, promotion brief, and manifest
 assets.
+It also includes `scheduled_review_packages`: verification failures block deployment, while
+verified manifests without archive ZIPs warn so teams can finish audit packaging before promotion.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing per-run `publish-verification.json` files for drift detection after deploys or
 manual edits. Release evidence now rolls those run-level reports into `publish_verifications.json`,

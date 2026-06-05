@@ -5,6 +5,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from contentops_core.factory import build_pipeline, build_review_service
+from contentops_core.jobs import (
+    JobExecutionReport,
+    JobRunResult,
+    job_execution_dir,
+    scheduled_workflow_review_report,
+    verify_scheduled_workflow_review_manifest,
+    write_job_execution_report,
+    write_scheduled_workflow_pr_metadata,
+    write_scheduled_workflow_review_manifest,
+    write_scheduled_workflow_review_markdown,
+)
 from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest, RunRequest
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_gate import (
@@ -75,6 +86,7 @@ def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
     assert "configuration_audit" in check_names
     assert "content_distribution" in check_names
     assert "retention_archive_governance" in check_names
+    assert "scheduled_review_packages" in check_names
 
 
 def test_release_gate_warns_for_dirty_distribution_assets(tmp_path: Path) -> None:
@@ -258,6 +270,156 @@ def test_release_gate_fails_with_pending_source_reviews(tmp_path: Path) -> None:
     assert source_review_check.evidence["needs_review_count"] == 1
     assert "source review dashboard" in source_review_check.remediation_steps[0]
     assert report.release_evidence.can_release is False
+
+
+def test_release_gate_fails_when_scheduled_review_package_verification_fails(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    receipt = JobExecutionReport(
+        name="scheduled-review-gate",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="review",
+                topic="Scheduled review gate",
+                publish=False,
+                run_id="run-scheduled-gate",
+                status="needs_review",
+            )
+        ],
+    )
+    write_job_execution_report(receipt, job_execution_dir(settings.artifact_root))
+    scheduled_dir = settings.artifact_root / "scheduled"
+    scheduled_dir.mkdir(parents=True)
+    operations_console_path = scheduled_dir / "daily-operations-console.json"
+    operations_console_path.write_text("{}", encoding="utf-8")
+    review = scheduled_workflow_review_report(
+        job_execution_dir(settings.artifact_root),
+        limit=5,
+        operations_console={"status": "pass"},
+    )
+    markdown_path = write_scheduled_workflow_review_markdown(
+        review,
+        scheduled_dir / "daily-review.md",
+    )
+    metadata_path = write_scheduled_workflow_pr_metadata(
+        review,
+        scheduled_dir / "daily-pr-metadata.json",
+    )
+    manifest_path = write_scheduled_workflow_review_manifest(
+        review,
+        scheduled_dir / "daily-review-manifest.json",
+        review_markdown_path=markdown_path,
+        pr_metadata_path=metadata_path,
+        operations_console_path=operations_console_path,
+    )
+    markdown_path.write_text("manual drift", encoding="utf-8")
+    verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    (scheduled_dir / "daily-review-manifest-verification.json").write_text(
+        verification.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="scheduled-review-fail-sha",
+        require_approval=False,
+    )
+
+    scheduled_check = next(
+        check for check in report.checks if check.name == "scheduled_review_packages"
+    )
+    assert report.status == "fail"
+    assert report.can_deploy is False
+    assert scheduled_check.status == "fail"
+    assert scheduled_check.evidence["failed_count"] == 1
+    assert scheduled_check.evidence["failed_package_ids"]
+    assert "/dashboard/scheduled-reviews" in scheduled_check.remediation_steps[0]
+
+
+def test_release_gate_warns_when_scheduled_review_archive_is_missing(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    receipt = JobExecutionReport(
+        name="scheduled-review-archive-missing",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="review",
+                topic="Scheduled review archive missing",
+                publish=False,
+                run_id="run-scheduled-archive-missing",
+                status="needs_review",
+            )
+        ],
+    )
+    write_job_execution_report(receipt, job_execution_dir(settings.artifact_root))
+    scheduled_dir = settings.artifact_root / "scheduled"
+    scheduled_dir.mkdir(parents=True)
+    operations_console_path = scheduled_dir / "daily-operations-console.json"
+    operations_console_path.write_text("{}", encoding="utf-8")
+    review = scheduled_workflow_review_report(
+        job_execution_dir(settings.artifact_root),
+        limit=5,
+        operations_console={"status": "pass"},
+    )
+    markdown_path = write_scheduled_workflow_review_markdown(
+        review,
+        scheduled_dir / "daily-review.md",
+    )
+    metadata_path = write_scheduled_workflow_pr_metadata(
+        review,
+        scheduled_dir / "daily-pr-metadata.json",
+    )
+    manifest_path = write_scheduled_workflow_review_manifest(
+        review,
+        scheduled_dir / "daily-review-manifest.json",
+        review_markdown_path=markdown_path,
+        pr_metadata_path=metadata_path,
+        operations_console_path=operations_console_path,
+    )
+    verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    (scheduled_dir / "daily-review-manifest-verification.json").write_text(
+        verification.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="scheduled-review-warn-sha",
+        require_approval=False,
+    )
+
+    scheduled_check = next(
+        check for check in report.checks if check.name == "scheduled_review_packages"
+    )
+    assert report.status == "warn"
+    assert report.can_deploy is False
+    assert scheduled_check.status == "warn"
+    assert scheduled_check.evidence["missing_archive_package_ids"]
+    assert "scheduled-workflow-archive" in scheduled_check.remediation_steps[0]
 
 
 def test_release_gate_warns_when_retention_candidates_lack_archive(tmp_path: Path) -> None:

@@ -227,11 +227,12 @@ Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 
 The gate fails when release readiness fails, deployment preflight fails, required configuration
 audit items are missing, published files drift from their receipts, distribution manifests are
-incomplete, retention archive S3 mirroring failed, no approval exists, the latest approval rejects
-deployment, or the approval git SHA does not match the commit being released.
+incomplete, scheduled review package verification failed, retention archive S3 mirroring failed,
+no approval exists, the latest approval rejects deployment, or the approval git SHA does not match
+the commit being released.
 It warns when published content has no distribution evidence, generated distribution files are
-still dirty in git, or old artifact candidates exist without a non-dry-run retention archive
-receipt.
+still dirty in git, scheduled review manifests are verified but missing archive ZIPs, or old
+artifact candidates exist without a non-dry-run retention archive receipt.
 Every release gate check also includes `remediation_steps`, so failed API, CLI, and dashboard
 reports can point operators to the next command or review action instead of only exposing raw
 status.

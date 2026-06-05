@@ -258,11 +258,11 @@ deployment is approved.
 Release approval records capture the approver, decision, notes, force flag, release/deployment
 status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 `release-gate` combines readiness, deployment preflight, redacted configuration audit, approval
-state, publish drift detection, content distribution readiness, and git SHA matching into a single
-CI/CD pass/fail report.
+state, publish drift detection, content distribution readiness, scheduled review package
+verification, and git SHA matching into a single CI/CD pass/fail report.
 Each check includes `remediation_steps`, giving operators concrete next actions when approval,
-configuration, source governance, publish verification, content distribution, or deployment
-preflight blocks a release.
+configuration, source governance, publish verification, content distribution, scheduled review
+package verification, or deployment preflight blocks a release.
 The report also includes a human deployment checklist, and the CLI can write it with
 `--checklist-output` for release review packets.
 CI uploads `release-gate/release-gate.json` and `release-gate/deployment-checklist.md` as a

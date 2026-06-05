@@ -44,6 +44,7 @@ def release_gate(
         _source_review_governance_check(bundle),
         _publish_verification_check(bundle),
         _content_distribution_check(bundle),
+        _scheduled_review_package_check(bundle),
         _retention_archive_governance_check(bundle, review_service),
         _deployment_preflight_check(bundle),
         _configuration_audit_check(audit),
@@ -310,6 +311,59 @@ def _publish_verification_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
             "drift_count": verifications.drift_count,
             "missing_receipt_count": verifications.missing_receipt_count,
         },
+    )
+
+
+def _scheduled_review_package_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    packages = bundle.scheduled_review_packages
+    failed = [
+        item.id for item in packages.items if item.verification_status == "fail"
+    ]
+    missing_archives = [
+        item.id
+        for item in packages.items
+        if item.verification_status == "pass" and not item.archive_exists
+    ]
+    evidence = {
+        "total": packages.total,
+        "archived_count": packages.archived_count,
+        "failed_count": packages.failed_count,
+        "action_required_count": packages.action_required_count,
+        "failed_package_ids": failed,
+        "missing_archive_package_ids": missing_archives,
+    }
+    if failed:
+        return ReleaseGateItem(
+            name="scheduled_review_packages",
+            status="fail",
+            message="Scheduled review package verification failures block deployment.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `/dashboard/scheduled-reviews` and inspect failed package verification.",
+                (
+                    "Regenerate the scheduled review manifest after missing or drifted files "
+                    "are fixed."
+                ),
+                "Rerun `contentops scheduled-workflow-verify` and regenerate release evidence.",
+            ],
+        )
+    if missing_archives:
+        return ReleaseGateItem(
+            name="scheduled_review_packages",
+            status="warn",
+            message="Scheduled review manifests passed verification but have no archive ZIP.",
+            evidence=evidence,
+            remediation_steps=[
+                "Run `contentops scheduled-workflow-archive <manifest.json> <package.zip>`.",
+                "Keep the ZIP with Actions artifacts or the configured artifact root.",
+                "Regenerate release evidence so scheduled review packages show archive readiness.",
+            ],
+        )
+    return ReleaseGateItem(
+        name="scheduled_review_packages",
+        status="pass",
+        message="Scheduled review packages are verified or not required for this release.",
+        evidence=evidence,
     )
 
 
