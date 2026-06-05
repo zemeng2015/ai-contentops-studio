@@ -240,6 +240,9 @@ configured for higher API limits or private repositories.
 Review `ops_brief.json` or run `contentops ops-brief --days 14 --json` after each scheduled
 execution window. It summarizes provider health, worker alerts, run incidents, quality, budget,
 and review queue pressure into a status, top risks, and recommended operator actions.
+Run `contentops ops-brief-notify --days 14` or call `POST /ops-brief/notify` when the brief should
+be sent to the configured notification webhook. The delivery attempt is written to
+`ops-brief-notification-log.json` and copied into release evidence as `ops_brief_deliveries.json`.
 Recorded gate reports are stored under `artifacts/release-gates` and can be inspected through
 `contentops release-gates --json` or `GET /release-gates`. Both surfaces include a release gate
 history summary with pass rate, blocked deployment count, consecutive failures, latest status, and

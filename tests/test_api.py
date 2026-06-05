@@ -406,6 +406,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     incident_reports_response = client.get("/incident-reports?limit=5")
     ops_summary_response = client.get("/ops-summary")
     ops_brief_response = client.get("/ops-brief?days=7")
+    ops_brief_notify_response = client.post("/ops-brief/notify?days=7")
+    ops_brief_notifications_response = client.get("/ops-brief/notifications")
     ops_trends_response = client.get("/ops-trends?days=7")
     worker_alerts_response = client.get("/job-executions/alerts?days=7")
     worker_alert_notify_response = client.post("/job-executions/alerts/notify?days=7")
@@ -480,6 +482,10 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert ops_brief_response.json()["days"] == 7
     assert ops_brief_response.json()["summary"]["total_runs"] >= 1
     assert ops_brief_response.json()["recommended_actions"]
+    assert ops_brief_notify_response.status_code == 200
+    assert ops_brief_notify_response.json()["status"] in {"skipped", "delivered", "failed"}
+    assert ops_brief_notifications_response.status_code == 200
+    assert ops_brief_notifications_response.json()
     assert ops_trends_response.status_code == 200
     assert ops_trends_response.json()["days"] == 7
     assert ops_trends_response.json()["summary"]["total_runs"] >= 1
@@ -499,6 +505,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert release_evidence_payload["release_readiness"]["operations"]["total_runs"] >= 1
     assert "deployment_manifest" in release_evidence_payload
     assert "ops_brief" in release_evidence_payload
+    assert "ops_brief_deliveries" in release_evidence_payload
     assert "worker_execution_trends" in release_evidence_payload
     assert "worker_execution_alerts" in release_evidence_payload
     assert "worker_execution_alert_deliveries" in release_evidence_payload
@@ -1168,8 +1175,14 @@ def test_dashboard_ops_brief_renders() -> None:
     assert response.status_code == 200
     assert "Operations Brief" in response.text
     assert "Ops brief JSON" in response.text
+    assert "Notify ops brief" in response.text
+    assert "Notification History" in response.text
     assert "Top Risks" in response.text
     assert "Recommended Actions" in response.text
+
+    notify_response = client.post("/dashboard/ops-brief/notify", follow_redirects=False)
+
+    assert notify_response.status_code == 303
 
 
 def test_dashboard_job_execution_trends_renders() -> None:
@@ -1219,6 +1232,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert response.status_code == 200
     assert "Release Evidence" in response.text
     assert "Operations Brief" in response.text
+    assert "Ops Brief Notifications" in response.text
     assert "Deployment Gate" in response.text
     assert "Deployment Preflight" in response.text
     assert "Release Gate Checks" in response.text

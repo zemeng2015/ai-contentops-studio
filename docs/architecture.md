@@ -155,6 +155,9 @@ The operations brief is the decision layer above those signals. It combines prov
 worker execution alerts, incidents, quality, budget, and review queue pressure into a headline,
 top risks, and recommended actions through `/ops-brief`, `contentops ops-brief`,
 `/dashboard/ops-brief`, and release evidence `ops_brief.json`.
+Operators can also deliver the brief through `contentops ops-brief-notify` or
+`POST /ops-brief/notify`. Each attempt writes `ops-brief-notification-log.json`, and release
+evidence indexes those receipts in `ops_brief_deliveries.json` for auditability.
 The deployment manifest reuses readiness checks and adds redacted runtime, security, operations,
 and capability evidence. It is intended for release reviews, interview walkthroughs, and
 automation that needs to understand deployment posture without exposing secrets.

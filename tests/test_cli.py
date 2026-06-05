@@ -408,6 +408,8 @@ def test_cli_queue_and_manifest_commands(
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
     ops_brief_result = runner.invoke(app, ["ops-brief", "--days", "7", "--json"])
+    ops_brief_notify_result = runner.invoke(app, ["ops-brief-notify", "--days", "7"])
+    ops_brief_notifications_result = runner.invoke(app, ["ops-brief-notifications"])
     ops_trends_result = runner.invoke(app, ["ops-trends", "--days", "7", "--json"])
     release_readiness_result = runner.invoke(app, ["release-readiness", "--json"])
     release_evidence_dir = tmp_path / "release-evidence"
@@ -460,6 +462,15 @@ def test_cli_queue_and_manifest_commands(
     assert ops_brief_payload["days"] == 7
     assert ops_brief_payload["summary"]["total_runs"] == 1
     assert ops_brief_payload["recommended_actions"]
+    assert ops_brief_notify_result.exit_code == 0
+    ops_brief_notify_payload = json.loads(ops_brief_notify_result.output)
+    assert ops_brief_notify_payload["status"] == "skipped"
+    assert ops_brief_notify_payload["brief_status"] in {"pass", "warn", "fail"}
+    assert ops_brief_notifications_result.exit_code == 0
+    ops_brief_notifications_payload = json.loads(ops_brief_notifications_result.output)
+    assert ops_brief_notifications_payload[0]["delivery_id"] == (
+        ops_brief_notify_payload["delivery_id"]
+    )
     assert ops_trends_result.exit_code == 0
     ops_trends_payload = json.loads(ops_trends_result.output)
     assert ops_trends_payload["days"] == 7
@@ -473,6 +484,7 @@ def test_cli_queue_and_manifest_commands(
     assert release_evidence_payload["summary"]["can_release"] is True
     assert release_evidence_payload["operations_summary"]["total_runs"] == 1
     assert release_evidence_payload["ops_brief"]["summary"]["total_runs"] == 1
+    assert release_evidence_payload["ops_brief_deliveries"]
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
     assert release_evidence_payload["content_distribution"]["total"] >= 0
     assert release_evidence_payload["publish_recovery_executions"]["total"] >= 0
@@ -489,6 +501,7 @@ def test_cli_queue_and_manifest_commands(
     assert (release_evidence_dir / "source_reviews.json").exists()
     assert (release_evidence_dir / "worker_execution_trends.json").exists()
     assert (release_evidence_dir / "ops_brief.json").exists()
+    assert (release_evidence_dir / "ops_brief_deliveries.json").exists()
     assert (release_evidence_dir / "evidence_manifest.json").exists()
     assert (release_evidence_dir / "release_readiness.json").exists()
     evidence_manifest = json.loads(

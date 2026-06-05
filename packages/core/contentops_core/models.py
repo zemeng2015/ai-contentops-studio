@@ -515,6 +515,20 @@ class OpsBriefReport(BaseModel):
     recommended_actions: list[OpsBriefAction] = Field(default_factory=list)
 
 
+class OpsBriefDelivery(BaseModel):
+    delivery_id: str = Field(default_factory=lambda: uuid4().hex[:12])
+    action: str = "ops_brief"
+    provider: str
+    status: str
+    brief_status: str
+    action_required: bool
+    message: str
+    endpoint: str | None = None
+    status_code: int | None = None
+    error: str | None = None
+    delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class RetentionCandidate(BaseModel):
     run_id: str
     status: RunStatus
@@ -747,6 +761,7 @@ class ReleaseEvidenceBundle(BaseModel):
     doctor: SystemStatus
     provider_health: ProviderHealthReport
     ops_brief: OpsBriefReport
+    ops_brief_deliveries: list[OpsBriefDelivery] = Field(default_factory=list)
     deployment_manifest: DeploymentManifest
     operations_summary: OperationsSummary
     release_readiness: ReleaseReadinessReport

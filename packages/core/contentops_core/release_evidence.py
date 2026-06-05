@@ -49,7 +49,7 @@ from contentops_core.models import (
     WorkerDeliverySummaryEvidence,
     WorkerDeliverySummaryEvidenceItem,
 )
-from contentops_core.ops_brief import build_ops_brief
+from contentops_core.ops_brief import build_ops_brief, ops_brief_notification_log
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -113,6 +113,7 @@ def build_release_evidence(
     worker_summary_deliveries = worker_delivery_summary_notification_log(
         job_execution_dir(settings.artifact_root)
     )
+    ops_brief_deliveries = ops_brief_notification_log(settings.artifact_root)
     artifact_files = [
         "doctor.json",
         "deployment_check.json",
@@ -122,6 +123,7 @@ def build_release_evidence(
         "homepage_handoffs.json",
         "operations_summary.json",
         "ops_brief.json",
+        "ops_brief_deliveries.json",
         "provider_health.json",
         "publish_recovery_executions.json",
         "publish_verifications.json",
@@ -148,6 +150,7 @@ def build_release_evidence(
         doctor=doctor,
         provider_health=providers,
         ops_brief=ops_brief,
+        ops_brief_deliveries=ops_brief_deliveries,
         deployment_manifest=manifest,
         operations_summary=operations,
         release_readiness=readiness,
@@ -184,6 +187,9 @@ def write_release_evidence(
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "ops_brief": bundle.ops_brief.model_dump(mode="json"),
+        "ops_brief_deliveries": [
+            delivery.model_dump(mode="json") for delivery in bundle.ops_brief_deliveries
+        ],
         "provider_health": bundle.provider_health.model_dump(mode="json"),
         "publish_recovery_executions": bundle.publish_recovery_executions.model_dump(
             mode="json"

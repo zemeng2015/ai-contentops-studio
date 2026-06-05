@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
+
+import httpx
 
 from contentops_core.diagnostics import provider_health
 from contentops_core.jobs import job_execution_alert_report, job_execution_dir
@@ -9,6 +13,7 @@ from contentops_core.models import (
     IncidentSeverity,
     OperationsSummary,
     OpsBriefAction,
+    OpsBriefDelivery,
     OpsBriefReport,
     OpsBriefRisk,
 )
@@ -56,6 +61,56 @@ def build_ops_brief(
         top_risks=risks[:8],
         recommended_actions=actions[:8],
     )
+
+
+def notify_ops_brief(
+    *,
+    settings: Settings,
+    review_service: ReviewService,
+    days: int = 14,
+    window_size: int = 100,
+    endpoint: str | None = None,
+    timeout_seconds: float = 5.0,
+) -> OpsBriefDelivery:
+    report = build_ops_brief(
+        settings=settings,
+        review_service=review_service,
+        days=days,
+        window_size=window_size,
+    )
+    delivery = _deliver_ops_brief(
+        report,
+        endpoint=endpoint,
+        timeout_seconds=timeout_seconds,
+    )
+    write_ops_brief_delivery(delivery, settings.artifact_root)
+    return delivery
+
+
+def write_ops_brief_delivery(delivery: OpsBriefDelivery, artifact_root: Path) -> Path:
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    path = ops_brief_notification_log_path(artifact_root)
+    if path.exists():
+        deliveries = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        deliveries = []
+    deliveries.append(delivery.model_dump(mode="json"))
+    path.write_text(json.dumps(deliveries, indent=2), encoding="utf-8")
+    return path
+
+
+def ops_brief_notification_log(artifact_root: Path) -> list[OpsBriefDelivery]:
+    path = ops_brief_notification_log_path(artifact_root)
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        return []
+    return [OpsBriefDelivery.model_validate(item) for item in data]
+
+
+def ops_brief_notification_log_path(artifact_root: Path) -> Path:
+    return artifact_root / "ops-brief-notification-log.json"
 
 
 def _top_risks(
@@ -158,6 +213,49 @@ def _top_risks(
             )
         )
     return sorted(risks, key=_risk_sort_key)
+
+
+def _deliver_ops_brief(
+    report: OpsBriefReport,
+    *,
+    endpoint: str | None,
+    timeout_seconds: float,
+) -> OpsBriefDelivery:
+    action_required = report.status == "fail"
+    if endpoint is None:
+        return OpsBriefDelivery(
+            provider="local",
+            status="skipped",
+            brief_status=report.status,
+            action_required=action_required,
+            message=report.headline,
+        )
+    try:
+        response = httpx.post(
+            endpoint,
+            json={"ops_brief": report.model_dump(mode="json")},
+            timeout=timeout_seconds,
+        )
+    except httpx.HTTPError as exc:
+        return OpsBriefDelivery(
+            provider="webhook",
+            status="failed",
+            brief_status=report.status,
+            action_required=action_required,
+            message=report.headline,
+            endpoint=endpoint,
+            error=str(exc),
+        )
+    return OpsBriefDelivery(
+        provider="webhook",
+        status="delivered" if response.is_success else "failed",
+        brief_status=report.status,
+        action_required=action_required,
+        message=report.headline,
+        endpoint=endpoint,
+        status_code=response.status_code,
+        error=None if response.is_success else response.text[:500],
+    )
 
 
 def _recommended_actions(risks: list[OpsBriefRisk]) -> list[OpsBriefAction]:

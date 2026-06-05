@@ -28,6 +28,7 @@ from contentops_core.models import (
     IncidentReportListResponse,
     NotificationDelivery,
     OperationsSummary,
+    OpsBriefDelivery,
     OpsBriefReport,
     OpsTrendReport,
     PublishedContentListResponse,
@@ -980,6 +981,36 @@ def _ops_brief_html(report: OpsBriefReport) -> str:
     """
 
 
+def _ops_brief_deliveries_html(deliveries: list[OpsBriefDelivery]) -> str:
+    if not deliveries:
+        return "<p>No ops brief notifications recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(delivery.delivered_at.isoformat())}</td>
+          <td>{escape(delivery.provider)}</td>
+          <td>{escape(delivery.status)}</td>
+          <td>{escape(delivery.brief_status)}</td>
+          <td>{str(delivery.action_required).lower()}</td>
+          <td>{escape(delivery.message)}</td>
+        </tr>
+        """
+        for delivery in deliveries[:20]
+    )
+    return f"""
+      <p><a href="/ops-brief/notifications">Ops brief notifications JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Delivered</th><th>Provider</th><th>Status</th>
+            <th>Brief</th><th>Action</th><th>Message</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
 def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     latest_success = (
         report.summary.latest_success_at.isoformat() if report.summary.latest_success_at else "n/a"
@@ -1775,10 +1806,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <strong>{escape(str(worker_trends_summary.get("action_required", 0)))}</strong>
           <span>Worker actions</span>
         </div>
+        <div>
+          <strong>{len(bundle.ops_brief_deliveries)}</strong>
+          <span>Ops brief deliveries</span>
+        </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
       <h2>Operations Brief</h2>
       {_ops_brief_html(bundle.ops_brief)}
+      <h2>Ops Brief Notifications</h2>
+      {_ops_brief_deliveries_html(bundle.ops_brief_deliveries)}
       <h2>Provider Health</h2>
       <table>
         <thead>

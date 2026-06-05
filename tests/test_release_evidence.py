@@ -46,6 +46,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "homepage_handoffs.json",
         "operations_summary.json",
         "ops_brief.json",
+        "ops_brief_deliveries.json",
         "provider_health.json",
         "publish_recovery_executions.json",
         "publish_verifications.json",
@@ -97,6 +98,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
         (output_dir / "provider_health.json").read_text(encoding="utf-8")
     )
     ops_brief = json.loads((output_dir / "ops_brief.json").read_text(encoding="utf-8"))
+    ops_brief_deliveries = json.loads(
+        (output_dir / "ops_brief_deliveries.json").read_text(encoding="utf-8")
+    )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
     assert deployment_check["profile"] == "production"
     assert "environment_template" in {check["name"] for check in deployment_check["checks"]}
@@ -127,8 +131,10 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.publish_recovery_executions.total == 0
     assert bundle.provider_health.status in {"pass", "warn", "fail"}
     assert ops_brief["status"] in {"pass", "warn", "fail"}
+    assert ops_brief_deliveries == []
     assert bundle.ops_brief.status in {"pass", "warn", "fail"}
     assert bundle.ops_brief.recommended_actions
+    assert bundle.ops_brief_deliveries == []
     assert bundle.worker_execution_alert_deliveries == []
     assert bundle.worker_delivery_summary_deliveries == []
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0

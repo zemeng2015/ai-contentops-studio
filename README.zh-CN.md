@@ -128,6 +128,8 @@ contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops release-evidence --output-dir release-evidence
 contentops provider-health --json
 contentops ops-brief --days 14 --json
+contentops ops-brief-notify --days 14
+contentops ops-brief-notifications
 contentops ops-trends --days 14 --json
 ```
 
@@ -151,6 +153,8 @@ GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /ops-brief
+POST /ops-brief/notify
+GET  /ops-brief/notifications
 GET  /ops-trends
 GET  /provider-health
 GET  /deployment-manifest

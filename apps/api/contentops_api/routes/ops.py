@@ -49,6 +49,7 @@ from contentops_core.models import (
     JobExecutionPublishRequest,
     JobExecutionReviewRequest,
     OperationsSummary,
+    OpsBriefDelivery,
     OpsBriefReport,
     OpsTrendReport,
     ProviderHealthReport,
@@ -66,7 +67,11 @@ from contentops_core.models import (
     ScorecardListResponse,
     SystemStatus,
 )
-from contentops_core.ops_brief import build_ops_brief
+from contentops_core.ops_brief import (
+    build_ops_brief,
+    notify_ops_brief,
+    ops_brief_notification_log,
+)
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import (
@@ -661,6 +666,32 @@ def build_ops_router(
             review_service=review_service,
             days=days,
             window_size=window_size,
+        )
+
+    @router.get(
+        "/ops-brief/notifications",
+        response_model=list[OpsBriefDelivery],
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_ops_brief_notifications() -> list[OpsBriefDelivery]:
+        return ops_brief_notification_log(settings.artifact_root)
+
+    @router.post(
+        "/ops-brief/notify",
+        response_model=OpsBriefDelivery,
+        dependencies=[Depends(require_operator)],
+    )
+    def notify_ops_brief_report(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> OpsBriefDelivery:
+        return notify_ops_brief(
+            settings=settings,
+            review_service=review_service,
+            days=days,
+            window_size=window_size,
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
         )
 
     @router.get(

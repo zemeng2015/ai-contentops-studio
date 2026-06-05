@@ -35,7 +35,11 @@ from contentops_core.models import (
     SourceReviewDecision,
     SourceReviewRequest,
 )
-from contentops_core.ops_brief import build_ops_brief
+from contentops_core.ops_brief import (
+    build_ops_brief,
+    notify_ops_brief,
+    ops_brief_notification_log,
+)
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence
@@ -69,6 +73,7 @@ from contentops_api.views import (
     _job_executions_html,
     _notification_log_html,
     _operations_summary_html,
+    _ops_brief_deliveries_html,
     _ops_brief_html,
     _ops_trends_html,
     _page,
@@ -345,6 +350,7 @@ def build_dashboard_router(
             days=days,
             window_size=window_size,
         )
+        deliveries = ops_brief_notification_log(settings.artifact_root)
         return HTMLResponse(
             _page(
                 "Operations Brief",
@@ -356,10 +362,32 @@ def build_dashboard_router(
                     Actionable summary of provider health, worker alerts, incidents,
                     quality, budget, and review queue posture.
                   </p>
+                  <form method="post" action="/dashboard/ops-brief/notify{_api_key_query(api_key)}">
+                    <button type="submit">Notify ops brief</button>
+                  </form>
                   {_ops_brief_html(report)}
+                  <h2>Notification History</h2>
+                  {_ops_brief_deliveries_html(deliveries)}
                 </section>
                 """,
             )
+        )
+
+
+    @router.post(
+        "/dashboard/ops-brief/notify",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_notify_ops_brief(api_key: str = Query(default="")) -> RedirectResponse:
+        notify_ops_brief(
+            settings=settings,
+            review_service=review_service,
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
+        )
+        return RedirectResponse(
+            f"/dashboard/ops-brief{_api_key_query(api_key)}",
+            status_code=303,
         )
 
 

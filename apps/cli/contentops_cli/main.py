@@ -44,7 +44,11 @@ from contentops_core.models import (
     SourceReviewDecision,
     SourceReviewRequest,
 )
-from contentops_core.ops_brief import build_ops_brief
+from contentops_core.ops_brief import (
+    build_ops_brief,
+    notify_ops_brief,
+    ops_brief_notification_log,
+)
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
 from contentops_core.release_gate import (
@@ -523,6 +527,37 @@ def ops_brief(
             f"- P{action.priority} {action.owner}: {action.action} "
             f"Reason: {action.reason}"
         )
+
+
+@app.command("ops-brief-notify")
+def ops_brief_notify(
+    days: Annotated[
+        int,
+        typer.Option(help="Number of recent calendar days to include."),
+    ] = 14,
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to scan."),
+    ] = 100,
+) -> None:
+    settings = Settings()
+    service = build_review_service(settings)
+    delivery = notify_ops_brief(
+        settings=settings,
+        review_service=service,
+        days=days,
+        window_size=window_size,
+        endpoint=settings.notification_webhook_url,
+        timeout_seconds=settings.notification_timeout_seconds,
+    )
+    typer.echo(delivery.model_dump_json(indent=2))
+
+
+@app.command("ops-brief-notifications")
+def ops_brief_notifications() -> None:
+    settings = Settings()
+    deliveries = ops_brief_notification_log(settings.artifact_root)
+    typer.echo(json.dumps([item.model_dump(mode="json") for item in deliveries], indent=2))
 
 
 @app.command("ops-trends")

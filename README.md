@@ -143,6 +143,8 @@ contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
 contentops release-gates --json
 contentops ops-brief --days 14 --json
+contentops ops-brief-notify --days 14
+contentops ops-brief-notifications
 contentops ops-trends --days 14 --json
 ```
 
@@ -153,6 +155,9 @@ and `evidence_manifest.json` with SHA-256 hashes and file metadata for every evi
 CI output can be archived and compared during deployment reviews.
 The operations brief rolls provider health, worker alerts, run incidents, quality, budget, and
 review queue pressure into a headline, top risks, and recommended actions for daily triage.
+`contentops ops-brief-notify` sends that brief to the configured notification webhook and records
+the attempt in `ops-brief-notification-log.json`; release evidence includes those receipts in
+`ops_brief_deliveries.json`.
 When a release approval exists, the evidence bundle also includes `release_approval.json` and the
 API response includes `latest_release_approval`, closing the audit loop between review and deploy.
 Source review decisions are operational gates, not just notes: excluded sources are removed from
@@ -187,6 +192,8 @@ POST /runs/{run_id}/publish-recovery
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /ops-brief
+POST /ops-brief/notify
+GET  /ops-brief/notifications
 GET  /ops-trends
 GET  /content
 POST /content-assets
