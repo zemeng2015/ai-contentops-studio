@@ -235,6 +235,30 @@ variable "release_gate_require_approval" {
   default     = true
 }
 
+variable "retention_archive_schedule_expression" {
+  description = "EventBridge Scheduler expression for recurring retention archive creation."
+  type        = string
+  default     = "cron(30 14 ? * SUN *)"
+}
+
+variable "retention_archive_schedule_enabled" {
+  description = "Whether the recurring retention archive task is enabled."
+  type        = bool
+  default     = false
+}
+
+variable "retention_archive_days" {
+  description = "Artifact age in days selected by the recurring retention archive task."
+  type        = number
+  default     = 90
+}
+
+variable "retention_archive_scan_limit" {
+  description = "Number of recent runs scanned by the recurring retention archive task."
+  type        = number
+  default     = 500
+}
+
 variable "alarm_actions" {
   description = "SNS topic ARNs or other CloudWatch alarm actions for alarm and OK transitions."
   type        = list(string)

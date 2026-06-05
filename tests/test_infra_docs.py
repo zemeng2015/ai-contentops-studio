@@ -39,9 +39,16 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert '"release-gate"' in main
     assert '"--record"' in main
     assert "var.release_gate_window_size" in main
+    assert "aws_ecs_task_definition\" \"retention_archive" in main
+    assert '"retention-archive"' in main
+    assert "var.retention_archive_days" in main
+    assert "var.retention_archive_scan_limit" in main
     assert "release_gate_schedule_enabled" in variables
     assert "release_gate_schedule_arn" in outputs
     assert "release_gate_task_definition_arn" in outputs
+    assert "retention_archive_schedule_enabled" in variables
+    assert "retention_archive_schedule_arn" in outputs
+    assert "retention_archive_task_definition_arn" in outputs
     assert "worker_alert_schedule_enabled" in variables
     assert "worker_alert_notifier_schedule_arn" in outputs
     assert "worker_alert_notifier_task_definition_arn" in outputs
@@ -180,3 +187,14 @@ def test_aws_docs_describe_release_gate_schedule() -> None:
     assert "release_gate_schedule_enabled=true" in aws_readme
     assert "contentops release-gate --record --json" in deployment
     assert "release_gate_schedule_expression" in deployment
+
+
+def test_aws_docs_describe_retention_archive_schedule() -> None:
+    aws_readme = Path("infra/aws/README.md").read_text(encoding="utf-8")
+    deployment = Path("docs/deployment.md").read_text(encoding="utf-8")
+
+    assert "retention archive scheduler" in aws_readme
+    assert "retention_archive_schedule_enabled=true" in aws_readme
+    assert "contentops retention-archive" in deployment
+    assert "retention_archive_schedule_expression" in deployment
+    assert "retention_archives.json" in aws_readme

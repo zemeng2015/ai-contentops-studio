@@ -301,6 +301,9 @@ real cloud target.
 It also provisions an EventBridge Scheduler rule for the worker task. The schedule is disabled by
 default so deployments can validate networking, RDS connectivity, and publishing configuration
 before recurring content generation is turned on.
+The same Terraform layer provisions disabled-by-default schedules for worker alerts, operations
+brief delivery, release gates, and retention archive creation, keeping operational automation
+explicit until the artifact bucket and metadata database are ready.
 
 ## Stage 2 provider boundaries
 

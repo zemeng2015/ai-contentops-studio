@@ -691,6 +691,53 @@ resource "aws_ecs_task_definition" "release_gate" {
   tags = local.tags
 }
 
+resource "aws_ecs_task_definition" "retention_archive" {
+  family                   = "${local.name}-retention-archive"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "retention-archive"
+      image     = var.container_image
+      essential = true
+      command = [
+        "contentops",
+        "retention-archive",
+        "--days",
+        tostring(var.retention_archive_days),
+        "--limit",
+        tostring(var.retention_archive_scan_limit)
+      ]
+      environment = [
+        { name = "CONTENTOPS_ARTIFACT_STORE_PROVIDER", value = "s3" },
+        { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
+        { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
+        { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) }
+      ]
+      secrets = [
+        {
+          name      = "CONTENTOPS_DATABASE_URL"
+          valueFrom = aws_secretsmanager_secret.database_url.arn
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.worker.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "retention-archive"
+        }
+      }
+    }
+  ])
+  tags = local.tags
+}
+
 resource "aws_scheduler_schedule_group" "contentops" {
   name = local.name
   tags = local.tags
@@ -726,7 +773,8 @@ resource "aws_iam_role_policy" "scheduler_run_worker" {
           aws_ecs_task_definition.worker.arn,
           aws_ecs_task_definition.worker_alert_notifier.arn,
           aws_ecs_task_definition.ops_brief_notifier.arn,
-          aws_ecs_task_definition.release_gate.arn
+          aws_ecs_task_definition.release_gate.arn,
+          aws_ecs_task_definition.retention_archive.arn
         ]
       },
       {
@@ -859,6 +907,35 @@ resource "aws_scheduler_schedule" "release_gate" {
   }
 }
 
+resource "aws_scheduler_schedule" "retention_archive" {
+  name                         = "${local.name}-retention-archive"
+  group_name                   = aws_scheduler_schedule_group.contentops.name
+  schedule_expression          = var.retention_archive_schedule_expression
+  schedule_expression_timezone = var.worker_schedule_timezone
+  state                        = var.retention_archive_schedule_enabled ? "ENABLED" : "DISABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.main.arn
+    role_arn = aws_iam_role.scheduler.arn
+
+    ecs_parameters {
+      launch_type         = "FARGATE"
+      task_count          = 1
+      task_definition_arn = aws_ecs_task_definition.retention_archive.arn
+
+      network_configuration {
+        assign_public_ip = false
+        security_groups  = local.worker_security_group_ids
+        subnets          = var.private_subnet_ids
+      }
+    }
+  }
+}
+
 resource "aws_cloudwatch_dashboard" "operations" {
   dashboard_name = "${local.name}-operations"
 
@@ -946,6 +1023,7 @@ resource "aws_cloudwatch_dashboard" "operations" {
             [".", "MemoryUtilization", ".", ".", ".", "."],
             [".", "CPUUtilization", ".", ".", "TaskDefinitionFamily", aws_ecs_task_definition.worker_alert_notifier.family],
             [".", "CPUUtilization", ".", ".", "TaskDefinitionFamily", aws_ecs_task_definition.ops_brief_notifier.family],
+            [".", "CPUUtilization", ".", ".", "TaskDefinitionFamily", aws_ecs_task_definition.retention_archive.family],
             [".", "MemoryUtilization", ".", ".", ".", "."]
           ]
           period = 300

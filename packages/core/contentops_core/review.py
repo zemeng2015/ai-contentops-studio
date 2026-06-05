@@ -13,6 +13,11 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from contentops_publishing.static_site import Publisher
 from pydantic import BaseModel
 
+from contentops_core.artifacts import (
+    failed_s3_mirror_records,
+    mirror_files_to_s3,
+    write_s3_mirror_log,
+)
 from contentops_core.metrics import MetricsService
 from contentops_core.models import (
     ApprovalDecision,
@@ -83,6 +88,9 @@ class ReviewService:
         token_budget_per_run: int = 12000,
         model: str = "template",
         artifact_root: Path | None = None,
+        artifact_store_provider: str = "local",
+        artifact_s3_bucket: str = "",
+        artifact_s3_prefix: str = "contentops-artifacts",
     ) -> None:
         self.repository = repository
         self.publisher = publisher
@@ -92,6 +100,9 @@ class ReviewService:
         self.token_budget_per_run = token_budget_per_run
         self.model = model
         self.artifact_root = artifact_root or Path("artifacts")
+        self.artifact_store_provider = artifact_store_provider
+        self.artifact_s3_bucket = artifact_s3_bucket
+        self.artifact_s3_prefix = artifact_s3_prefix
         self.metrics_service = MetricsService()
 
     def list_artifacts(self, run_id: str) -> list[str]:
@@ -879,7 +890,44 @@ class ReviewService:
         )
         record_path = target_dir / f"{archive_id}-retention-archive.json"
         record_path.write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        self._mirror_retention_archive_to_s3(
+            record=record,
+            archive_path=archive_path,
+            record_path=record_path,
+            target_dir=target_dir,
+        )
         return record
+
+    def _mirror_retention_archive_to_s3(
+        self,
+        *,
+        record: RetentionArchiveRecord,
+        archive_path: Path,
+        record_path: Path,
+        target_dir: Path,
+    ) -> None:
+        if self.artifact_store_provider != "s3":
+            return
+        if not self.artifact_s3_bucket:
+            raise ValueError("CONTENTOPS_ARTIFACT_S3_BUCKET is required for S3 archive mirroring.")
+        records = mirror_files_to_s3(
+            [archive_path, record_path],
+            bucket=self.artifact_s3_bucket,
+            prefix=self.artifact_s3_prefix,
+            collection_id=f"retention-archives/{record.archive_id}",
+        )
+        mirror_log_path = target_dir / "s3-mirror-log.json"
+        write_s3_mirror_log(records, mirror_log_path)
+        failures = failed_s3_mirror_records(records)
+        record.s3_mirror_status = "failed" if failures else "mirrored"
+        record.s3_mirror_log_path = str(mirror_log_path)
+        record.s3_mirror_failures = len(failures)
+        record_path.write_text(record.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        if failures:
+            details = "; ".join(
+                f"{item.artifact_name}: {item.error or 'mirror failed'}" for item in failures
+            )
+            raise RuntimeError(f"Failed to mirror retention archive to S3: {details}")
 
     def retention_archives(
         self,

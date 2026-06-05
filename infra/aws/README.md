@@ -29,13 +29,14 @@ before Terraform or CDK resources are added.
 - ECS Fargate task definition for the worker alert notifier
 - ECS Fargate task definition for the operations brief notifier
 - ECS Fargate task definition for the release gate scheduler
+- ECS Fargate task definition for retention archive creation
 - task execution and artifact access IAM roles
 - CloudWatch log groups
 - CloudWatch log metric filters for API errors and worker failures
 - CloudWatch alarms for API errors, worker failures, and high RDS connections
 - CloudWatch operations dashboard for errors, ECS resources, RDS health, and recent failure logs
 - EventBridge Scheduler recurring worker run, worker alert notification check, operations brief
-  notification check, and release gate check
+  notification check, release gate check, and retention archive creation
 
 It intentionally stops short of creating public networking and an ALB until the runtime deployment
 choice is finalized.
@@ -68,6 +69,11 @@ The release gate scheduler is disabled by default. Set `release_gate_schedule_en
 release approvals, source review governance, and S3 artifact mirroring are part of the deployment
 workflow. It runs `contentops release-gate --record --json`, writes release gate reports under the
 artifact root, and fails the scheduled task when release gates block deployment.
+The retention archive scheduler is disabled by default. Set
+`retention_archive_schedule_enabled=true` after S3 artifact mirroring and RDS metadata are stable.
+It runs `contentops retention-archive`, creates a non-destructive zip plus JSON receipt for runs
+older than `retention_archive_days`, mirrors the archive artifacts to S3, and keeps recent receipts
+visible through `/retention-archives` and release evidence `retention_archives.json`.
 Set `worker_pipeline_path` to choose the scheduled content calendar. For example, use
 `pipelines/daily_ai_roundup.yaml` for AI trend monitoring or
 `pipelines/project_repository_updates.yaml` for GitHub project update drafts.

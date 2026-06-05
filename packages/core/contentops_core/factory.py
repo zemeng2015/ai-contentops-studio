@@ -154,6 +154,9 @@ def build_review_service(settings: Settings | None = None) -> ReviewService:
         token_budget_per_run=settings.token_budget_per_run,
         model=settings.openai_model if settings.generator_provider == "openai" else "template",
         artifact_root=settings.artifact_root,
+        artifact_store_provider=settings.artifact_store_provider,
+        artifact_s3_bucket=settings.artifact_s3_bucket or "",
+        artifact_s3_prefix=settings.artifact_s3_prefix,
     )
 
 

@@ -33,6 +33,11 @@ output "release_gate_task_definition_arn" {
   value       = aws_ecs_task_definition.release_gate.arn
 }
 
+output "retention_archive_task_definition_arn" {
+  description = "Retention archive task definition ARN."
+  value       = aws_ecs_task_definition.retention_archive.arn
+}
+
 output "metadata_db_endpoint" {
   description = "RDS Postgres endpoint for run metadata."
   value       = aws_db_instance.metadata.endpoint
@@ -61,6 +66,11 @@ output "ops_brief_notifier_schedule_arn" {
 output "release_gate_schedule_arn" {
   description = "EventBridge Scheduler ARN for recurring release gate checks."
   value       = aws_scheduler_schedule.release_gate.arn
+}
+
+output "retention_archive_schedule_arn" {
+  description = "EventBridge Scheduler ARN for recurring retention archive creation."
+  value       = aws_scheduler_schedule.retention_archive.arn
 }
 
 output "operations_dashboard_name" {

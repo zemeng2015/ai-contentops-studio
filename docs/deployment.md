@@ -59,6 +59,8 @@ The AWS Terraform skeleton lives in `infra/aws/terraform`. It defines the artifa
 Postgres metadata database, database URL secret, ECS task definitions, scheduled worker IAM role,
 EventBridge Scheduler rule, log groups, log-derived metrics, CloudWatch alarms, an operations
 dashboard, and scheduler group needed for the first production deployment shape.
+It also includes disabled-by-default scheduled tasks for worker alerts, operations briefs, release
+gates, and retention archive creation so operational checks can be enabled gradually.
 
 ## Provider environment variables
 
@@ -125,6 +127,11 @@ error message for every standalone artifact mirror attempt.
 When distribution assets have been generated, release evidence also writes
 `content_distribution.json` so deployment reviewers can verify the RSS feed, promotion brief, and
 distribution manifest were prepared with file hashes before the site is deployed.
+When `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` is configured, `contentops retention-archive` mirrors
+retention zip files and archive receipts to S3 and writes a local `s3-mirror-log.json`. The AWS
+retention archive scheduler runs the same command with `retention_archive_schedule_expression`,
+`retention_archive_days`, and `retention_archive_scan_limit`; keep
+`retention_archive_schedule_enabled=false` until the database and S3 artifact bucket are stable.
 
 For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy can use the
 `postgresql+psycopg://` URL:

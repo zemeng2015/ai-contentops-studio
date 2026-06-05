@@ -490,7 +490,8 @@ The repository includes:
 - production environment template
 - Alembic database migrations
 - AWS Terraform skeleton for S3, RDS, ECS task definitions, EventBridge Scheduler, worker alerts,
-  ops brief notifications, release gate checks, CloudWatch dashboard, and alarms
+  ops brief notifications, release gate checks, retention archives, CloudWatch dashboard, and
+  alarms
 
 See [Deployment](docs/deployment.md) and [Production Runbook](docs/runbook.md).
 

@@ -15,6 +15,7 @@ from contentops_core.jobs import (
     load_job_file,
     write_job_execution_report,
 )
+from contentops_core.models import ArtifactMirrorRecord
 from contentops_core.settings import Settings
 from typer.testing import CliRunner
 
@@ -551,6 +552,66 @@ def test_cli_queue_and_manifest_commands(
     with ZipFile(bundle_path) as bundle:
         assert "bundle-manifest.json" in bundle.namelist()
         assert "artifacts/eval-report.json" in bundle.namelist()
+
+
+def test_retention_archive_mirrors_to_s3_when_configured(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+
+    run_result = runner.invoke(app, ["run", "--topic", "Retention archive mirror"])
+    archive_dir = tmp_path / "retention-archives"
+    mirrored_names: list[str] = []
+
+    def fake_mirror_files_to_s3(
+        paths: list[Path],
+        *,
+        bucket: str,
+        prefix: str,
+        collection_id: str,
+    ) -> list[ArtifactMirrorRecord]:
+        mirrored_names.extend(path.name for path in paths)
+        return [
+            ArtifactMirrorRecord(
+                run_id=collection_id,
+                artifact_name=path.name,
+                provider="s3",
+                bucket=bucket,
+                key=f"{prefix}/{collection_id}/{path.name}",
+                content_type="application/octet-stream",
+                status="mirrored",
+            )
+            for path in paths
+        ]
+
+    monkeypatch.setattr("contentops_core.review.mirror_files_to_s3", fake_mirror_files_to_s3)
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_STORE_PROVIDER", "s3")
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_S3_BUCKET", "contentops-test-bucket")
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_S3_PREFIX", "contentops-artifacts")
+
+    archive_result = runner.invoke(
+        app,
+        [
+            "retention-archive",
+            "--days",
+            "0",
+            "--output-dir",
+            str(archive_dir),
+        ],
+    )
+
+    assert run_result.exit_code == 0
+    assert archive_result.exit_code == 0
+    payload = json.loads(archive_result.output)
+    assert payload["s3_mirror_status"] == "mirrored"
+    assert payload["s3_mirror_failures"] == 0
+    assert (archive_dir / "s3-mirror-log.json").exists()
+    assert any(name.endswith(".zip") for name in mirrored_names)
+    assert any(name.endswith("-retention-archive.json") for name in mirrored_names)
 
 
 def test_cli_source_review_records_decision(
