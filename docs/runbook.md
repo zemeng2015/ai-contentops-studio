@@ -45,6 +45,8 @@ Expected result:
 - Start deployment reviews from the dashboard Release Risk Summary. It rolls up release gate,
   preflight, campaign lineage, worker recovery, publish drift, and source review risks before the
   reviewer opens the detailed evidence tables.
+- Use each risk row's evidence link to jump directly to the detailed table or operations dashboard
+  behind the signal, then return to the summary before recording a release approval.
 - If `contentops release-gate` reports `content_calendar_lineage=warn`, finish the campaign review
   items that are in scope for the release. If it reports `fail`, recover or rerun failed calendar
   items before deploying.

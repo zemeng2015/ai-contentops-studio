@@ -1078,6 +1078,7 @@ def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
           <td><span class="pill">{escape(item["severity"])}</span></td>
           <td>{escape(item["signal"])}</td>
           <td>{escape(item["action"])}</td>
+          <td>{_release_risk_target_link(item)}</td>
         </tr>
         """
         for item in items
@@ -1085,7 +1086,7 @@ def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
     if not rows:
         rows = """
         <tr>
-          <td colspan="4"><span class="muted">No release risks detected.</span></td>
+          <td colspan="5"><span class="muted">No release risks detected.</span></td>
         </tr>
         """
     return f"""
@@ -1097,7 +1098,10 @@ def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
       </div>
       <table>
         <thead>
-          <tr><th>Area</th><th>Severity</th><th>Signal</th><th>Recommended action</th></tr>
+          <tr>
+            <th>Area</th><th>Severity</th><th>Signal</th><th>Recommended action</th>
+            <th>Open</th>
+          </tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>
@@ -1114,6 +1118,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                     release_check.status,
                     release_check.name,
                     release_check.message,
+                    "#release-gate-checks",
+                    "Open gate checks",
                 )
             )
     for deployment_check in bundle.deployment_check.checks:
@@ -1124,6 +1130,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                     deployment_check.status,
                     deployment_check.name,
                     deployment_check.message,
+                    "#deployment-preflight",
+                    "Open preflight",
                 )
             )
     for provider in bundle.provider_health.items:
@@ -1135,6 +1143,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                     provider.status,
                     f"{provider.category}: {provider.name}",
                     action or "Review provider configuration.",
+                    "#provider-health",
+                    "Open providers",
                 )
             )
     for smoke in bundle.integration_smoke_plan.items:
@@ -1145,6 +1155,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                     "warn",
                     f"{smoke.category}: {smoke.name}",
                     "; ".join(smoke.notes) or "Configure missing smoke-test environment.",
+                    "/dashboard/integration-smoke",
+                    "Open smoke history",
                 )
             )
     _append_calendar_risks(items, bundle.content_calendar_lineage)
@@ -1155,6 +1167,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                 "warn",
                 f"{bundle.source_reviews.needs_review_count} sources need review",
                 "Finish source review decisions before approving external publication.",
+                "#source-review-evidence",
+                "Open source review",
             )
         )
     if bundle.publish_verifications.drift_count:
@@ -1164,6 +1178,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                 "fail",
                 f"{bundle.publish_verifications.drift_count} published outputs drifted",
                 "Recover or republish drifted runs before deployment sign-off.",
+                "#publish-verification-evidence",
+                "Open verification",
             )
         )
     if bundle.publish_recovery_executions.failed_count:
@@ -1173,6 +1189,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                 "fail",
                 f"{bundle.publish_recovery_executions.failed_count} recovery runs failed",
                 "Inspect publish recovery executions and retry the failed recovery action.",
+                "#publish-recovery-executions",
+                "Open recovery",
             )
         )
     if bundle.scheduled_review_packages.action_required_count:
@@ -1185,18 +1203,36 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                     "packages need action"
                 ),
                 "Archive or verify scheduled review packages before release approval.",
+                "/dashboard/scheduled-reviews",
+                "Open packages",
             )
         )
     _append_worker_risks(items, bundle.worker_execution_alerts, bundle.worker_recovery_lineage)
     return items
 
 
-def _release_risk_item(area: str, severity: str, signal: str, action: str) -> dict[str, str]:
+def _release_risk_target_link(item: dict[str, str]) -> str:
+    return (
+        f'<a href="{escape(item["target"])}">'
+        f'{escape(item["target_label"])}</a>'
+    )
+
+
+def _release_risk_item(
+    area: str,
+    severity: str,
+    signal: str,
+    action: str,
+    target: str,
+    target_label: str,
+) -> dict[str, str]:
     return {
         "area": area,
         "severity": _release_risk_severity(severity),
         "signal": signal,
         "action": action,
+        "target": target,
+        "target_label": target_label,
     }
 
 
@@ -1223,6 +1259,8 @@ def _append_calendar_risks(
                 "fail",
                 f"{failed} calendar items have failed latest runs",
                 "Recover or rerun failed campaign items before release approval.",
+                "#content-calendar-lineage-evidence",
+                "Open calendar lineage",
             )
         )
     elif action_required:
@@ -1232,6 +1270,8 @@ def _append_calendar_risks(
                 "warn",
                 f"{action_required} calendar items need action",
                 "Review the campaign lineage table and finish required next actions.",
+                "#content-calendar-lineage-evidence",
+                "Open calendar lineage",
             )
         )
     elif needs_review:
@@ -1241,6 +1281,8 @@ def _append_calendar_risks(
                 "warn",
                 f"{needs_review} calendar items need review",
                 "Approve, revise, or publish reviewed campaign items before sign-off.",
+                "#content-calendar-lineage-evidence",
+                "Open calendar lineage",
             )
         )
 
@@ -1257,6 +1299,8 @@ def _append_worker_risks(
                 str(worker_alerts.get("severity", "warn")),
                 str(worker_alerts.get("message", "Worker alert requires action.")),
                 "Inspect worker alert signals and fix the latest automation failure.",
+                "/dashboard/job-execution-trends",
+                "Open worker trends",
             )
         )
     unrecovered = _release_payload_int(worker_recovery, "unrecovered_execution_count")
@@ -1267,6 +1311,8 @@ def _append_worker_risks(
                 "warn",
                 f"{unrecovered} failed executions remain unrecovered",
                 "Run recovery plans or mark failed jobs out of scope before release.",
+                "/dashboard/job-execution-trends",
+                "Open recovery lineage",
             )
         )
 
@@ -2546,7 +2592,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       {_ops_brief_deliveries_html(bundle.ops_brief_deliveries)}
       <h2>Retention Archives</h2>
       {_retention_archives_html(bundle.retention_archives)}
-      <h2>Provider Health</h2>
+      <h2 id="provider-health">Provider Health</h2>
       <table>
         <thead>
           <tr>
@@ -2556,7 +2602,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{provider_rows}</tbody>
       </table>
-      <h2>Integration Smoke Plan</h2>
+      <h2 id="integration-smoke-plan">Integration Smoke Plan</h2>
       <p>
         Run all: <code>{escape(bundle.integration_smoke_plan.command)}</code>
       </p>
@@ -2569,16 +2615,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{smoke_rows}</tbody>
       </table>
-      <h2>Integration Smoke Runs</h2>
+      <h2 id="integration-smoke-runs">Integration Smoke Runs</h2>
       {_integration_smoke_runs_html(bundle.integration_smoke_runs)}
-      <h2>Deployment Preflight</h2>
+      <h2 id="deployment-preflight">Deployment Preflight</h2>
       <table>
         <thead>
           <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
         </thead>
         <tbody>{preflight_rows}</tbody>
       </table>
-      <h2>Release Gate Checks</h2>
+      <h2 id="release-gate-checks">Release Gate Checks</h2>
       <table>
         <thead>
           <tr><th>Check</th><th>Status</th><th>Message</th><th>Evidence</th></tr>
@@ -2612,9 +2658,9 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{distribution_rows}</tbody>
       </table>
-      <h2>Content Calendar Lineage Evidence</h2>
+      <h2 id="content-calendar-lineage-evidence">Content Calendar Lineage Evidence</h2>
       {calendar_lineage_html}
-      <h2>Publish Verification Evidence</h2>
+      <h2 id="publish-verification-evidence">Publish Verification Evidence</h2>
       <table>
         <thead>
           <tr>
@@ -2624,7 +2670,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{publish_verification_rows}</tbody>
       </table>
-      <h2>Publish Recovery Executions</h2>
+      <h2 id="publish-recovery-executions">Publish Recovery Executions</h2>
       <table>
         <thead>
           <tr>
@@ -2634,7 +2680,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{publish_recovery_rows}</tbody>
       </table>
-      <h2>Scheduled Review Package Evidence</h2>
+      <h2 id="scheduled-review-package-evidence">Scheduled Review Package Evidence</h2>
       <table>
         <thead>
           <tr>
@@ -2645,7 +2691,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{scheduled_review_rows}</tbody>
       </table>
-      <h2>Source Review Evidence</h2>
+      <h2 id="source-review-evidence">Source Review Evidence</h2>
       <table>
         <thead>
           <tr>
@@ -2655,7 +2701,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{source_review_rows}</tbody>
       </table>
-      <h2>Worker Execution Trends</h2>
+      <h2 id="worker-execution-trends">Worker Execution Trends</h2>
       <div class="metrics">
         <div>
           <strong>{escape(str(worker_alerts.get("severity", "info")))}</strong>
@@ -2676,7 +2722,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{worker_alert_signal_rows}</tbody>
       </table>
-      <h2>Worker Recovery Lineage</h2>
+      <h2 id="worker-recovery-lineage">Worker Recovery Lineage</h2>
       <div class="metrics">
         <div>
           <strong>{escape(str(worker_recovery.get("total_failed_executions", 0)))}</strong>
@@ -2704,7 +2750,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{worker_recovery_rows}</tbody>
       </table>
-      <h2>Worker Alert Notifications</h2>
+      <h2 id="worker-alert-notifications">Worker Alert Notifications</h2>
       <table>
         <thead>
           <tr>
@@ -2720,7 +2766,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{worker_trend_rows}</tbody>
       </table>
-      <h2>Worker Failure Diagnostics</h2>
+      <h2 id="worker-failure-diagnostics">Worker Failure Diagnostics</h2>
       <table>
         <thead>
           <tr>

@@ -249,6 +249,8 @@ def test_release_approval_api_and_dashboard(
     assert "Release Risk Summary" in dashboard_response.text
     assert "Risk posture" in dashboard_response.text
     assert "Open risks" in dashboard_response.text
+    assert "Open gate checks" in dashboard_response.text
+    assert 'href="#release-gate-checks"' in dashboard_response.text
     assert "Publish Verification Evidence" in dashboard_response.text
     assert "Publish Recovery Executions" in dashboard_response.text
     assert "Content Calendar Lineage Evidence" in dashboard_response.text
@@ -1639,6 +1641,10 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Release Risk Summary" in response.text
     assert "Risk posture" in response.text
     assert "Open risks" in response.text
+    assert "<th>Open</th>" in response.text
+    assert 'id="release-gate-checks"' in response.text
+    assert 'id="content-calendar-lineage-evidence"' in response.text
+    assert 'href="/dashboard/job-execution-trends"' in response.text
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
