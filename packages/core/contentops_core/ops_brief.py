@@ -7,7 +7,11 @@ from typing import Any
 import httpx
 
 from contentops_core.diagnostics import provider_health
-from contentops_core.jobs import job_execution_alert_report, job_execution_dir
+from contentops_core.jobs import (
+    job_execution_alert_report,
+    job_execution_dir,
+    job_recovery_lineage,
+)
 from contentops_core.models import (
     IncidentReportListResponse,
     IncidentSeverity,
@@ -36,6 +40,10 @@ def build_ops_brief(
         job_execution_dir(settings.artifact_root),
         days=days,
     )
+    worker_recovery = job_recovery_lineage(
+        job_execution_dir(settings.artifact_root),
+        days=days,
+    )
     incidents = review_service.incident_reports(limit=min(window_size, 100))
     trends = review_service.operations_trends(days=days, window_size=max(window_size, 500))
     risks = _top_risks(
@@ -44,6 +52,7 @@ def build_ops_brief(
         provider_failures=sum(1 for item in providers.items if item.status == "fail"),
         provider_warnings=sum(1 for item in providers.items if item.status == "warn"),
         worker_alerts=worker_alerts.model_dump(mode="json"),
+        worker_recovery=worker_recovery.model_dump(mode="json"),
         incidents=incidents,
     )
     actions = _recommended_actions(risks)
@@ -56,6 +65,7 @@ def build_ops_brief(
         summary=summary,
         provider_health=providers,
         worker_execution_alerts=worker_alerts.model_dump(mode="json"),
+        worker_recovery_lineage=worker_recovery.model_dump(mode="json"),
         incidents=incidents,
         trends=trends,
         top_risks=risks[:8],
@@ -120,6 +130,7 @@ def _top_risks(
     provider_failures: int,
     provider_warnings: int,
     worker_alerts: dict[str, Any],
+    worker_recovery: dict[str, Any],
     incidents: IncidentReportListResponse,
 ) -> list[OpsBriefRisk]:
     risks: list[OpsBriefRisk] = []
@@ -142,18 +153,43 @@ def _top_risks(
             )
         )
     worker_severity = worker_alerts.get("severity")
+    unrecovered_executions = _int_field(worker_recovery, "unrecovered_execution_count")
+    recovered_executions = _int_field(worker_recovery, "recovered_execution_count")
+    recovery_attempts = _int_field(worker_recovery, "recovery_attempt_count")
+    if unrecovered_executions:
+        risks.append(
+            OpsBriefRisk(
+                severity=IncidentSeverity.CRITICAL,
+                category="worker_recovery",
+                message=(
+                    f"{unrecovered_executions} worker execution(s) still need recovery."
+                ),
+                evidence="worker_recovery_lineage",
+            )
+        )
     if worker_alerts.get("action_required"):
         severity = (
-            IncidentSeverity.CRITICAL
-            if worker_severity == IncidentSeverity.CRITICAL.value
-            else IncidentSeverity.WARNING
+            IncidentSeverity.WARNING
+            if recovered_executions and recovery_attempts and not unrecovered_executions
+            else (
+                IncidentSeverity.CRITICAL
+                if worker_severity == IncidentSeverity.CRITICAL.value
+                else IncidentSeverity.WARNING
+            )
         )
+        message = str(worker_alerts.get("message") or "Worker execution needs action.")
+        if recovered_executions and recovery_attempts and not unrecovered_executions:
+            message = "Recent worker failures were recovered; review the recovery lineage."
         risks.append(
             OpsBriefRisk(
                 severity=severity,
                 category="worker_execution",
-                message=str(worker_alerts.get("message") or "Worker execution needs action."),
-                evidence="worker_execution_alerts",
+                message=message,
+                evidence=(
+                    "worker_recovery_lineage"
+                    if recovered_executions and recovery_attempts and not unrecovered_executions
+                    else "worker_execution_alerts"
+                ),
             )
         )
     if summary.critical_incidents:
@@ -280,6 +316,17 @@ def _recommended_actions(risks: list[OpsBriefRisk]) -> list[OpsBriefAction]:
                     reason=risk.message,
                 )
             )
+        elif risk.category == "worker_recovery":
+            actions.append(
+                OpsBriefAction(
+                    priority=priority,
+                    owner="operations",
+                    action=(
+                        "Inspect worker recovery lineage and rerun unrecovered failed jobs."
+                    ),
+                    reason=risk.message,
+                )
+            )
         elif risk.category in {"run_incidents", "run_incident", "run_failures"}:
             actions.append(
                 OpsBriefAction(
@@ -359,6 +406,18 @@ def _priority(severity: IncidentSeverity) -> int:
     if severity == IncidentSeverity.WARNING:
         return 2
     return 4
+
+
+def _int_field(data: dict[str, Any], key: str) -> int:
+    value = data.get(key, 0)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _dedupe_actions(actions: list[OpsBriefAction]) -> list[OpsBriefAction]:

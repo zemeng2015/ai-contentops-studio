@@ -27,12 +27,46 @@ from contentops_core.models import (
     ReleaseApprovalRequest,
     RunRequest,
 )
+from contentops_core.ops_brief import build_ops_brief
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_evidence import create_release_evidence_archive
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
 from scripts.generate_release_evidence import generate_release_evidence
+
+
+def test_ops_brief_surfaces_worker_recovery_backlog(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    service = build_review_service(settings)
+    failed = JobExecutionReport(
+        name="ops-brief-worker-recovery",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="provider-timeout",
+                topic="Ops brief recovery backlog",
+                status="failed",
+                error="provider timeout",
+            )
+        ],
+    )
+    write_job_execution_report(failed, job_execution_dir(settings.artifact_root))
+
+    brief = build_ops_brief(settings=settings, review_service=service, days=1)
+
+    assert brief.status == "fail"
+    assert brief.worker_recovery_lineage["unrecovered_execution_count"] == 1
+    recovery_risk = next(risk for risk in brief.top_risks if risk.category == "worker_recovery")
+    assert recovery_risk.evidence == "worker_recovery_lineage"
+    assert "still need recovery" in recovery_risk.message
+    assert any("recovery lineage" in action.action for action in brief.recommended_actions)
 
 
 def test_generate_release_evidence_writes_operational_artifacts(

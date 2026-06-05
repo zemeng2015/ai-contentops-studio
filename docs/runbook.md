@@ -238,6 +238,9 @@ will rerun. Dry-run receipts are schedule previews and are intentionally blocked
 execution. Use `contentops job-recovery-lineage --days 14`,
 `GET /job-executions/recovery-lineage`, or `/dashboard/job-execution-trends` to verify whether the
 failed execution is recovered, partially recovered, or still waiting for a recovery attempt.
+The Operations Brief uses the same lineage: unrecovered worker backlog is raised as a
+`worker_recovery` risk, while fully recovered worker failures remain visible as warnings for
+release review.
 
 ## 3. CloudWatch Operations
 

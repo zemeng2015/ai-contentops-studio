@@ -509,6 +509,7 @@ class OpsBriefReport(BaseModel):
     summary: OperationsSummary
     provider_health: ProviderHealthReport
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
+    worker_recovery_lineage: dict[str, Any] = Field(default_factory=dict)
     incidents: IncidentReportListResponse
     trends: OpsTrendReport
     top_risks: list[OpsBriefRisk] = Field(default_factory=list)
