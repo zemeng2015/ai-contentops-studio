@@ -31,6 +31,10 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "worker_alert_notifier" in main
     assert "job-execution-alert-notify" in main
     assert "var.worker_alert_window_days" in main
+    assert "ops_brief_notifier" in main
+    assert "ops-brief-notify" in main
+    assert "var.ops_brief_window_days" in main
+    assert "var.ops_brief_window_size" in main
     assert "aws_ecs_task_definition\" \"release_gate" in main
     assert '"release-gate"' in main
     assert '"--record"' in main
@@ -41,6 +45,9 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "worker_alert_schedule_enabled" in variables
     assert "worker_alert_notifier_schedule_arn" in outputs
     assert "worker_alert_notifier_task_definition_arn" in outputs
+    assert "ops_brief_schedule_enabled" in variables
+    assert "ops_brief_notifier_schedule_arn" in outputs
+    assert "ops_brief_notifier_task_definition_arn" in outputs
     assert "var.research_provider" in main
     assert "CONTENTOPS_RUN_MIGRATIONS" in main
     assert "CONTENTOPS_REQUIRE_READ_API_KEY" in main
@@ -152,6 +159,17 @@ def test_aws_docs_describe_worker_alert_notifier() -> None:
     assert "worker-alert-notification-log.json" in aws_readme
     assert "worker_alert_schedule_expression" in deployment
     assert "worker_execution_alert_deliveries.json" in deployment
+
+
+def test_aws_docs_describe_ops_brief_notifier() -> None:
+    aws_readme = Path("infra/aws/README.md").read_text(encoding="utf-8")
+    deployment = Path("docs/deployment.md").read_text(encoding="utf-8")
+
+    assert "operations brief notifier" in aws_readme
+    assert "ops_brief_schedule_enabled=true" in aws_readme
+    assert "ops-brief-notification-log.json" in aws_readme
+    assert "ops_brief_schedule_expression" in deployment
+    assert "ops_brief_deliveries.json" in deployment
 
 
 def test_aws_docs_describe_release_gate_schedule() -> None:

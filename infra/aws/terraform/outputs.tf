@@ -23,6 +23,11 @@ output "worker_alert_notifier_task_definition_arn" {
   value       = aws_ecs_task_definition.worker_alert_notifier.arn
 }
 
+output "ops_brief_notifier_task_definition_arn" {
+  description = "Operations brief notifier task definition ARN."
+  value       = aws_ecs_task_definition.ops_brief_notifier.arn
+}
+
 output "release_gate_task_definition_arn" {
   description = "Release gate task definition ARN."
   value       = aws_ecs_task_definition.release_gate.arn
@@ -46,6 +51,11 @@ output "daily_worker_schedule_arn" {
 output "worker_alert_notifier_schedule_arn" {
   description = "EventBridge Scheduler ARN for recurring worker alert notifications."
   value       = aws_scheduler_schedule.worker_alert_notifier.arn
+}
+
+output "ops_brief_notifier_schedule_arn" {
+  description = "EventBridge Scheduler ARN for recurring operations brief notifications."
+  value       = aws_scheduler_schedule.ops_brief_notifier.arn
 }
 
 output "release_gate_schedule_arn" {

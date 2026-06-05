@@ -322,6 +322,12 @@ Terraform also defines a disabled-by-default worker alert notifier task. Enable
 `contentops job-execution-alert-notify` after the worker schedule. The notifier records
 `worker-alert-notification-log.json`; release evidence mirrors those receipts in
 `worker_execution_alert_deliveries.json`.
+Terraform also defines a disabled-by-default operations brief notifier task. Enable
+`ops_brief_schedule_enabled=true` after the recurring worker is writing useful run history, and
+tune `ops_brief_schedule_expression`, `ops_brief_window_days`, and `ops_brief_window_size` to run
+`contentops ops-brief-notify` after the worker schedule. The notifier records
+`ops-brief-notification-log.json`; release evidence mirrors those receipts in
+`ops_brief_deliveries.json`.
 Terraform also defines a disabled-by-default release gate scheduler. Enable
 `release_gate_schedule_enabled=true` after release approvals and source review governance are part
 of the operating rhythm, and tune `release_gate_schedule_expression`, `release_gate_window_size`,

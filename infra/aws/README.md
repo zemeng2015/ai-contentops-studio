@@ -27,13 +27,15 @@ before Terraform or CDK resources are added.
   `CONTENTOPS_RESEARCH_GITHUB_TOKEN`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL`
 - ECS Fargate task definitions for API and worker
 - ECS Fargate task definition for the worker alert notifier
+- ECS Fargate task definition for the operations brief notifier
 - ECS Fargate task definition for the release gate scheduler
 - task execution and artifact access IAM roles
 - CloudWatch log groups
 - CloudWatch log metric filters for API errors and worker failures
 - CloudWatch alarms for API errors, worker failures, and high RDS connections
 - CloudWatch operations dashboard for errors, ECS resources, RDS health, and recent failure logs
-- EventBridge Scheduler recurring worker run, worker alert notification check, and release gate check
+- EventBridge Scheduler recurring worker run, worker alert notification check, operations brief
+  notification check, and release gate check
 
 It intentionally stops short of creating public networking and an ALB until the runtime deployment
 choice is finalized.
@@ -57,6 +59,11 @@ The worker alert notifier schedule is also disabled by default. Set
 `notification_webhook_url_secret_arn` is configured when external delivery is required. The notifier
 runs `contentops job-execution-alert-notify`, writes `worker-alert-notification-log.json`, and makes
 the same receipts visible through `/job-executions/alerts/notifications` and release evidence.
+The operations brief notifier schedule is disabled by default. Set
+`ops_brief_schedule_enabled=true` after the worker has produced enough recent runs for useful
+triage and `notification_webhook_url_secret_arn` is configured when external delivery is required.
+The notifier runs `contentops ops-brief-notify`, writes `ops-brief-notification-log.json`, and
+makes the same receipts visible through `/ops-brief/notifications` and release evidence.
 The release gate scheduler is disabled by default. Set `release_gate_schedule_enabled=true` after
 release approvals, source review governance, and S3 artifact mirroring are part of the deployment
 workflow. It runs `contentops release-gate --record --json`, writes release gate reports under the

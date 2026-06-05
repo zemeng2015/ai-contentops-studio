@@ -520,6 +520,84 @@ resource "aws_ecs_task_definition" "worker_alert_notifier" {
   tags = local.tags
 }
 
+resource "aws_ecs_task_definition" "ops_brief_notifier" {
+  family                   = "${local.name}-ops-brief-notifier"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "ops-brief-notifier"
+      image     = var.container_image
+      essential = true
+      command = [
+        "contentops",
+        "ops-brief-notify",
+        "--days",
+        tostring(var.ops_brief_window_days),
+        "--window-size",
+        tostring(var.ops_brief_window_size)
+      ]
+      environment = [
+        { name = "CONTENTOPS_ARTIFACT_STORE_PROVIDER", value = "s3" },
+        { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
+        { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
+        { name = "CONTENTOPS_RESEARCH_PROVIDER", value = var.research_provider },
+        { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) },
+        { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) },
+        { name = "CONTENTOPS_LATENCY_SLO_MS", value = tostring(var.latency_slo_ms) },
+        { name = "CONTENTOPS_MIN_SOURCE_COUNT", value = tostring(var.min_source_count) },
+        { name = "CONTENTOPS_TOKEN_BUDGET_PER_RUN", value = tostring(var.token_budget_per_run) }
+      ]
+      secrets = concat(
+        [
+          {
+            name      = "CONTENTOPS_DATABASE_URL"
+            valueFrom = aws_secretsmanager_secret.database_url.arn
+          }
+        ],
+        var.openai_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_OPENAI_API_KEY"
+            valueFrom = var.openai_api_key_secret_arn
+          }
+        ] : [],
+        var.research_search_api_key_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_RESEARCH_SEARCH_API_KEY"
+            valueFrom = var.research_search_api_key_secret_arn
+          }
+        ] : [],
+        var.research_github_token_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_RESEARCH_GITHUB_TOKEN"
+            valueFrom = var.research_github_token_secret_arn
+          }
+        ] : [],
+        var.notification_webhook_url_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_NOTIFICATION_WEBHOOK_URL"
+            valueFrom = var.notification_webhook_url_secret_arn
+          }
+        ] : []
+      )
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.worker.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ops-brief-notifier"
+        }
+      }
+    }
+  ])
+  tags = local.tags
+}
+
 resource "aws_ecs_task_definition" "release_gate" {
   family                   = "${local.name}-release-gate"
   requires_compatibilities = ["FARGATE"]
@@ -647,6 +725,7 @@ resource "aws_iam_role_policy" "scheduler_run_worker" {
         Resource = [
           aws_ecs_task_definition.worker.arn,
           aws_ecs_task_definition.worker_alert_notifier.arn,
+          aws_ecs_task_definition.ops_brief_notifier.arn,
           aws_ecs_task_definition.release_gate.arn
         ]
       },
@@ -712,6 +791,35 @@ resource "aws_scheduler_schedule" "worker_alert_notifier" {
       launch_type         = "FARGATE"
       task_count          = 1
       task_definition_arn = aws_ecs_task_definition.worker_alert_notifier.arn
+
+      network_configuration {
+        assign_public_ip = false
+        security_groups  = local.worker_security_group_ids
+        subnets          = var.private_subnet_ids
+      }
+    }
+  }
+}
+
+resource "aws_scheduler_schedule" "ops_brief_notifier" {
+  name                         = "${local.name}-ops-brief-notifier"
+  group_name                   = aws_scheduler_schedule_group.contentops.name
+  schedule_expression          = var.ops_brief_schedule_expression
+  schedule_expression_timezone = var.worker_schedule_timezone
+  state                        = var.ops_brief_schedule_enabled ? "ENABLED" : "DISABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.main.arn
+    role_arn = aws_iam_role.scheduler.arn
+
+    ecs_parameters {
+      launch_type         = "FARGATE"
+      task_count          = 1
+      task_definition_arn = aws_ecs_task_definition.ops_brief_notifier.arn
 
       network_configuration {
         assign_public_ip = false
@@ -837,6 +945,7 @@ resource "aws_cloudwatch_dashboard" "operations" {
             ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "TaskDefinitionFamily", aws_ecs_task_definition.worker.family],
             [".", "MemoryUtilization", ".", ".", ".", "."],
             [".", "CPUUtilization", ".", ".", "TaskDefinitionFamily", aws_ecs_task_definition.worker_alert_notifier.family],
+            [".", "CPUUtilization", ".", ".", "TaskDefinitionFamily", aws_ecs_task_definition.ops_brief_notifier.family],
             [".", "MemoryUtilization", ".", ".", ".", "."]
           ]
           period = 300

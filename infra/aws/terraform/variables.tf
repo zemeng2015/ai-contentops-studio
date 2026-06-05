@@ -187,6 +187,30 @@ variable "worker_alert_window_days" {
   default     = 14
 }
 
+variable "ops_brief_schedule_expression" {
+  description = "EventBridge Scheduler expression for recurring operations brief notifications."
+  type        = string
+  default     = "cron(45 13 * * ? *)"
+}
+
+variable "ops_brief_schedule_enabled" {
+  description = "Whether the recurring operations brief notifier schedule is enabled."
+  type        = bool
+  default     = false
+}
+
+variable "ops_brief_window_days" {
+  description = "Number of recent days included by the operations brief notifier task."
+  type        = number
+  default     = 14
+}
+
+variable "ops_brief_window_size" {
+  description = "Number of recent runs scanned by the operations brief notifier task."
+  type        = number
+  default     = 100
+}
+
 variable "release_gate_schedule_expression" {
   description = "EventBridge Scheduler expression for recurring release gate evidence checks."
   type        = string
