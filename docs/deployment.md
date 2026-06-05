@@ -282,8 +282,9 @@ workflow uses `contents: write` and `pull-requests: write` to create a `contento
 branch, commit the review Markdown, PR metadata JSON, and review manifest under
 `scheduled-reviews/`, and open a draft PR using the generated PR title and body. The manifest
 indexes worker receipts, delivery summaries, release evidence, content asset paths, homepage
-handoffs, published URLs, and the Operations Console snapshot. Keep this manual until the team is
-comfortable with automatic publishing review branches.
+handoffs, published URLs, and the Operations Console snapshot with size, media type, SHA-256, and
+missing-file metadata. Keep this manual until the team is comfortable with automatic publishing
+review branches.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes

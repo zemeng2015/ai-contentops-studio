@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import mimetypes
 from collections import Counter
 from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
@@ -278,6 +280,16 @@ class ScheduledWorkflowPrMetadata(BaseModel):
     checklist: list[str] = Field(default_factory=list)
 
 
+class ScheduledWorkflowReviewArtifact(BaseModel):
+    path: str
+    name: str
+    exists: bool
+    size_bytes: int = Field(ge=0, default=0)
+    media_type: str = "application/octet-stream"
+    sha256: str | None = None
+    updated_at: datetime | None = None
+
+
 class ScheduledWorkflowReviewManifest(BaseModel):
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     manifest_type: str = "scheduled_workflow_review"
@@ -293,6 +305,8 @@ class ScheduledWorkflowReviewManifest(BaseModel):
     published_urls: list[str] = Field(default_factory=list)
     action_required: bool = False
     operations_console_summary: dict[str, Any] = Field(default_factory=dict)
+    artifacts: dict[str, ScheduledWorkflowReviewArtifact] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class JobExecutionListResponse(BaseModel):
@@ -960,36 +974,65 @@ def scheduled_workflow_review_manifest(
     pr_metadata_path: Path | None = None,
     operations_console_path: Path | None = None,
 ) -> ScheduledWorkflowReviewManifest:
+    worker_receipt_paths = [
+        item.worker_receipt_path
+        for item in report.items
+        if item.worker_receipt_path is not None
+    ]
+    delivery_summary_paths = [
+        item.delivery_summary_markdown_path
+        for item in report.items
+        if item.delivery_summary_markdown_path is not None
+    ]
+    release_evidence_paths = [
+        item.release_evidence_path for item in report.items if item.release_evidence_path
+    ]
+    content_assets_paths = [
+        item.content_assets_path for item in report.items if item.content_assets_path
+    ]
+    homepage_handoff_paths = [
+        path for item in report.items for path in item.homepage_handoff_paths
+    ]
+    artifact_paths = _dedupe_preserve_order(
+        [
+            path
+            for path in [
+                _optional_path(review_markdown_path),
+                _optional_path(pr_metadata_path),
+                _optional_path(operations_console_path),
+                *worker_receipt_paths,
+                *delivery_summary_paths,
+                *release_evidence_paths,
+                *content_assets_paths,
+                *homepage_handoff_paths,
+            ]
+            if path is not None
+        ]
+    )
     return ScheduledWorkflowReviewManifest(
         review_markdown_path=_optional_path(review_markdown_path),
         pr_metadata_path=_optional_path(pr_metadata_path),
         operations_console_path=_optional_path(operations_console_path),
         source_execution_ids=[item.execution_id for item in report.items],
-        worker_receipt_paths=[
-            item.worker_receipt_path
-            for item in report.items
-            if item.worker_receipt_path is not None
-        ],
-        delivery_summary_paths=[
-            item.delivery_summary_markdown_path
-            for item in report.items
-            if item.delivery_summary_markdown_path is not None
-        ],
-        release_evidence_paths=[
-            item.release_evidence_path for item in report.items if item.release_evidence_path
-        ],
-        content_assets_paths=[
-            item.content_assets_path for item in report.items if item.content_assets_path
-        ],
-        homepage_handoff_paths=[
-            path for item in report.items for path in item.homepage_handoff_paths
-        ],
+        worker_receipt_paths=worker_receipt_paths,
+        delivery_summary_paths=delivery_summary_paths,
+        release_evidence_paths=release_evidence_paths,
+        content_assets_paths=content_assets_paths,
+        homepage_handoff_paths=homepage_handoff_paths,
         published_urls=[url for item in report.items for url in item.published_urls],
         action_required=(
             report.action_required_count > 0
             or bool(report.operations_console_summary.get("action_required"))
         ),
         operations_console_summary=report.operations_console_summary,
+        artifacts={
+            path: _scheduled_review_artifact(path)
+            for path in artifact_paths
+        },
+        metadata={
+            "hash_algorithm": "sha256",
+            "artifact_count": len(artifact_paths),
+        },
     )
 
 
@@ -1014,6 +1057,54 @@ def write_scheduled_workflow_review_manifest(
 
 def _optional_path(path: Path | None) -> str | None:
     return None if path is None else str(path)
+
+
+def _scheduled_review_artifact(path_value: str) -> ScheduledWorkflowReviewArtifact:
+    path = Path(path_value)
+    if path.is_dir():
+        return _scheduled_review_directory_artifact(path_value, path)
+    if not path.exists():
+        return ScheduledWorkflowReviewArtifact(
+            path=path_value,
+            name=path.name,
+            exists=False,
+        )
+    stat = path.stat()
+    return ScheduledWorkflowReviewArtifact(
+        path=path_value,
+        name=path.name,
+        exists=True,
+        size_bytes=stat.st_size,
+        media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream",
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
+    )
+
+
+def _scheduled_review_directory_artifact(
+    path_value: str,
+    path: Path,
+) -> ScheduledWorkflowReviewArtifact:
+    files = sorted(item for item in path.rglob("*") if item.is_file())
+    digest = hashlib.sha256()
+    size_bytes = 0
+    for item in files:
+        relative = item.relative_to(path).as_posix()
+        content = item.read_bytes()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(content)
+        size_bytes += len(content)
+    latest = max((item.stat().st_mtime for item in files), default=path.stat().st_mtime)
+    return ScheduledWorkflowReviewArtifact(
+        path=path_value,
+        name=path.name,
+        exists=True,
+        size_bytes=size_bytes,
+        media_type="inode/directory",
+        sha256=digest.hexdigest(),
+        updated_at=datetime.fromtimestamp(latest, UTC),
+    )
 
 
 def _operations_console_summary(

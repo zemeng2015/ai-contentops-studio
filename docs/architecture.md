@@ -269,7 +269,8 @@ Console summary to produce review Markdown and PR metadata for GitHub Actions ha
 release gate, retention gate, worker alert, content distribution assets, and queue pressure signals.
 It can also write a scheduled review manifest that indexes the Markdown, PR metadata, Operations
 Console snapshot, worker receipts, release evidence paths, content asset paths, homepage handoffs,
-and published URLs committed by a manual draft PR workflow.
+and published URLs committed by a manual draft PR workflow, including size, media type, SHA-256,
+and missing-file metadata for each local artifact.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
 dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
 handoff success rate, and action-required counts.

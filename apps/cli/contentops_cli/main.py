@@ -794,6 +794,8 @@ def scheduled_workflow_summary_command(
         limit=limit,
         operations_console=operations_console.model_dump(mode="json"),
     )
+    if output is not None:
+        write_scheduled_workflow_review_markdown(report, output)
     if pr_metadata_output is not None:
         write_scheduled_workflow_pr_metadata(report, pr_metadata_output)
     if manifest_output is not None:
@@ -805,7 +807,6 @@ def scheduled_workflow_summary_command(
             operations_console_path=operations_console_path,
         )
     if output is not None:
-        write_scheduled_workflow_review_markdown(report, output)
         typer.echo(str(output))
         return
     if json_output:

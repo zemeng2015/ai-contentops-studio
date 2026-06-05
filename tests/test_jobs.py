@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -286,19 +287,31 @@ def test_job_execution_delivery_summary_writes_json_and_markdown(tmp_path: Path)
 
 def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> None:
     receipt_dir = tmp_path / "receipts"
+    site_dir = tmp_path / "site"
+    release_evidence_dir = tmp_path / "release-evidence"
+    handoff_path = tmp_path / "run-scheduled-homepage-handoff.zip"
+    operations_console_path = tmp_path / "operations-console.json"
+    site_dir.mkdir()
+    release_evidence_dir.mkdir()
+    (site_dir / "feed.xml").write_text("<feed />", encoding="utf-8")
+    (site_dir / "promotion-brief.md").write_text("Promotion brief", encoding="utf-8")
+    (release_evidence_dir / "summary.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "summary.md").write_text("# Delivery Summary", encoding="utf-8")
+    handoff_path.write_bytes(b"handoff")
+    operations_console_path.write_text("{}", encoding="utf-8")
     report = JobExecutionReport(
         name="scheduled-calendar",
         total=1,
         succeeded=1,
         failed=0,
-        content_assets_path=str(tmp_path / "site"),
+        content_assets_path=str(site_dir),
         content_assets_status="generated",
         content_assets_files=[
             "feed.xml",
             "promotion-brief.md",
             "content-distribution-manifest.json",
         ],
-        release_evidence_path=str(tmp_path / "release-evidence"),
+        release_evidence_path=str(release_evidence_dir),
         delivery_summary_markdown_path=str(tmp_path / "summary.md"),
         results=[
             JobRunResult(
@@ -309,7 +322,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
                 run_id="run-scheduled",
                 status=RunStatus.PUBLISHED,
                 published_url="https://example.com/posts/scheduled.html",
-                homepage_handoff_path=str(tmp_path / "run-scheduled-homepage-handoff.zip"),
+                homepage_handoff_path=str(handoff_path),
             )
         ],
     )
@@ -350,7 +363,7 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
         tmp_path / "scheduled-review-manifest.json",
         review_markdown_path=markdown_path,
         pr_metadata_path=metadata_path,
-        operations_console_path=tmp_path / "operations-console.json",
+        operations_console_path=operations_console_path,
     )
 
     markdown = markdown_path.read_text(encoding="utf-8")
@@ -396,12 +409,26 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert manifest["manifest_type"] == "scheduled_workflow_review"
     assert manifest["review_markdown_path"] == str(markdown_path)
     assert manifest["pr_metadata_path"] == str(metadata_path)
-    assert manifest["operations_console_path"] == str(tmp_path / "operations-console.json")
+    assert manifest["operations_console_path"] == str(operations_console_path)
     assert manifest["source_execution_ids"] == [report.execution_id]
     assert manifest["worker_receipt_paths"] == [report.receipt_path]
-    assert manifest["release_evidence_paths"] == [str(tmp_path / "release-evidence")]
-    assert manifest["content_assets_paths"] == [str(tmp_path / "site")]
+    assert manifest["release_evidence_paths"] == [str(release_evidence_dir)]
+    assert manifest["content_assets_paths"] == [str(site_dir)]
     assert manifest["published_urls"] == ["https://example.com/posts/scheduled.html"]
+    assert manifest["metadata"]["hash_algorithm"] == "sha256"
+    assert manifest["artifacts"][str(markdown_path)]["exists"] is True
+    assert manifest["artifacts"][str(markdown_path)]["sha256"] == hashlib.sha256(
+        markdown_path.read_bytes()
+    ).hexdigest()
+    assert manifest["artifacts"][str(operations_console_path)]["media_type"] == (
+        "application/json"
+    )
+    assert manifest["artifacts"][str(site_dir)]["exists"] is True
+    assert manifest["artifacts"][str(site_dir)]["media_type"] == "inode/directory"
+    assert manifest["artifacts"][str(site_dir)]["size_bytes"] > 0
+    assert manifest["artifacts"][str(handoff_path)]["sha256"] == hashlib.sha256(
+        handoff_path.read_bytes()
+    ).hexdigest()
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

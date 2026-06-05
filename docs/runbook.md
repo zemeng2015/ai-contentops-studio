@@ -60,8 +60,9 @@ Set `create_draft_pr=true` only when the run should open a draft PR. The workflo
 `scheduled-reviews/*.md`, PR metadata JSON, and a `*-manifest.json` review package index on a
 `contentops/scheduled-*` branch. The manifest lists worker receipts, delivery summaries, release
 evidence paths, content asset paths, homepage handoffs, published URLs, and the Operations Console
-snapshot. The workflow uses the generated PR metadata as the draft PR title and body. Leave this
-disabled for unattended cron runs unless every scheduled execution should create a review branch.
+snapshot, with size, media type, SHA-256, and missing-file metadata for each local artifact. The
+workflow uses the generated PR metadata as the draft PR title and body. Leave this disabled for
+unattended cron runs unless every scheduled execution should create a review branch.
 
 For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
 durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs

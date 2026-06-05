@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from subprocess import run
@@ -851,6 +852,14 @@ def test_cli_job_execution_commands(
     )
     assert review_manifest_payload["content_assets_paths"] == [str(tmp_path / "site")]
     assert review_manifest_payload["worker_receipt_paths"]
+    assert review_manifest_payload["metadata"]["hash_algorithm"] == "sha256"
+    assert review_manifest_payload["artifacts"][str(scheduled_summary_markdown)][
+        "sha256"
+    ] == hashlib.sha256(scheduled_summary_markdown.read_bytes()).hexdigest()
+    assert review_manifest_payload["artifacts"][str(scheduled_pr_metadata)]["exists"] is True
+    assert review_manifest_payload["artifacts"][str(scheduled_operations_console)][
+        "media_type"
+    ] == "application/json"
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0
