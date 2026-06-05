@@ -603,6 +603,13 @@ def _research_provider_health(settings: Settings) -> ProviderHealthItem:
         credential_configured=credential_configured,
         scheduled_ready=scheduled_ready,
         warnings=warnings,
+        remediation_steps=_research_provider_remediation_steps(
+            settings,
+            configured=configured,
+            credential_configured=credential_configured,
+            scheduled_ready=scheduled_ready,
+            warnings=warnings,
+        ),
         evidence={
             "feeds_configured": readiness.get("feeds_configured"),
             "feed_count": len(_research_feeds(settings)),
@@ -642,6 +649,12 @@ def _generator_provider_health(settings: Settings) -> ProviderHealthItem:
         credential_configured=credential_configured,
         scheduled_ready=configured and credential_configured,
         warnings=warnings,
+        remediation_steps=_generator_provider_remediation_steps(
+            settings,
+            configured=configured,
+            credential_configured=credential_configured,
+            warnings=warnings,
+        ),
         evidence={
             "model": settings.openai_model if settings.generator_provider == "openai" else "n/a",
             "timeout_seconds": settings.openai_timeout_seconds,
@@ -668,12 +681,92 @@ def _publisher_provider_health(settings: Settings) -> ProviderHealthItem:
         credential_configured=True,
         scheduled_ready=ready,
         warnings=warnings,
+        remediation_steps=_publisher_provider_remediation_steps(
+            settings,
+            configured=configured,
+            ready=ready,
+            warnings=warnings,
+        ),
         evidence={
             "target_url": readiness.get("target_url"),
             "output_dir": readiness.get("output_dir"),
             "homepage_repo_path": readiness.get("homepage_repo_path"),
         },
     )
+
+
+def _research_provider_remediation_steps(
+    settings: Settings,
+    *,
+    configured: bool,
+    credential_configured: bool,
+    scheduled_ready: bool,
+    warnings: list[str],
+) -> list[str]:
+    steps: list[str] = []
+    if not configured:
+        steps.append(
+            "Set CONTENTOPS_RESEARCH_PROVIDER to local, hybrid, url, feed, discovery, "
+            "search, or github."
+        )
+    if settings.research_provider == "search" and not credential_configured:
+        steps.append("Set CONTENTOPS_RESEARCH_SEARCH_API_KEY before scheduled search research.")
+    if settings.research_provider in {"feed", "discovery"} and not _research_feeds(settings):
+        steps.append("Set CONTENTOPS_RESEARCH_FEEDS to one or more RSS or Atom feed URLs.")
+    if settings.research_provider == "github" and not credential_configured:
+        steps.append(
+            "Set CONTENTOPS_RESEARCH_GITHUB_TOKEN for reliable scheduled repository research."
+        )
+    if settings.research_provider in {"local", "hybrid", "url"} and not scheduled_ready:
+        steps.append(
+            "Use feed, discovery, search, or github research for unattended scheduled jobs."
+        )
+    if warnings and not steps:
+        steps.append("Review provider warnings before enabling unattended scheduled workers.")
+    return steps
+
+
+def _generator_provider_remediation_steps(
+    settings: Settings,
+    *,
+    configured: bool,
+    credential_configured: bool,
+    warnings: list[str],
+) -> list[str]:
+    steps: list[str] = []
+    if not configured:
+        steps.append("Set CONTENTOPS_GENERATOR_PROVIDER to template or openai.")
+    if settings.generator_provider == "openai" and not credential_configured:
+        steps.append("Set CONTENTOPS_OPENAI_API_KEY before using the OpenAI generator.")
+    if settings.generator_provider == "template":
+        steps.append("Set CONTENTOPS_GENERATOR_PROVIDER=openai for live model-backed drafting.")
+    if warnings and not steps:
+        steps.append("Review generation warnings and confirm the fallback policy before release.")
+    return steps
+
+
+def _publisher_provider_remediation_steps(
+    settings: Settings,
+    *,
+    configured: bool,
+    ready: bool,
+    warnings: list[str],
+) -> list[str]:
+    steps: list[str] = []
+    if not configured:
+        steps.append("Set CONTENTOPS_PUBLISHER_PROVIDER to static or homepage.")
+    if settings.publisher_provider == "static" and not ready:
+        steps.append("Create CONTENTOPS_SITE_OUTPUT_DIR and make it writable.")
+    if settings.publisher_provider == "homepage":
+        if settings.homepage_repo_path is None:
+            steps.append("Set CONTENTOPS_HOMEPAGE_REPO_PATH to the local homepage repository.")
+        elif not ready:
+            steps.append(
+                "Ensure the homepage repo contains index.html, posts/, and the post-grid marker."
+            )
+    if warnings and not steps:
+        steps.append("Review publishing warnings before enabling automatic publish handoff.")
+    return steps
 
 
 def _string_list_field(value: object) -> list[str]:

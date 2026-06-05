@@ -744,6 +744,7 @@ def test_system_status_reports_missing_search_credentials(tmp_path: Path) -> Non
     assert research.status == "fail"
     assert research.credential_required is True
     assert research.credential_configured is False
+    assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in research.remediation_steps[0]
     assert provider_check.fields["provider_health"]["summary"]["fail"] >= 1
 
 
@@ -764,6 +765,30 @@ def test_system_status_reports_github_research_readiness(tmp_path: Path) -> None
     assert readiness["mode"] == "repository_intelligence"
     assert readiness["scheduled_ready"] is True
     assert readiness["credential_configured"] is True
+
+
+def test_provider_health_includes_actionable_remediation_steps(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        research_provider="feed",
+        research_feeds="",
+        generator_provider="template",
+        publisher_provider="homepage",
+        homepage_repo_path=None,
+    )
+
+    health = provider_health(settings)
+
+    research = next(item for item in health.items if item.category == "research")
+    generator = next(item for item in health.items if item.category == "generator")
+    publisher = next(item for item in health.items if item.category == "publisher")
+    assert research.status == "warn"
+    assert "CONTENTOPS_RESEARCH_FEEDS" in research.remediation_steps[0]
+    assert generator.status == "warn"
+    assert "CONTENTOPS_GENERATOR_PROVIDER=openai" in generator.remediation_steps[0]
+    assert publisher.status == "fail"
+    assert "CONTENTOPS_HOMEPAGE_REPO_PATH" in publisher.remediation_steps[0]
 
 
 def test_deployment_manifest_reports_scheduled_research_capability(tmp_path: Path) -> None:

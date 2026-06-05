@@ -239,6 +239,8 @@ def show_provider_health(
         )
         for warning in item.warnings:
             typer.echo(f"  warning: {warning}")
+        for step in item.remediation_steps:
+            typer.echo(f"  fix: {step}")
     raise typer.Exit(0 if report.status != "fail" else 1)
 
 

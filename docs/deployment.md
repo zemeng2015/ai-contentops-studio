@@ -268,7 +268,9 @@ even when the gate reports `fail`, so review packages still contain deployment p
 Review `provider_health.json` in release evidence or run `contentops provider-health --json`
 before enabling scheduled jobs. Search research should show configured credentials, feed/discovery
 providers should show scheduled readiness, and GitHub research should record whether a token is
-configured for higher API limits or private repositories.
+configured for higher API limits or private repositories. Each provider health item includes
+`remediation_steps`, so missing keys, feed URLs, homepage paths, or live model settings can be
+fixed directly from the evidence bundle.
 Review `integration_smoke_plan.json` in the same evidence bundle to confirm the live provider smoke
 selectors and missing environment variables before opting into external smoke tests.
 Review `integration_smoke_runs.json` beside it to inspect recent recorded smoke run history,

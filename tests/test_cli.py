@@ -133,6 +133,7 @@ def test_cli_doctor_reports_system_status(
         "generator",
         "publisher",
     }
+    assert all("remediation_steps" in item for item in provider_payload["items"])
     assert smoke_payload["status"] == "warn"
     assert smoke_payload["command"] == "pytest -m integration tests/test_integration_smoke.py"
     assert any(

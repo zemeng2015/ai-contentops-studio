@@ -640,6 +640,7 @@ class ProviderHealthItem(BaseModel):
     credential_configured: bool = True
     scheduled_ready: bool = False
     warnings: list[str] = Field(default_factory=list)
+    remediation_steps: list[str] = Field(default_factory=list)
     evidence: dict[str, Any] = Field(default_factory=dict)
 
 

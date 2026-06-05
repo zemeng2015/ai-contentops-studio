@@ -1722,6 +1722,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td>{escape(str(item.scheduled_ready).lower())}</td>
           <td>{escape(str(item.credential_configured).lower())}</td>
           <td>{escape("; ".join(item.warnings) or "none")}</td>
+          <td>{_remediation_list_html(item.remediation_steps)}</td>
         </tr>
         """
         for item in bundle.provider_health.items
@@ -2100,7 +2101,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <thead>
           <tr>
             <th>Category</th><th>Provider</th><th>Status</th><th>Mode</th>
-            <th>Scheduled</th><th>Credential</th><th>Warnings</th>
+            <th>Scheduled</th><th>Credential</th><th>Warnings</th><th>Remediation</th>
           </tr>
         </thead>
         <tbody>{provider_rows}</tbody>

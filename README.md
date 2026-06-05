@@ -256,7 +256,8 @@ combines system readiness, deployment capabilities, release gates, API security,
 placeholder checks.
 Use `contentops provider-health --json` or `GET /provider-health` to inspect research,
 generation, and publishing provider posture, including credentials, scheduled readiness, retries,
-cache configuration, and provider-specific warnings.
+cache configuration, provider-specific warnings, and remediation steps for missing credentials or
+paths.
 Use `contentops integration-smoke-plan --json` or `GET /integration-smoke-plan` to see which
 optional live provider smoke tests are ready to run, which environment variables are missing, and
 the exact pytest selector for each provider path.
