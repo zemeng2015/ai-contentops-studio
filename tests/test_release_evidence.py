@@ -36,6 +36,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
     bundle = generate_release_evidence(output_dir)
 
     expected_files = {
+        "content_distribution.json",
         "doctor.json",
         "deployment_check.json",
         "deployment_manifest.json",
@@ -92,6 +93,53 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
+
+
+def test_release_evidence_indexes_content_distribution_manifests(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(artifact_root))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(site_dir))
+    distribution_manifest = site_dir / "content-distribution-manifest.json"
+    distribution_manifest.write_text(
+        json.dumps(
+            {
+                "manifest_type": "content_distribution",
+                "output_dir": str(site_dir),
+                "assets": [
+                    {"relative_path": "feed.xml", "sha256": "feed-sha"},
+                    {"relative_path": "promotion-brief.md", "sha256": "brief-sha"},
+                ],
+                "git": {"is_repository": True, "branch": "main", "dirty": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    payload = json.loads((output_dir / "content_distribution.json").read_text(encoding="utf-8"))
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    expected_sha = hashlib.sha256(distribution_manifest.read_bytes()).hexdigest()
+    assert bundle.content_distribution.total == 1
+    assert bundle.content_distribution.items[0].manifest_path == (
+        "content-distribution-manifest.json"
+    )
+    assert bundle.content_distribution.items[0].asset_count == 2
+    assert bundle.content_distribution.items[0].sha256 == expected_sha
+    assert payload["items"][0]["git"]["branch"] == "main"
+    assert "content_distribution.json" in bundle.summary.artifact_files
+    assert evidence_manifest["artifacts"]["content_distribution.json"]["media_type"] == (
+        "application/json"
+    )
 
 
 def test_release_evidence_indexes_homepage_handoff_bundles(

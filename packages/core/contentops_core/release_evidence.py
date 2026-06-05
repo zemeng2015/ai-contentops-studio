@@ -29,6 +29,8 @@ from contentops_core.jobs import (
 from contentops_core.models import (
     ArtifactManifest,
     ArtifactMetadata,
+    ContentDistributionEvidence,
+    ContentDistributionEvidenceItem,
     HomepageHandoffEvidence,
     HomepageHandoffEvidenceItem,
     ReleaseEvidenceBundle,
@@ -58,6 +60,7 @@ def build_release_evidence(
     preflight = deployment_check(settings, repository, operations)
     approval = _latest_release_approval(settings.artifact_root)
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
+    content_distribution = _content_distribution_evidence(settings)
     source_reviews = _source_review_evidence(settings.artifact_root)
     release_status = "fail" if source_reviews.needs_review_count else readiness.status
     can_release = readiness.can_release and source_reviews.needs_review_count == 0
@@ -76,6 +79,7 @@ def build_release_evidence(
         "doctor.json",
         "deployment_check.json",
         "deployment_manifest.json",
+        "content_distribution.json",
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
@@ -103,6 +107,7 @@ def build_release_evidence(
         release_readiness=readiness,
         deployment_check=preflight,
         homepage_handoffs=homepage_handoffs,
+        content_distribution=content_distribution,
         source_reviews=source_reviews,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
         worker_execution_alert_deliveries=[
@@ -123,6 +128,7 @@ def write_release_evidence(
         "doctor": bundle.doctor.model_dump(mode="json"),
         "deployment_check": bundle.deployment_check.model_dump(mode="json"),
         "deployment_manifest": bundle.deployment_manifest.model_dump(mode="json"),
+        "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
@@ -235,6 +241,57 @@ def _homepage_handoff_item(
     )
 
 
+def _content_distribution_evidence(
+    settings: Settings,
+    limit: int = 20,
+) -> ContentDistributionEvidence:
+    candidate_roots = [settings.site_output_dir, settings.artifact_root]
+    if settings.homepage_repo_path is not None:
+        candidate_roots.insert(0, settings.homepage_repo_path)
+    paths: list[Path] = []
+    seen: set[Path] = set()
+    for root in candidate_roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("content-distribution-manifest.json"):
+            resolved = path.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            paths.append(path)
+    paths.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    items = [
+        item
+        for path in paths[:limit]
+        if (item := _content_distribution_item(settings, path)) is not None
+    ]
+    return ContentDistributionEvidence(total=len(paths), items=items)
+
+
+def _content_distribution_item(
+    settings: Settings,
+    path: Path,
+) -> ContentDistributionEvidenceItem | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    assets = payload.get("assets")
+    git = payload.get("git")
+    stat = path.stat()
+    return ContentDistributionEvidenceItem(
+        manifest_path=_best_relative_path(settings, path),
+        output_dir=str(payload.get("output_dir")) if payload.get("output_dir") else None,
+        asset_count=len(assets) if isinstance(assets, list) else 0,
+        size_bytes=stat.st_size,
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        git=git if isinstance(git, dict) else {},
+        updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
+    )
+
+
 def _source_review_evidence(artifact_root: Path, limit: int = 100) -> SourceReviewEvidence:
     if not artifact_root.exists():
         return SourceReviewEvidence(total_runs=0, total_decisions=0)
@@ -292,6 +349,21 @@ def _run_id_from_artifact_dir(path: Path) -> str:
     if "-" not in name:
         return name
     return name.rsplit("-", 1)[-1]
+
+
+def _best_relative_path(settings: Settings, path: Path) -> str:
+    for root in [
+        settings.homepage_repo_path,
+        settings.site_output_dir,
+        settings.artifact_root,
+    ]:
+        if root is None:
+            continue
+        try:
+            return path.relative_to(root).as_posix()
+        except ValueError:
+            continue
+    return path.as_posix()
 
 
 def _evidence_manifest(output_dir: Path, artifact_files: list[str]) -> ArtifactManifest:

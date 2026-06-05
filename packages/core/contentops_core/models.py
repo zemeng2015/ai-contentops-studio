@@ -574,6 +574,22 @@ class SourceReviewEvidence(BaseModel):
     items: list[SourceReviewEvidenceItem] = Field(default_factory=list)
 
 
+class ContentDistributionEvidenceItem(BaseModel):
+    manifest_path: str
+    output_dir: str | None = None
+    asset_count: int = Field(ge=0)
+    size_bytes: int = Field(ge=0)
+    sha256: str
+    git: dict[str, Any] = Field(default_factory=dict)
+    updated_at: datetime
+
+
+class ContentDistributionEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    items: list[ContentDistributionEvidenceItem] = Field(default_factory=list)
+
+
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
@@ -582,6 +598,7 @@ class ReleaseEvidenceBundle(BaseModel):
     release_readiness: ReleaseReadinessReport
     deployment_check: DeploymentCheckReport
     homepage_handoffs: HomepageHandoffEvidence
+    content_distribution: ContentDistributionEvidence
     source_reviews: SourceReviewEvidence
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)

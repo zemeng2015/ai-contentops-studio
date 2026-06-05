@@ -120,6 +120,9 @@ as generated posts and evaluation reports.
 The same distribution workflow is available through `POST /content-assets` and the dashboard
 Published Content section, with read endpoints for the RSS feed, promotion brief, and distribution
 manifest.
+Release evidence indexes generated `content-distribution-manifest.json` files in
+`content_distribution.json`, including manifest digests, asset counts, and git status, so CI/CD
+reviews can prove distribution assets were generated and are ready to commit or deploy.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,

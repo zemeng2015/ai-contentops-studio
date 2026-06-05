@@ -1351,6 +1351,28 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="5"><span class="muted">No homepage handoff bundles recorded.</span></td>
         </tr>
         """
+    distribution_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.manifest_path)}</td>
+          <td>{item.asset_count}</td>
+          <td>{item.size_bytes}</td>
+          <td><code>{escape(item.sha256[:16])}...</code></td>
+          <td>{escape(str(item.git.get("branch") or "n/a"))}</td>
+          <td>{escape(str(item.git.get("dirty", "n/a")).lower())}</td>
+          <td>{escape(item.updated_at.isoformat())}</td>
+        </tr>
+        """
+        for item in bundle.content_distribution.items
+    )
+    if not distribution_rows:
+        distribution_rows = """
+        <tr>
+          <td colspan="7">
+            <span class="muted">No content distribution manifests recorded.</span>
+          </td>
+        </tr>
+        """
     worker_trend_rows = "".join(
         f"""
         <tr>
@@ -1444,6 +1466,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
         <div>
+          <strong>{bundle.content_distribution.total}</strong>
+          <span>Distribution manifests</span>
+        </div>
+        <div>
           <strong>{bundle.source_reviews.total_decisions}</strong>
           <span>Source reviews</span>
         </div>
@@ -1491,6 +1517,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <tr><th>Run</th><th>Artifact</th><th>Size</th><th>SHA256</th><th>Updated</th></tr>
         </thead>
         <tbody>{handoff_rows}</tbody>
+      </table>
+      <h2>Content Distribution Evidence</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Manifest</th><th>Assets</th><th>Size</th><th>SHA256</th>
+            <th>Branch</th><th>Dirty</th><th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>{distribution_rows}</tbody>
       </table>
       <h2>Source Review Evidence</h2>
       <table>

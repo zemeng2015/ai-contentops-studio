@@ -122,6 +122,9 @@ s3://$CONTENTOPS_ARTIFACT_S3_BUCKET/$CONTENTOPS_ARTIFACT_S3_PREFIX/<run_id>/<art
 Release evidence and worker execution receipts use the same bucket and prefix. Their local output
 directories include `s3-mirror-log.json`, which records the bucket, key, content type, status, and
 error message for every standalone artifact mirror attempt.
+When distribution assets have been generated, release evidence also writes
+`content_distribution.json` so deployment reviewers can verify the RSS feed, promotion brief, and
+distribution manifest were prepared with file hashes before the site is deployed.
 
 For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy can use the
 `postgresql+psycopg://` URL:
