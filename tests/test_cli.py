@@ -228,6 +228,7 @@ def test_cli_approve_then_publish(
     publish_result = runner.invoke(app, ["publish", run_id])
     receipt_result = runner.invoke(app, ["publish-receipt", run_id])
     verification_result = runner.invoke(app, ["verify-publish", run_id])
+    recovery_plan_result = runner.invoke(app, ["publish-recovery-plan", run_id])
     content_result = runner.invoke(app, ["content", "--json"])
     content_assets_dir = tmp_path / "content-assets"
     content_assets_result = runner.invoke(
@@ -248,6 +249,8 @@ def test_cli_approve_then_publish(
     assert '"reviewer": "zack"' in receipt_result.output
     assert verification_result.exit_code == 0
     assert '"verified": true' in verification_result.output
+    assert recovery_plan_result.exit_code == 0
+    assert '"recommended_action": "none"' in recovery_plan_result.output
     assert content_result.exit_code == 0
     assert run_id in content_result.output
     assert '"provider": "static"' in content_result.output

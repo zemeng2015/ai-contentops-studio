@@ -246,6 +246,28 @@ class PublishVerificationReport(BaseModel):
     verified_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PublishRecoveryFileAction(BaseModel):
+    path: str
+    status: str
+    exists: bool
+    matches_receipt: bool
+    recommended_action: str
+    reason: str
+
+
+class PublishRecoveryPlan(BaseModel):
+    run_id: str
+    provider: str
+    url: str
+    verified: bool
+    recommended_action: str
+    runnable: bool
+    blocked_reason: str | None = None
+    file_actions: list[PublishRecoveryFileAction] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class PublishedContentItem(BaseModel):
     run_id: str
     topic: str

@@ -36,6 +36,8 @@ from contentops_core.models import (
     PublishFileChange,
     PublishPlan,
     PublishReceipt,
+    PublishRecoveryFileAction,
+    PublishRecoveryPlan,
     PublishRollbackResult,
     PublishVerificationItem,
     PublishVerificationReport,
@@ -505,6 +507,51 @@ class ReviewService:
         self._write_publish_verification(run, report)
         return report
 
+    def publish_recovery_plan(self, run_id: str) -> PublishRecoveryPlan:
+        run = self._get_run(run_id)
+        report = self.verify_publish(run_id)
+        file_actions = [_publish_recovery_file_action(item) for item in report.items]
+        if report.verified:
+            plan = PublishRecoveryPlan(
+                run_id=run_id,
+                provider=report.provider,
+                url=report.url,
+                verified=True,
+                recommended_action="none",
+                runnable=False,
+                blocked_reason="Published files already match the publish receipt.",
+                file_actions=file_actions,
+                steps=[
+                    "No recovery is required.",
+                    "Keep `publish-verification.json` with the release evidence.",
+                ],
+            )
+        else:
+            plan = PublishRecoveryPlan(
+                run_id=run_id,
+                provider=report.provider,
+                url=report.url,
+                verified=False,
+                recommended_action="manual_restore_or_republish",
+                runnable=True,
+                file_actions=file_actions,
+                steps=[
+                    f"Inspect `publish-verification.json` for run `{run_id}`.",
+                    (
+                        "Restore target files to the expected receipt hashes or republish "
+                        "approved content."
+                    ),
+                    f"Run `contentops verify-publish {run_id}` until verification passes.",
+                    (
+                        f"Use `contentops rollback-publish {run_id} --actor <name>` "
+                        "if the published change should be removed."
+                    ),
+                    "Regenerate release evidence and rerun the release gate.",
+                ],
+            )
+        self._write_publish_recovery_plan(run, plan)
+        return plan
+
     def published_content(
         self,
         limit: int = 20,
@@ -921,6 +968,14 @@ class ReviewService:
     ) -> None:
         path = run.artifact_dir / "publish-verification.json"
         path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _write_publish_recovery_plan(
+        run: RunRecord,
+        plan: PublishRecoveryPlan,
+    ) -> None:
+        path = run.artifact_dir / "publish-recovery-plan.json"
+        path.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
 
     def _published_content_item(self, run: RunRecord) -> PublishedContentItem:
         draft = self._load_json(run, "draft.json", Draft)
@@ -1430,6 +1485,37 @@ def _pass_rate(values: Iterable[bool]) -> float:
     if not items:
         return 0.0
     return round(sum(1 for item in items if item) / len(items), 3)
+
+
+def _publish_recovery_file_action(
+    item: PublishVerificationItem,
+) -> PublishRecoveryFileAction:
+    if item.matches_receipt:
+        return PublishRecoveryFileAction(
+            path=item.path,
+            status="ok",
+            exists=item.exists,
+            matches_receipt=item.matches_receipt,
+            recommended_action="none",
+            reason="Published file matches the receipt.",
+        )
+    if not item.exists:
+        return PublishRecoveryFileAction(
+            path=item.path,
+            status="missing",
+            exists=item.exists,
+            matches_receipt=item.matches_receipt,
+            recommended_action="restore_or_republish",
+            reason="Published file is missing from the target.",
+        )
+    return PublishRecoveryFileAction(
+        path=item.path,
+        status="mismatch",
+        exists=item.exists,
+        matches_receipt=item.matches_receipt,
+        recommended_action="restore_expected_hash_or_republish",
+        reason="Published file exists but does not match the receipt hash.",
+    )
 
 
 def _artifact_dir_stats(path: Path) -> tuple[int, int]:

@@ -372,6 +372,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     publish_response = client.post(f"/runs/{run['id']}/publish")
     receipt_response = client.get(f"/runs/{run['id']}/publish-receipt")
     verification_response = client.get(f"/runs/{run['id']}/publish-verification")
+    recovery_plan_response = client.get(f"/runs/{run['id']}/publish-recovery-plan")
     notifications_response = client.get(f"/runs/{run['id']}/notifications")
     content_response = client.get("/content?limit=5")
     content_assets_response = client.post("/content-assets?title=API%20Feed")
@@ -474,6 +475,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert verification_response.status_code == 200
     assert verification_response.json()["verified"] is True
     assert len(verification_response.json()["items"]) == 4
+    assert recovery_plan_response.status_code == 200
+    assert recovery_plan_response.json()["recommended_action"] == "none"
     assert notifications_response.status_code == 200
     notification_actions = [item["action"] for item in notifications_response.json()]
     assert "source_review" in notification_actions

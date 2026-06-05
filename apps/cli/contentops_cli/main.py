@@ -1243,6 +1243,16 @@ def verify_publish(run_id: str) -> None:
     typer.echo(report.model_dump_json(indent=2))
 
 
+@app.command("publish-recovery-plan")
+def publish_recovery_plan(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        plan = service.publish_recovery_plan(run_id)
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(plan.model_dump_json(indent=2))
+
+
 @app.command("generation-receipt")
 def generation_receipt(run_id: str) -> None:
     service = build_review_service(Settings())

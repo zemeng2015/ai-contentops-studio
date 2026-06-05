@@ -497,10 +497,17 @@ def test_publish_verification_detects_modified_files(tmp_path: Path) -> None:
     Path(receipt.file_changes[0].path).write_text("tampered", encoding="utf-8")
 
     verification = review_service.verify_publish(result.run.id)
+    recovery_plan = review_service.publish_recovery_plan(result.run.id)
     incident = review_service.incident_report(result.run.id)
 
     assert verification.verified is False
     assert any(not item.matches_receipt for item in verification.items)
+    assert recovery_plan.verified is False
+    assert recovery_plan.runnable is True
+    assert recovery_plan.recommended_action == "manual_restore_or_republish"
+    assert recovery_plan.file_actions[0].status == "mismatch"
+    assert "rollback-publish" in recovery_plan.steps[3]
+    assert (result.run.artifact_dir / "publish-recovery-plan.json").exists()
     assert incident.severity.value == "critical"
     assert incident.requires_action is True
     assert any(signal.category == "publish" for signal in incident.signals)

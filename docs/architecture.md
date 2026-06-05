@@ -131,6 +131,9 @@ Publish verification reads the current target files and compares their hashes ag
 receipt, producing per-run `publish-verification.json` files for drift detection after deploys or
 manual edits. Release evidence now rolls those run-level reports into `publish_verifications.json`,
 and the release gate fails when published content no longer matches its recorded receipt.
+When drift appears, `contentops publish-recovery-plan <run_id>` and
+`GET /runs/{id}/publish-recovery-plan` produce `publish-recovery-plan.json` with file-level
+restore, republish, or rollback guidance before any destructive recovery action is taken.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,
 budget warnings, publish drift, and notification delivery failures into a single severity and
 action-required flag. They are exposed through the dashboard, CLI, and API so operational triage

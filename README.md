@@ -99,6 +99,7 @@ Each run writes inspectable artifacts such as:
 - `approval.json`
 - `publish-receipt.json`
 - `publish-verification.json`
+- `publish-recovery-plan.json`
 - `audit-log.json`
 
 ## Features
@@ -173,6 +174,7 @@ GET  /runs/{run_id}/s3-mirror-log
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
+GET  /runs/{run_id}/publish-recovery-plan
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /ops-trends

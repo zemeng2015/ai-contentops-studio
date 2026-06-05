@@ -166,6 +166,10 @@ distribution assets because the manifest is incomplete.
 If the gate reports `publish_verification=fail`, run `contentops verify-publish <run_id>` for each
 drifting run in `publish_verifications.json`, then restore the expected target files, republish the
 approved content, or roll the run back before regenerating release evidence.
+Use `contentops publish-recovery-plan <run_id>` or
+`GET /runs/{id}/publish-recovery-plan` before changing files. The plan writes
+`publish-recovery-plan.json` and classifies each target file as `ok`, `missing`, or `mismatch` with
+recommended restore, republish, or rollback actions.
 When preparing a deployment handoff, run
 `contentops release-gate --git-sha <sha> --json --record --checklist-output release-gate-checklist.md`
 and review the Markdown checklist with the JSON report. The checklist translates failed or warning

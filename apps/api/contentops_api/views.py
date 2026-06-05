@@ -365,6 +365,9 @@ def _publish_verification_html(report: PublishVerificationReport) -> str:
       <p>
         <a href="/runs/{escape(report.run_id)}/publish-verification">
           Publish verification JSON
+        </a> |
+        <a href="/runs/{escape(report.run_id)}/publish-recovery-plan">
+          Publish recovery plan JSON
         </a>
       </p>
       <p>
