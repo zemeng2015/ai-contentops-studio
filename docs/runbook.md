@@ -127,6 +127,9 @@ The same trend, alert, and notification payloads are written to release evidence
 `worker_execution_trends.json`, `worker_execution_alerts.json`, and
 `worker_execution_alert_deliveries.json`, so compare the dashboard with the latest CI evidence
 bundle when investigating scheduled automation regressions.
+Release evidence also writes `scheduled_review_packages.json`, which records recent scheduled
+review manifest status, verification failures, archive readiness, ZIP hashes, and action-required
+state for audit handoff.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced

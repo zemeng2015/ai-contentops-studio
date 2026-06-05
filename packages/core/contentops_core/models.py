@@ -814,6 +814,31 @@ class RetentionArchiveEvidence(BaseModel):
     items: list[RetentionArchiveRecord] = Field(default_factory=list)
 
 
+class ScheduledReviewPackageEvidenceItem(BaseModel):
+    id: str
+    manifest_path: str
+    status: str
+    action_required: bool = False
+    artifact_count: int = Field(ge=0, default=0)
+    source_execution_ids: list[str] = Field(default_factory=list)
+    verification_status: str = "missing"
+    verification_failed_count: int = Field(ge=0, default=0)
+    archive_path: str | None = None
+    archive_exists: bool = False
+    archive_size_bytes: int = Field(ge=0, default=0)
+    archive_sha256: str | None = None
+    updated_at: datetime | None = None
+
+
+class ScheduledReviewPackageEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    archived_count: int = Field(ge=0, default=0)
+    failed_count: int = Field(ge=0, default=0)
+    action_required_count: int = Field(ge=0, default=0)
+    items: list[ScheduledReviewPackageEvidenceItem] = Field(default_factory=list)
+
+
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
@@ -832,6 +857,9 @@ class ReleaseEvidenceBundle(BaseModel):
     source_reviews: SourceReviewEvidence
     worker_delivery_summaries: WorkerDeliverySummaryEvidence
     retention_archives: RetentionArchiveEvidence
+    scheduled_review_packages: ScheduledReviewPackageEvidence = Field(
+        default_factory=lambda: ScheduledReviewPackageEvidence(total=0)
+    )
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alert_deliveries: list[dict[str, Any]] = Field(default_factory=list)

@@ -1398,6 +1398,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
+    assert "Scheduled Review Package Evidence" in response.text
     assert "Source Review Evidence" in response.text
     assert "Worker Execution Trends" in response.text
     assert "Worker alert" in response.text

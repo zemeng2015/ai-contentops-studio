@@ -155,9 +155,9 @@ contentops retention-archives
 `release-evidence` writes system status, deployment preflight, release gates, homepage handoff
 inventory, content distribution manifests, publish verification summaries, publish recovery
 execution summaries, source review summaries, worker execution trends, the daily operations brief,
-the machine-readable operations console, retention archive receipts, and `evidence_manifest.json`
-with SHA-256 hashes and file metadata for every evidence artifact, so CI output can be archived and
-compared during deployment reviews.
+the machine-readable operations console, retention archive receipts, scheduled review package
+inventory, and `evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence
+artifact, so CI output can be archived and compared during deployment reviews.
 The operations console combines the daily brief, worker health, release gate, retention
 governance, and review queue into one JSON report for dashboards, CI checks, and external operator
 automation.

@@ -1729,6 +1729,31 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td colspan="9"><span class="muted">No publish recovery executions recorded.</span></td>
         </tr>
         """
+    scheduled_review_rows = "".join(
+        f"""
+        <tr>
+          <td><code>{escape(item.id)}</code></td>
+          <td><span class="pill">{escape(item.status)}</span></td>
+          <td>{escape(item.verification_status)}</td>
+          <td>{item.verification_failed_count}</td>
+          <td>{item.artifact_count}</td>
+          <td>{escape(str(item.action_required).lower())}</td>
+          <td>{escape(item.manifest_path)}</td>
+          <td>{escape(item.archive_path or "not available")}</td>
+          <td>{item.archive_size_bytes}</td>
+          <td>{escape((item.archive_sha256 or "n/a")[:16])}</td>
+        </tr>
+        """
+        for item in bundle.scheduled_review_packages.items
+    )
+    if not scheduled_review_rows:
+        scheduled_review_rows = """
+        <tr>
+          <td colspan="10">
+            <span class="muted">No scheduled review packages recorded.</span>
+          </td>
+        </tr>
+        """
     worker_trend_rows = "".join(
         f"""
         <tr>
@@ -1862,6 +1887,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <strong>{bundle.retention_archives.total}</strong>
           <span>Retention archives</span>
         </div>
+        <div>
+          <strong>{bundle.scheduled_review_packages.total}</strong>
+          <span>Scheduled packages</span>
+        </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
       <h2>Operations Brief</h2>
@@ -1940,6 +1969,17 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </tr>
         </thead>
         <tbody>{publish_recovery_rows}</tbody>
+      </table>
+      <h2>Scheduled Review Package Evidence</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Package</th><th>Status</th><th>Verification</th><th>Failed</th>
+            <th>Artifacts</th><th>Action</th><th>Manifest</th><th>Archive</th>
+            <th>Zip bytes</th><th>SHA256</th>
+          </tr>
+        </thead>
+        <tbody>{scheduled_review_rows}</tbody>
       </table>
       <h2>Source Review Evidence</h2>
       <table>

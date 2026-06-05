@@ -179,10 +179,10 @@ python scripts/generate_release_evidence.py --output-dir release-evidence
 
 The evidence bundle includes system status, deployment preflight checks, a redacted deployment
 manifest, operations summary, release readiness gates, homepage handoff inventory, worker execution
-trends, a summary file with the commit SHA, and `evidence_manifest.json` with SHA-256 hashes, sizes,
-media types, and timestamps for the generated evidence artifacts. The command exits non-zero only
-when release readiness is `fail`; local-development `warn` states remain inspectable without
-blocking ordinary CI.
+trends, scheduled review package inventory, a summary file with the commit SHA, and
+`evidence_manifest.json` with SHA-256 hashes, sizes, media types, and timestamps for the generated
+evidence artifacts. The command exits non-zero only when release readiness is `fail`;
+local-development `warn` states remain inspectable without blocking ordinary CI.
 When homepage handoff zip files exist under the artifact root, `homepage_handoffs.json` records
 their run id, relative artifact path, size, SHA-256 digest, and update time so personal homepage
 publishing packages remain part of the release review trail.

@@ -10,10 +10,16 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
+    create_scheduled_workflow_review_archive,
     job_execution_dir,
     notify_worker_delivery_summary,
+    scheduled_workflow_review_report,
+    verify_scheduled_workflow_review_manifest,
     write_job_execution_delivery_summary,
     write_job_execution_report,
+    write_scheduled_workflow_pr_metadata,
+    write_scheduled_workflow_review_manifest,
+    write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest, RunRequest
 from contentops_core.release_approvals import approve_release
@@ -54,6 +60,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "release_readiness.json",
         "retention_archives.json",
         "source_reviews.json",
+        "scheduled_review_packages.json",
         "summary.json",
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
@@ -90,6 +97,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     source_reviews = json.loads(
         (output_dir / "source_reviews.json").read_text(encoding="utf-8")
     )
+    scheduled_review_packages = json.loads(
+        (output_dir / "scheduled_review_packages.json").read_text(encoding="utf-8")
+    )
     publish_verifications = json.loads(
         (output_dir / "publish_verifications.json").read_text(encoding="utf-8")
     )
@@ -125,6 +135,8 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert worker_delivery_summaries["total"] == 0
     assert source_reviews["total_runs"] == 0
     assert source_reviews["total_decisions"] == 0
+    assert scheduled_review_packages["total"] == 0
+    assert bundle.scheduled_review_packages.total == 0
     assert publish_verifications["total"] == 0
     assert publish_verifications["drift_count"] == 0
     assert publish_recovery_executions["total"] == 0
@@ -482,6 +494,92 @@ def test_release_evidence_includes_worker_execution_trends(
     assert evidence_manifest["artifacts"]["worker_execution_trends.json"]["media_type"] == (
         "application/json"
     )
+
+
+def test_release_evidence_includes_scheduled_review_packages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(artifact_root))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    settings = Settings()
+    receipt = JobExecutionReport(
+        name="release-evidence-scheduled-review",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="reviewed",
+                topic="Scheduled review package evidence",
+                publish=False,
+                run_id="run-scheduled-evidence",
+                status="needs_review",
+            )
+        ],
+    )
+    write_job_execution_report(receipt, job_execution_dir(settings.artifact_root))
+    scheduled_dir = settings.artifact_root / "scheduled"
+    scheduled_dir.mkdir(parents=True)
+    operations_console_path = scheduled_dir / "daily-operations-console.json"
+    operations_console_path.write_text("{}", encoding="utf-8")
+    review = scheduled_workflow_review_report(
+        job_execution_dir(settings.artifact_root),
+        limit=5,
+        operations_console={"status": "pass"},
+    )
+    markdown_path = write_scheduled_workflow_review_markdown(
+        review,
+        scheduled_dir / "daily-review.md",
+    )
+    metadata_path = write_scheduled_workflow_pr_metadata(
+        review,
+        scheduled_dir / "daily-pr-metadata.json",
+    )
+    manifest_path = write_scheduled_workflow_review_manifest(
+        review,
+        scheduled_dir / "daily-review-manifest.json",
+        review_markdown_path=markdown_path,
+        pr_metadata_path=metadata_path,
+        operations_console_path=operations_console_path,
+    )
+    verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    (scheduled_dir / "daily-review-manifest-verification.json").write_text(
+        verification.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    archive_report = create_scheduled_workflow_review_archive(
+        manifest_path,
+        scheduled_dir / "daily-review-package.zip",
+    )
+    (scheduled_dir / "daily-review-package.json").write_text(
+        archive_report.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    payload = json.loads(
+        (output_dir / "scheduled_review_packages.json").read_text(encoding="utf-8")
+    )
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    assert bundle.scheduled_review_packages.total == 1
+    assert bundle.scheduled_review_packages.archived_count == 1
+    assert bundle.scheduled_review_packages.items[0].status == "archived"
+    assert bundle.scheduled_review_packages.items[0].archive_sha256 == (
+        archive_report.archive_sha256
+    )
+    assert payload["items"][0]["manifest_path"] == "scheduled/daily-review-manifest.json"
+    assert payload["items"][0]["archive_path"] == "scheduled/daily-review-package.zip"
+    assert "scheduled_review_packages.json" in bundle.summary.artifact_files
+    assert evidence_manifest["artifacts"]["scheduled_review_packages.json"][
+        "media_type"
+    ] == "application/json"
 
 
 def test_release_evidence_includes_latest_release_approval(

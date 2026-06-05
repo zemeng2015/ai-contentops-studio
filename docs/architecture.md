@@ -279,6 +279,8 @@ handoff files, giving scheduled automation a portable review artifact.
 `GET /scheduled-reviews`, `GET /scheduled-reviews/{package_id}/archive`, and
 `/dashboard/scheduled-reviews` make those packages inspectable without opening raw Actions
 artifacts, including verification state, failed counts, ZIP size, and SHA-256.
+Release evidence includes the same inventory in `scheduled_review_packages.json`, so scheduled
+review packages are preserved with deployment evidence and the release evidence dashboard.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
 dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
 handoff success rate, and action-required counts.

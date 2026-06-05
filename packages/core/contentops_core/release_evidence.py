@@ -26,6 +26,7 @@ from contentops_core.jobs import (
     job_execution_alert_report,
     job_execution_dir,
     job_execution_trends,
+    list_scheduled_workflow_review_packages,
     worker_delivery_summary_notification_log,
 )
 from contentops_core.models import (
@@ -43,6 +44,8 @@ from contentops_core.models import (
     ReleaseEvidenceSummary,
     RetentionArchiveEvidence,
     RunStatus,
+    ScheduledReviewPackageEvidence,
+    ScheduledReviewPackageEvidenceItem,
     SourceReviewDecision,
     SourceReviewEvidence,
     SourceReviewEvidenceItem,
@@ -94,6 +97,7 @@ def build_release_evidence(
         extra_paths=worker_delivery_summary_paths,
     )
     retention_archives = _retention_archive_evidence(review_service)
+    scheduled_review_packages = _scheduled_review_package_evidence(settings.artifact_root)
     source_reviews = _source_review_evidence(settings.artifact_root)
     has_publish_drift = (
         publish_verifications.drift_count > 0
@@ -141,6 +145,7 @@ def build_release_evidence(
         "release_readiness.json",
         "retention_archives.json",
         "source_reviews.json",
+        "scheduled_review_packages.json",
         "summary.json",
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
@@ -175,6 +180,7 @@ def build_release_evidence(
         source_reviews=source_reviews,
         worker_delivery_summaries=worker_delivery_summaries,
         retention_archives=retention_archives,
+        scheduled_review_packages=scheduled_review_packages,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
         worker_execution_alert_deliveries=[
             delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
@@ -212,6 +218,7 @@ def write_release_evidence(
         "publish_verifications": bundle.publish_verifications.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "retention_archives": bundle.retention_archives.model_dump(mode="json"),
+        "scheduled_review_packages": bundle.scheduled_review_packages.model_dump(mode="json"),
         "source_reviews": bundle.source_reviews.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
         "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
@@ -513,6 +520,41 @@ def _worker_delivery_summary_evidence(
 def _retention_archive_evidence(review_service: ReviewService) -> RetentionArchiveEvidence:
     archives = review_service.retention_archives(limit=20)
     return RetentionArchiveEvidence(total=archives.total, items=archives.items)
+
+
+def _scheduled_review_package_evidence(
+    artifact_root: Path,
+) -> ScheduledReviewPackageEvidence:
+    packages = list_scheduled_workflow_review_packages(artifact_root, limit=50)
+    items = [
+        ScheduledReviewPackageEvidenceItem(
+            id=item.id,
+            manifest_path=_best_relative_path_to_root(artifact_root, Path(item.manifest_path)),
+            status=item.status,
+            action_required=item.action_required,
+            artifact_count=item.artifact_count,
+            source_execution_ids=item.source_execution_ids,
+            verification_status=item.verification_status,
+            verification_failed_count=item.verification_failed_count,
+            archive_path=(
+                _best_relative_path_to_root(artifact_root, Path(item.archive_path))
+                if item.archive_path
+                else None
+            ),
+            archive_exists=item.archive_exists,
+            archive_size_bytes=item.archive_size_bytes,
+            archive_sha256=item.archive_sha256,
+            updated_at=item.updated_at,
+        )
+        for item in packages.items
+    ]
+    return ScheduledReviewPackageEvidence(
+        total=packages.total,
+        archived_count=sum(1 for item in items if item.archive_exists),
+        failed_count=sum(1 for item in items if item.verification_status == "fail"),
+        action_required_count=sum(1 for item in items if item.action_required),
+        items=items,
+    )
 
 
 def _worker_delivery_summary_item(
