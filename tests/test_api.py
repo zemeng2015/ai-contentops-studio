@@ -1160,8 +1160,30 @@ def test_dashboard_renders() -> None:
     assert "Release evidence dashboard" in response.text
     assert "Audit Events" in response.text
     assert "Artifact Retention" in response.text
+    assert "Open retention lifecycle" in response.text
     assert "Create archive" in response.text
     assert "Worker Job Catalog" in response.text
+
+
+def test_dashboard_retention_lifecycle_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/retention?days=90&limit=100")
+    archive_response = client.post(
+        "/dashboard/retention/archive",
+        data={"days": "0", "limit": "100"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert "Retention Lifecycle" in response.text
+    assert "Archive candidates" in response.text
+    assert "Archive receipts" in response.text
+    assert "Gate status" in response.text
+    assert "retention_archive_governance" in response.text
+    assert "S3 mirror" in response.text
+    assert archive_response.status_code == 303
+    assert archive_response.headers["location"].startswith("/dashboard/retention")
 
 
 def test_dashboard_ops_trends_renders() -> None:

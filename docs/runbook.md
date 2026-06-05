@@ -174,6 +174,8 @@ If the gate reports `retention_archive_governance=warn`, run
 `contentops retention-archive --days 90` before cleanup and regenerate release evidence. If it
 reports `fail`, inspect the archive `s3-mirror-log.json` and fix S3 bucket, IAM, or network
 configuration before rerunning the archive.
+Use `/dashboard/retention` when you want the same lifecycle in one operator view: candidate
+counts, archive receipts, S3 mirror status, and the release gate governance check.
 Use `contentops publish-recovery-plan <run_id>` or
 `GET /runs/{id}/publish-recovery-plan` before changing files. The plan writes
 `publish-recovery-plan.json` and classifies each target file as `ok`, `missing`, or `mismatch` with

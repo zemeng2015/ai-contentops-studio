@@ -2197,6 +2197,8 @@ def _retention_archives_html(
           <td>{item.candidate_count}</td>
           <td>{item.archived_size_bytes}</td>
           <td>{escape(str(item.dry_run).lower())}</td>
+          <td>{escape(item.s3_mirror_status)}</td>
+          <td>{item.s3_mirror_failures}</td>
           <td>{escape(item.created_at.isoformat())}</td>
         </tr>
         """
@@ -2206,7 +2208,10 @@ def _retention_archives_html(
       <h2>Recent Archives</h2>
       <table>
         <thead>
-          <tr><th>Archive</th><th>Candidates</th><th>Bytes</th><th>Dry run</th><th>Created</th></tr>
+          <tr>
+            <th>Archive</th><th>Candidates</th><th>Bytes</th><th>Dry run</th>
+            <th>S3 mirror</th><th>Mirror failures</th><th>Created</th>
+          </tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>

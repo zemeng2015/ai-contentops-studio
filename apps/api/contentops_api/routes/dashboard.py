@@ -153,9 +153,7 @@ def build_dashboard_router(
         audit_events = review_service.audit_events(limit=5)
         retention_report = review_service.retention_report()
         retention_archives = review_service.retention_archives(limit=5)
-        retention_archive_action = (
-            f"/dashboard/retention-archives{_api_key_query(api_key)}"
-        )
+        retention_archive_action = f"/dashboard/retention/archive{_api_key_query(api_key)}"
         operations_summary = review_service.operations_summary()
         ops_brief = build_ops_brief(
             settings=settings,
@@ -261,6 +259,7 @@ def build_dashboard_router(
                   <p>
                     Storage hygiene report for old run artifacts that can be archived or pruned.
                   </p>
+                  <p><a href="/dashboard/retention">Open retention lifecycle</a></p>
                   <form method="post" action="{retention_archive_action}">
                     <input name="days" value="90" placeholder="Retention days">
                     <input name="limit" value="100" placeholder="Scan limit">
@@ -354,6 +353,91 @@ def build_dashboard_router(
     ) -> RedirectResponse:
         review_service.retention_archive(retention_days=days, limit=limit)
         return RedirectResponse(f"/dashboard{_api_key_query(api_key)}", status_code=303)
+
+
+    @router.get(
+        "/dashboard/retention",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_retention(
+        days: int = Query(default=90, ge=0, le=3650),
+        limit: int = Query(default=100, ge=1, le=1000),
+        api_key: str = Query(default=""),
+    ) -> HTMLResponse:
+        report = review_service.retention_report(retention_days=days, limit=limit)
+        archives = review_service.retention_archives(limit=20)
+        gate = release_gate(
+            settings=settings,
+            repository=repository,
+            review_service=review_service,
+            require_approval=False,
+        )
+        retention_gate = next(
+            check for check in gate.checks if check.name == "retention_archive_governance"
+        )
+        retention_archive_action = f"/dashboard/retention/archive{_api_key_query(api_key)}"
+        return HTMLResponse(
+            _page(
+                "Retention Lifecycle",
+                f"""
+                <section class="hero compact">
+                  <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                  <h2>Retention Lifecycle</h2>
+                  <p>
+                    Review old artifact candidates, create non-destructive archives, and confirm
+                    release gate governance before any cleanup.
+                  </p>
+                  <div class="metrics">
+                    <div><strong>{report.total_runs_scanned}</strong><span>Runs scanned</span></div>
+                    <div>
+                      <strong>{report.candidate_count}</strong><span>Archive candidates</span>
+                    </div>
+                    <div>
+                      <strong>{report.candidate_size_bytes}</strong><span>Candidate bytes</span>
+                    </div>
+                    <div><strong>{archives.total}</strong><span>Archive receipts</span></div>
+                    <div>
+                      <strong>{escape(retention_gate.status)}</strong><span>Gate status</span>
+                    </div>
+                  </div>
+                  <form method="get" action="/dashboard/retention">
+                    <input name="days" value="{days}" placeholder="Retention days">
+                    <input name="limit" value="{limit}" placeholder="Scan limit">
+                    {_api_key_hidden(api_key)}
+                    <button type="submit">Refresh report</button>
+                  </form>
+                  <form method="post" action="{retention_archive_action}">
+                    <input name="days" value="{days}" placeholder="Retention days">
+                    <input name="limit" value="{limit}" placeholder="Scan limit">
+                    <button type="submit">Create archive</button>
+                  </form>
+                  <h2>Governance</h2>
+                  {_release_gate_html(gate)}
+                  <h2>Retention Report</h2>
+                  {_retention_report_html(report, archives)}
+                </section>
+                """,
+            )
+        )
+
+
+    @router.post(
+        "/dashboard/retention/archive",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_retention_create_archive(
+        days: Annotated[int, Form()] = 90,
+        limit: Annotated[int, Form()] = 100,
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        review_service.retention_archive(retention_days=days, limit=limit)
+        query = _api_key_query(api_key)
+        separator = "&" if query else "?"
+        return RedirectResponse(
+            f"/dashboard/retention{query}{separator}days={days}&limit={limit}",
+            status_code=303,
+        )
 
 
     @router.get(
