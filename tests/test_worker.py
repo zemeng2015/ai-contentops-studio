@@ -328,5 +328,10 @@ def _job_receipt(receipt_dir: Path) -> Path:
         path
         for path in receipt_dir.glob("*.json")
         if not path.name.endswith("-delivery-summary.json")
-        and path.name not in {"s3-mirror-log.json", "worker-alert-notification-log.json"}
+        and path.name
+        not in {
+            "s3-mirror-log.json",
+            "worker-alert-notification-log.json",
+            "worker-delivery-summary-notification-log.json",
+        }
     )
