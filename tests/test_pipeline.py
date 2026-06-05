@@ -145,7 +145,7 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert manifest.artifacts["draft.json"].size_bytes > 0
     assert len(manifest.artifacts["draft.json"].sha256) == 64
     assert plan.ready is True
-    assert len(plan.items) == 3
+    assert len(plan.items) == 4
     assert metrics.run_id == result.run.id
     assert metrics.total_duration_ms is not None
     assert metrics.publish_ready is True
@@ -178,12 +178,12 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert receipt.url == published.published_url
     assert receipt.approval is not None
     assert receipt.approval.reviewer == "zack"
-    assert len(receipt.file_changes) == 3
+    assert len(receipt.file_changes) == 4
     assert {change.action for change in receipt.file_changes} == {"created"}
     assert all(change.after_sha256 for change in receipt.file_changes)
     assert all("roll back" in change.rollback_hint for change in receipt.file_changes)
     assert verification.verified is True
-    assert len(verification.items) == 3
+    assert len(verification.items) == 4
     assert all(item.exists for item in verification.items)
     assert all(item.matches_receipt for item in verification.items)
     assert (result.run.artifact_dir / "publish-verification.json").exists()
@@ -212,7 +212,12 @@ def test_review_service_lists_artifacts_and_publishes_existing_run(tmp_path: Pat
     assert global_audit_events.action_counts["publish"] == 1
     assert audit_events[0].actor == "zack"
     assert audit_events[1].new_status == RunStatus.PUBLISHED
-    assert audit_events[1].fields["changed_files"] == 3
+    assert audit_events[1].fields["changed_files"] == 4
+    publish_index = json.loads(
+        (tmp_path / "site" / "contentops-publish-index.json").read_text(encoding="utf-8")
+    )
+    assert publish_index["entries"][0]["run_id"] == result.run.id
+    assert publish_index["entries"][0]["quality"]["publish_ready"] is True
     assert [delivery.action for delivery in notifications] == ["approve", "publish"]
     assert {delivery.provider for delivery in notifications} == {"local"}
     assert {delivery.status for delivery in notifications} == {"skipped"}
@@ -440,7 +445,7 @@ def test_publish_receipt_records_overwrite_backups(tmp_path: Path) -> None:
     notifications = review_service.notification_log(second.id)
 
     assert rollback.errors == []
-    assert len(rollback.restored_files) == 3
+    assert len(rollback.restored_files) == 4
     assert rolled_back is not None
     assert rolled_back.status == RunStatus.APPROVED
     assert rolled_back.published_url is None
@@ -470,7 +475,7 @@ def test_publish_rollback_deletes_created_files(tmp_path: Path) -> None:
     assert receipt is not None
     assert {change.action for change in receipt.file_changes} == {"created"}
     assert rollback.errors == []
-    assert len(rollback.deleted_files) == 3
+    assert len(rollback.deleted_files) == 4
     assert all(not Path(path).exists() for path in rollback.deleted_files)
 
 

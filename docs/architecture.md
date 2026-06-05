@@ -107,6 +107,10 @@ Successful publishes write `publish-receipt.json`, which links the public URL ba
 publisher, approval record, force flag, publish plan items, before/after file hashes, and rollback
 hints. Existing publish targets are backed up under the run artifact directory before they are
 overwritten.
+The static-site and homepage publishers also upsert `contentops-publish-index.json` in the publish
+target. The index is a machine-readable content catalog with run ids, public URLs, provider names,
+timestamps, and evaluation scores, giving downstream automation a stable contract for homepage
+aggregation, search indexing, RSS generation, or social promotion without scraping HTML.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,

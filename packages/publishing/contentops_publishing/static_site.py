@@ -4,7 +4,15 @@ from pathlib import Path
 from shutil import copyfile
 from typing import Protocol
 
-from contentops_core.models import Draft, EvaluationReport, PublishPlan, PublishPlanItem, RunRecord
+from contentops_core.models import (
+    Draft,
+    EvaluationReport,
+    PublishPlan,
+    PublishPlanItem,
+    RunRecord,
+)
+
+from contentops_publishing.publish_index import upsert_publish_index_entry
 
 
 class Publisher(Protocol):
@@ -27,15 +35,25 @@ class StaticSitePublisher:
         posts_dir = self.output_dir / "posts"
         posts_dir.mkdir(parents=True, exist_ok=True)
         post_path = posts_dir / f"{draft.slug}.html"
+        target_url = f"{self.public_base_url}/posts/{draft.slug}.html"
         post_path.write_text(draft.html, encoding="utf-8")
         self._write_index(draft, report)
         copyfile(run.artifact_dir / "eval-report.json", posts_dir / f"{draft.slug}.eval.json")
-        return f"{self.public_base_url}/posts/{draft.slug}.html"
+        upsert_publish_index_entry(
+            self.output_dir / "contentops-publish-index.json",
+            provider="static",
+            public_url=target_url,
+            run=run,
+            draft=draft,
+            report=report,
+        )
+        return target_url
 
     def plan(self, run: RunRecord, draft: Draft, report: EvaluationReport) -> PublishPlan:
         post_path = self.output_dir / "posts" / f"{draft.slug}.html"
         eval_path = self.output_dir / "posts" / f"{draft.slug}.eval.json"
         index_path = self.output_dir / "index.html"
+        publish_index_path = self.output_dir / "contentops-publish-index.json"
         target_url = f"{self.public_base_url}/posts/{draft.slug}.html"
         return PublishPlan(
             provider="static",
@@ -60,6 +78,12 @@ class StaticSitePublisher:
                     action="create" if not index_path.exists() else "update",
                     exists=index_path.exists(),
                     description="Add post link to static site index.",
+                ),
+                PublishPlanItem(
+                    path=str(publish_index_path),
+                    action="create" if not publish_index_path.exists() else "update",
+                    exists=publish_index_path.exists(),
+                    description="Upsert machine-readable publish index entry.",
                 ),
             ],
         )

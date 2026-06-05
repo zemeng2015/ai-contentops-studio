@@ -4,7 +4,15 @@ from pathlib import Path
 from shutil import copyfile
 from subprocess import run
 
-from contentops_core.models import Draft, EvaluationReport, PublishPlan, PublishPlanItem, RunRecord
+from contentops_core.models import (
+    Draft,
+    EvaluationReport,
+    PublishPlan,
+    PublishPlanItem,
+    RunRecord,
+)
+
+from contentops_publishing.publish_index import upsert_publish_index_entry
 
 
 class HomepagePublisher:
@@ -19,16 +27,26 @@ class HomepagePublisher:
         posts_dir = self.homepage_repo_path / "posts"
         posts_dir.mkdir(parents=True, exist_ok=True)
         post_path = posts_dir / f"{draft.slug}.html"
+        target_url = f"{self.public_base_url}/posts/{draft.slug}.html"
         post_path.write_text(self._wrap_for_homepage(draft.html), encoding="utf-8")
         copyfile(run.artifact_dir / "eval-report.json", posts_dir / f"{draft.slug}.eval.json")
         self._update_index(draft, report)
-        return f"{self.public_base_url}/posts/{draft.slug}.html"
+        upsert_publish_index_entry(
+            self.homepage_repo_path / "contentops-publish-index.json",
+            provider="homepage",
+            public_url=target_url,
+            run=run,
+            draft=draft,
+            report=report,
+        )
+        return target_url
 
     def plan(self, run: RunRecord, draft: Draft, report: EvaluationReport) -> PublishPlan:
         posts_dir = self.homepage_repo_path / "posts"
         post_path = posts_dir / f"{draft.slug}.html"
         eval_path = posts_dir / f"{draft.slug}.eval.json"
         index_path = self.homepage_repo_path / "index.html"
+        publish_index_path = self.homepage_repo_path / "contentops-publish-index.json"
         items = [
             PublishPlanItem(
                 path=str(post_path),
@@ -47,6 +65,12 @@ class HomepagePublisher:
                 action="update",
                 exists=index_path.exists(),
                 description="Insert article card into homepage Writing grid.",
+            ),
+            PublishPlanItem(
+                path=str(publish_index_path),
+                action="create" if not publish_index_path.exists() else "update",
+                exists=publish_index_path.exists(),
+                description="Upsert machine-readable publish index entry.",
             ),
         ]
         warnings: list[str] = []

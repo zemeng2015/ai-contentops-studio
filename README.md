@@ -109,7 +109,7 @@ Each run writes inspectable artifacts such as:
 | Generation | Template generator by default, optional OpenAI provider |
 | Evaluation | Groundedness, source coverage, technical depth, publish readiness |
 | Review | Review queue, status filters, batch approve/reject, run comparison |
-| Publishing | Static site and git-aware homepage publishers, receipts, verification, rollback |
+| Publishing | Static site and git-aware homepage publishers, publish index, receipts, verification, rollback |
 | Observability | Trace artifacts, scorecards, token budgets, incidents, operations summary |
 | Scheduling | YAML worker jobs, dry runs, receipts, recovery plans |
 | Release Evidence | Deployment manifest, release readiness gate, release approvals, hashed CI evidence manifest |
@@ -334,6 +334,11 @@ strong, weak, or needs reviewer spot-checking.
 Set `CONTENTOPS_RESEARCH_CACHE_DIR` to enable URL fetch caching for direct URL research and search
 result enrichment. `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` controls how long cached page extracts
 can be reused, reducing repeated network calls during scheduled worker reruns.
+
+Publishing adapters also maintain `contentops-publish-index.json` beside the target site. This
+machine-readable catalog records published article URLs, run ids, providers, timestamps, and
+quality scores so a homepage, search indexer, RSS generator, or promotion workflow can consume
+published content without scraping HTML.
 The search provider records its planned query variants, selected URLs, result counts, and
 enrichment mode in `research.json`, which makes recurring web research easier to audit.
 

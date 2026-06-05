@@ -98,6 +98,11 @@ CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepag
 search-result enrichment. Keep it on durable worker storage in production so recurring jobs can
 reuse recent extracts and reduce repeated external provider calls.
 
+When publishing to a static site or homepage repository, preserve
+`contentops-publish-index.json` with the rest of the site output. It is updated on every publish
+and should be committed or deployed with the generated post, eval report, and homepage index so
+downstream automation can discover published content from a stable JSON contract.
+
 For ECS or Lambda workers, set `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` so each local artifact
 write is mirrored to S3 under:
 

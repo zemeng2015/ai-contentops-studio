@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from subprocess import run
 
@@ -95,6 +96,13 @@ def test_homepage_publisher_updates_post_grid(tmp_path: Path) -> None:
     assert 'href="posts/generated-article.html"' in (homepage / "index.html").read_text(
         encoding="utf-8"
     )
+    publish_index = json.loads(
+        (homepage / "contentops-publish-index.json").read_text(encoding="utf-8")
+    )
+    assert publish_index["schema_version"] == 1
+    assert publish_index["entries"][0]["run_id"] == run.id
+    assert publish_index["entries"][0]["url"] == "https://example.com/posts/generated-article.html"
+    assert publish_index["entries"][0]["quality"]["groundedness"] == 0.9
 
 
 def test_homepage_publisher_plan_describes_file_changes(tmp_path: Path) -> None:
@@ -134,11 +142,12 @@ def test_homepage_publisher_plan_describes_file_changes(tmp_path: Path) -> None:
     assert plan.provider == "homepage"
     assert plan.ready is True
     assert plan.target_url == "https://example.com/posts/generated-article.html"
-    assert [item.action for item in plan.items] == ["create", "create", "update"]
+    assert [item.action for item in plan.items] == ["create", "create", "update", "create"]
     assert plan.metadata["relative_paths"] == [
         "posts/generated-article.html",
         "posts/generated-article.eval.json",
         "index.html",
+        "contentops-publish-index.json",
     ]
     assert plan.metadata["git"]["is_repository"] is True
     assert plan.metadata["git"]["dirty"] is True

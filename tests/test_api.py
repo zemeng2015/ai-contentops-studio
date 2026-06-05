@@ -453,10 +453,14 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert receipt_response.status_code == 200
     assert receipt_response.json()["url"] == publish_response.json()["published_url"]
     assert receipt_response.json()["approval"]["reviewer"] == "zack"
-    assert len(receipt_response.json()["file_changes"]) == 3
+    assert len(receipt_response.json()["file_changes"]) == 4
+    assert any(
+        change["path"].endswith("contentops-publish-index.json")
+        for change in receipt_response.json()["file_changes"]
+    )
     assert verification_response.status_code == 200
     assert verification_response.json()["verified"] is True
-    assert len(verification_response.json()["items"]) == 3
+    assert len(verification_response.json()["items"]) == 4
     assert notifications_response.status_code == 200
     notification_actions = [item["action"] for item in notifications_response.json()]
     assert "source_review" in notification_actions
@@ -560,7 +564,7 @@ def test_publish_rollback_endpoint_restores_run_state() -> None:
     assert rollback_response.json()["errors"] == []
     rollback_payload = rollback_response.json()
     changed_count = len(rollback_payload["deleted_files"]) + len(rollback_payload["restored_files"])
-    assert changed_count == 3
+    assert changed_count == 4
     assert audit_response.status_code == 200
     assert [event["action"] for event in audit_response.json()] == [
         "approve",

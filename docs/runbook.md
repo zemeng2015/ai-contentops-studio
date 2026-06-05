@@ -94,6 +94,10 @@ execution as one operator action.
 Then use the same dashboard detail page or `POST /job-executions/{execution_id}/publish-runs` to
 publish approved runs from the execution. The response is per-run, so keep any failed item in the
 review queue and inspect its run detail before retrying or forcing publication.
+After a publish, confirm `contentops-publish-index.json` changed with the generated post and eval
+report. Commit or deploy that JSON catalog with the site output because homepage aggregation,
+search indexing, RSS generation, and promotion scripts can use it as the authoritative published
+content feed.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

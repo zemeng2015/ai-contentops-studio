@@ -126,7 +126,7 @@ def test_configured_homepage_publisher_can_plan_real_target(tmp_path: Path) -> N
 
     assert plan.provider == "homepage"
     assert plan.target_url.endswith("/posts/integration-homepage-plan.html")
-    assert [item.action for item in plan.items] == ["create", "create", "update"]
+    assert [item.action for item in plan.items] == ["create", "create", "update", "create"]
     assert plan.ready is True
 
 
