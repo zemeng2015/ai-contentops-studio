@@ -1,8 +1,20 @@
 name: daily-ai-roundup
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+  timezone: Asia/Shanghai
+  description: "Daily AI engineering research and publish workflow."
+run_policy:
+  timeout_minutes: 45
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: production-llm-systems
     topic: "AI engineering signals for production LLM systems"
     publish: true
+    homepage_handoff: true
     source_urls: []
     tags:
       - ai-engineering

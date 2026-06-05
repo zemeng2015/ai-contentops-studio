@@ -1,4 +1,15 @@
 name: project-repository-updates
+schedule:
+  enabled: true
+  cron: "30 8 * * 1"
+  timezone: Asia/Shanghai
+  description: "Weekly portfolio project update research workflow."
+run_policy:
+  timeout_minutes: 60
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: ai-contentops-studio-product-update
     topic: "AI ContentOps Studio as a production-grade AI content operations platform"

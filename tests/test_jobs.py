@@ -25,6 +25,7 @@ from contentops_core.jobs import (
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     worker_delivery_summary_notification_log,
+    worker_job_readiness,
     write_job_execution_delivery_summary,
     write_job_execution_report,
 )
@@ -598,6 +599,16 @@ def test_worker_job_catalog_lists_valid_and_invalid_yaml(tmp_path: Path) -> None
     (pipeline_dir / "daily.yaml").write_text(
         """
 name: daily-calendar
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 45
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: production-llm
     topic: Production LLM systems
@@ -625,15 +636,70 @@ jobs:
     assert daily.topics == ["Production LLM systems", "Agent workflow reliability"]
     assert daily.tags == ["agents", "llm", "portfolio"]
     assert daily.handoff_count == 1
+    assert daily.readiness_status == "ready"
+    assert daily.schedule is not None
+    assert daily.schedule.cron == "0 8 * * *"
+    assert daily.run_policy is not None
+    assert daily.run_policy.timeout_minutes == 45
     broken = next(item for item in catalog.items if item.path == "broken.yaml")
     assert broken.valid is False
     assert broken.errors
+
+
+def test_worker_job_readiness_flags_schedule_and_policy_gaps(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "ready.yaml").write_text(
+        """
+name: ready-calendar
+schedule:
+  enabled: true
+  cron: "0 9 * * 1"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 30
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
+jobs:
+  - name: weekly-review
+    topic: Weekly AI platform update
+    publish: false
+""",
+        encoding="utf-8",
+    )
+    (pipeline_dir / "manual.yaml").write_text(
+        """
+name: manual-calendar
+jobs:
+  - name: missing-schedule
+    topic: Missing schedule
+    publish: true
+""",
+        encoding="utf-8",
+    )
+
+    report = worker_job_readiness(pipeline_dir)
+
+    assert report.total == 2
+    assert report.ready_count == 1
+    assert report.failed_count == 1
+    assert report.can_schedule is False
+    ready = next(item for item in report.items if item.name == "ready-calendar")
+    manual = next(item for item in report.items if item.name == "manual-calendar")
+    assert ready.status == "ready"
+    assert manual.status == "failed"
+    assert any(check.name == "schedule" and check.status == "fail" for check in manual.checks)
 
 
 def test_project_repository_updates_pipeline_targets_github_repos() -> None:
     job_file = load_job_file(Path("pipelines/project_repository_updates.yaml"))
 
     assert job_file.name == "project-repository-updates"
+    assert job_file.schedule is not None
+    assert job_file.schedule.cron == "30 8 * * 1"
+    assert job_file.run_policy.timeout_minutes == 60
     assert len(job_file.jobs) >= 4
     assert all(job.publish is False for job in job_file.jobs)
     assert all("github" in job.tags for job in job_file.jobs)

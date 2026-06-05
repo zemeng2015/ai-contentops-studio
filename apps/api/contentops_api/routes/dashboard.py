@@ -23,6 +23,7 @@ from contentops_core.jobs import (
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     worker_delivery_summary_notification_log,
+    worker_job_readiness,
 )
 from contentops_core.models import (
     ArtifactMirrorRecord,
@@ -89,6 +90,7 @@ from contentops_api.views import (
     _system_status_html,
     _timeline_rows,
     _worker_delivery_summary_deliveries_html,
+    _worker_job_readiness_html,
     _worker_jobs_html,
     _workflow_context_html,
 )
@@ -434,6 +436,7 @@ def build_dashboard_router(
     )
     def dashboard_worker_jobs(api_key: str = Query(default="")) -> HTMLResponse:
         worker_jobs = list_worker_job_catalog(settings.pipeline_dir)
+        readiness = worker_job_readiness(settings.pipeline_dir)
         return HTMLResponse(
             _page(
                 "Content Calendar",
@@ -446,6 +449,7 @@ def build_dashboard_router(
                     update jobs should stay in review mode until a human approves the generated
                     article.
                   </p>
+                  {_worker_job_readiness_html(readiness)}
                   {_worker_jobs_html(worker_jobs.items)}
                 </section>
                 """,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from html import escape
 from urllib.parse import urlencode
 
@@ -12,6 +13,7 @@ from contentops_core.jobs import (
     JobRecoveryPlan,
     WorkerDeliverySummaryDelivery,
     WorkerJobCatalogItem,
+    WorkerJobReadinessResponse,
     job_execution_summary,
 )
 from contentops_core.models import (
@@ -639,6 +641,7 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
     review_count = sum(item.review_count for item in items)
     handoff_count = sum(item.handoff_count for item in items)
     invalid_count = sum(1 for item in items if not item.valid)
+    ready_count = sum(1 for item in items if item.readiness_status == "ready")
     job_count = sum(item.total for item in items)
     file_rows = "".join(
         f"""
@@ -646,6 +649,9 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
           <td>{escape(item.path)}</td>
           <td>{escape(item.name)}</td>
           <td>{str(item.valid).lower()}</td>
+          <td>{_readiness_label(item.readiness_status)}</td>
+          <td>{escape(_schedule_label(item))}</td>
+          <td>{escape(_run_policy_label(item))}</td>
           <td>{item.total}</td>
           <td>{item.publish_count}</td>
           <td>{item.review_count}</td>
@@ -666,6 +672,7 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
         <div><strong>{publish_count}</strong><span>Auto publish</span></div>
         <div><strong>{handoff_count}</strong><span>Homepage handoffs</span></div>
         <div><strong>{invalid_count}</strong><span>Invalid files</span></div>
+        <div><strong>{ready_count}</strong><span>Ready files</span></div>
       </div>
       <h3>Planned Jobs</h3>
       <table>
@@ -681,11 +688,45 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
       <table>
         <thead>
           <tr>
-            <th>File</th><th>Name</th><th>Valid</th><th>Jobs</th>
+            <th>File</th><th>Name</th><th>Valid</th><th>Readiness</th>
+            <th>Schedule</th><th>Run policy</th><th>Jobs</th>
             <th>Publish</th><th>Review</th><th>Handoffs</th><th>Tags</th><th>Topics</th>
           </tr>
         </thead>
         <tbody>{file_rows}</tbody>
+      </table>
+    """
+
+
+def _worker_job_readiness_html(report: WorkerJobReadinessResponse) -> str:
+    if not report.items:
+        return """
+          <h3>Automation Readiness</h3>
+          <p>No worker job files are configured for readiness checks.</p>
+        """
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.path)}</td>
+          <td>{escape(item.name)}</td>
+          <td>{_readiness_label(item.status)}</td>
+          <td>{_readiness_checks_html(item.checks)}</td>
+        </tr>
+        """
+        for item in report.items
+    )
+    return f"""
+      <h3>Automation Readiness</h3>
+      <p><a href="/worker-jobs/readiness">Worker job readiness JSON</a></p>
+      <div class="metrics">
+        <div><strong>{report.ready_count}</strong><span>Ready</span></div>
+        <div><strong>{report.warning_count}</strong><span>Warning</span></div>
+        <div><strong>{report.failed_count}</strong><span>Failed</span></div>
+        <div><strong>{str(report.can_schedule).lower()}</strong><span>Can schedule</span></div>
+      </div>
+      <table>
+        <thead><tr><th>File</th><th>Name</th><th>Status</th><th>Checks</th></tr></thead>
+        <tbody>{rows}</tbody>
       </table>
     """
 
@@ -719,6 +760,46 @@ def _worker_job_rows(item: WorkerJobCatalogItem) -> str:
         </tr>
         """
         for job in item.jobs
+    )
+
+
+def _readiness_checks_html(checks: Sequence[object]) -> str:
+    if not checks:
+        return '<span class="muted">none</span>'
+    items = []
+    for check in checks:
+        name = escape(str(getattr(check, "name", "check")))
+        status = escape(str(getattr(check, "status", "unknown")))
+        message = escape(str(getattr(check, "message", "")))
+        items.append(f"<li><strong>{name}</strong>: {status} - {message}</li>")
+    return f"<ul>{''.join(items)}</ul>"
+
+
+def _readiness_label(status: str) -> str:
+    normalized = status or "unknown"
+    css_class = "publish" if normalized == "ready" else "review"
+    if normalized == "failed":
+        css_class = "failed"
+    return f'<span class="pill {css_class}">{escape(normalized)}</span>'
+
+
+def _schedule_label(item: WorkerJobCatalogItem) -> str:
+    schedule = item.schedule
+    if schedule is None:
+        return "not configured"
+    enabled = "enabled" if schedule.enabled else "disabled"
+    cron = schedule.cron or "no cron"
+    return f"{enabled}: {cron} ({schedule.timezone})"
+
+
+def _run_policy_label(item: WorkerJobCatalogItem) -> str:
+    policy = item.run_policy
+    if policy is None:
+        return "not configured"
+    return (
+        f"timeout={policy.timeout_minutes}m, "
+        f"concurrency={policy.concurrency_policy}, "
+        f"retry={policy.retry.max_attempts}x/{policy.retry.backoff_seconds}s"
     )
 
 

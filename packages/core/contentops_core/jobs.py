@@ -42,8 +42,28 @@ class ContentJob(BaseModel):
         )
 
 
+class WorkerJobSchedule(BaseModel):
+    enabled: bool = True
+    cron: str | None = None
+    timezone: str = "UTC"
+    description: str = ""
+
+
+class WorkerJobRetryPolicy(BaseModel):
+    max_attempts: int = Field(ge=1, default=2)
+    backoff_seconds: int = Field(ge=0, default=300)
+
+
+class WorkerJobRunPolicy(BaseModel):
+    timeout_minutes: int = Field(ge=1, default=30)
+    concurrency_policy: str = "forbid"
+    retry: WorkerJobRetryPolicy = Field(default_factory=WorkerJobRetryPolicy)
+
+
 class ContentJobFile(BaseModel):
     name: str = "contentops-jobs"
+    schedule: WorkerJobSchedule | None = None
+    run_policy: WorkerJobRunPolicy = Field(default_factory=WorkerJobRunPolicy)
     jobs: list[ContentJob]
 
     @classmethod
@@ -224,6 +244,9 @@ class WorkerJobCatalogItem(BaseModel):
     path: str
     name: str
     valid: bool = True
+    schedule: WorkerJobSchedule | None = None
+    run_policy: WorkerJobRunPolicy | None = None
+    readiness_status: str = "unknown"
     total: int = 0
     publish_count: int = 0
     review_count: int = 0
@@ -242,6 +265,33 @@ class WorkerJobCatalogResponse(BaseModel):
     review_count: int
     handoff_count: int
     invalid_count: int
+    ready_count: int = 0
+    action_required_count: int = 0
+
+
+class WorkerJobReadinessCheck(BaseModel):
+    name: str
+    status: str
+    message: str
+    remediation_steps: list[str] = Field(default_factory=list)
+
+
+class WorkerJobReadinessItem(BaseModel):
+    path: str
+    name: str
+    status: str
+    valid: bool
+    checks: list[WorkerJobReadinessCheck] = Field(default_factory=list)
+
+
+class WorkerJobReadinessResponse(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = 0
+    ready_count: int = 0
+    warning_count: int = 0
+    failed_count: int = 0
+    can_schedule: bool = False
+    items: list[WorkerJobReadinessItem] = Field(default_factory=list)
 
 
 class JobRecoveryPlan(BaseModel):
@@ -372,6 +422,23 @@ def list_worker_job_catalog(pipeline_dir: Path) -> WorkerJobCatalogResponse:
         review_count=sum(item.review_count for item in items),
         handoff_count=sum(item.handoff_count for item in items),
         invalid_count=sum(1 for item in items if not item.valid),
+        ready_count=sum(1 for item in items if item.readiness_status == "ready"),
+        action_required_count=sum(
+            1 for item in items if item.readiness_status in {"warning", "failed"}
+        ),
+    )
+
+
+def worker_job_readiness(pipeline_dir: Path) -> WorkerJobReadinessResponse:
+    catalog = list_worker_job_catalog(pipeline_dir)
+    items = [_worker_job_readiness_item(item) for item in catalog.items]
+    return WorkerJobReadinessResponse(
+        total=len(items),
+        ready_count=sum(1 for item in items if item.status == "ready"),
+        warning_count=sum(1 for item in items if item.status == "warning"),
+        failed_count=sum(1 for item in items if item.status == "failed"),
+        can_schedule=bool(items) and all(item.status in {"ready", "warning"} for item in items),
+        items=items,
     )
 
 
@@ -491,10 +558,25 @@ def _worker_job_catalog_item(path: Path, pipeline_dir: Path) -> WorkerJobCatalog
     tags = sorted({tag for job in job_file.jobs for tag in job.tags})
     publish_count = sum(1 for job in job_file.jobs if job.publish)
     handoff_count = sum(1 for job in job_file.jobs if job.homepage_handoff)
+    readiness = _worker_job_readiness_for_job_file(
+        display_path,
+        job_file.name,
+        valid=True,
+        schedule=job_file.schedule,
+        run_policy=job_file.run_policy,
+        total=len(job_file.jobs),
+        publish_count=publish_count,
+        review_count=len(job_file.jobs) - publish_count,
+        handoff_count=handoff_count,
+        errors=[],
+    )
     return WorkerJobCatalogItem(
         path=display_path,
         name=job_file.name,
         valid=True,
+        schedule=job_file.schedule,
+        run_policy=job_file.run_policy,
+        readiness_status=readiness.status,
         total=len(job_file.jobs),
         publish_count=publish_count,
         review_count=len(job_file.jobs) - publish_count,
@@ -503,6 +585,227 @@ def _worker_job_catalog_item(path: Path, pipeline_dir: Path) -> WorkerJobCatalog
         tags=tags,
         jobs=job_file.jobs,
     )
+
+
+def _worker_job_readiness_item(item: WorkerJobCatalogItem) -> WorkerJobReadinessItem:
+    return _worker_job_readiness_for_job_file(
+        item.path,
+        item.name,
+        valid=item.valid,
+        schedule=item.schedule,
+        run_policy=item.run_policy or WorkerJobRunPolicy(),
+        total=item.total,
+        publish_count=item.publish_count,
+        review_count=item.review_count,
+        handoff_count=item.handoff_count,
+        errors=item.errors,
+    )
+
+
+def _worker_job_readiness_for_job_file(
+    path: str,
+    name: str,
+    *,
+    valid: bool,
+    schedule: WorkerJobSchedule | None,
+    run_policy: WorkerJobRunPolicy,
+    total: int,
+    publish_count: int,
+    review_count: int,
+    handoff_count: int,
+    errors: list[str],
+) -> WorkerJobReadinessItem:
+    checks: list[WorkerJobReadinessCheck] = []
+    if not valid:
+        checks.append(
+            WorkerJobReadinessCheck(
+                name="yaml_schema",
+                status="fail",
+                message="Worker job file cannot be loaded.",
+                remediation_steps=errors or ["Fix the YAML file and rerun worker-job-readiness."],
+            )
+        )
+        return WorkerJobReadinessItem(
+            path=path,
+            name=name,
+            status="failed",
+            valid=False,
+            checks=checks,
+        )
+    checks.extend(
+        [
+            _schedule_readiness_check(schedule),
+            _run_policy_timeout_check(run_policy),
+            _run_policy_concurrency_check(run_policy),
+            _run_policy_retry_check(run_policy),
+            _job_mix_readiness_check(
+                total=total,
+                publish_count=publish_count,
+                review_count=review_count,
+                handoff_count=handoff_count,
+            ),
+        ]
+    )
+    return WorkerJobReadinessItem(
+        path=path,
+        name=name,
+        status=_readiness_status(checks),
+        valid=True,
+        checks=checks,
+    )
+
+
+def _schedule_readiness_check(schedule: WorkerJobSchedule | None) -> WorkerJobReadinessCheck:
+    if schedule is None:
+        return WorkerJobReadinessCheck(
+            name="schedule",
+            status="fail",
+            message="No schedule is declared for this worker job file.",
+            remediation_steps=[
+                "Add schedule.enabled, schedule.cron, and schedule.timezone to the YAML file.",
+                "Use worker dry runs before enabling the schedule in production.",
+            ],
+        )
+    if not schedule.enabled:
+        return WorkerJobReadinessCheck(
+            name="schedule",
+            status="warn",
+            message="Schedule is present but disabled.",
+            remediation_steps=["Set schedule.enabled=true before wiring this job into automation."],
+        )
+    if not schedule.cron or not _looks_like_cron(schedule.cron):
+        return WorkerJobReadinessCheck(
+            name="schedule",
+            status="fail",
+            message="Schedule is enabled but cron expression is missing or invalid.",
+            remediation_steps=[
+                "Use a five-field cron expression such as `0 8 * * *`.",
+                "Confirm the timezone matches the operator's expected publishing window.",
+            ],
+        )
+    if not schedule.timezone.strip():
+        return WorkerJobReadinessCheck(
+            name="schedule",
+            status="fail",
+            message="Schedule timezone is empty.",
+            remediation_steps=["Set schedule.timezone, for example `Asia/Shanghai` or `UTC`."],
+        )
+    return WorkerJobReadinessCheck(
+        name="schedule",
+        status="pass",
+        message=f"Scheduled with cron `{schedule.cron}` in {schedule.timezone}.",
+    )
+
+
+def _run_policy_timeout_check(run_policy: WorkerJobRunPolicy) -> WorkerJobReadinessCheck:
+    if run_policy.timeout_minutes < 5:
+        return WorkerJobReadinessCheck(
+            name="timeout",
+            status="warn",
+            message="Timeout is very short for research and publishing workflows.",
+            remediation_steps=["Use at least 15 minutes for scheduled research jobs."],
+        )
+    return WorkerJobReadinessCheck(
+        name="timeout",
+        status="pass",
+        message=f"Worker timeout is {run_policy.timeout_minutes} minute(s).",
+    )
+
+
+def _run_policy_concurrency_check(run_policy: WorkerJobRunPolicy) -> WorkerJobReadinessCheck:
+    allowed = {"forbid", "replace", "allow"}
+    if run_policy.concurrency_policy not in allowed:
+        return WorkerJobReadinessCheck(
+            name="concurrency",
+            status="fail",
+            message=f"Unsupported concurrency policy: {run_policy.concurrency_policy}.",
+            remediation_steps=[
+                "Use `forbid` for production publishing jobs.",
+                "Use `replace` only when newer executions should supersede older ones.",
+            ],
+        )
+    if run_policy.concurrency_policy == "allow":
+        return WorkerJobReadinessCheck(
+            name="concurrency",
+            status="warn",
+            message="Concurrent executions are allowed.",
+            remediation_steps=[
+                "Prefer `forbid` when jobs publish files or write shared artifacts.",
+            ],
+        )
+    return WorkerJobReadinessCheck(
+        name="concurrency",
+        status="pass",
+        message=f"Concurrency policy is `{run_policy.concurrency_policy}`.",
+    )
+
+
+def _run_policy_retry_check(run_policy: WorkerJobRunPolicy) -> WorkerJobReadinessCheck:
+    retry = run_policy.retry
+    if retry.max_attempts == 1:
+        return WorkerJobReadinessCheck(
+            name="retry",
+            status="warn",
+            message="No retry is configured for transient provider or publishing failures.",
+            remediation_steps=["Set run_policy.retry.max_attempts to 2 or 3 for scheduled jobs."],
+        )
+    return WorkerJobReadinessCheck(
+        name="retry",
+        status="pass",
+        message=(
+            f"Retry policy allows {retry.max_attempts} attempt(s) "
+            f"with {retry.backoff_seconds}s backoff."
+        ),
+    )
+
+
+def _job_mix_readiness_check(
+    *,
+    total: int,
+    publish_count: int,
+    review_count: int,
+    handoff_count: int,
+) -> WorkerJobReadinessCheck:
+    if total == 0:
+        return WorkerJobReadinessCheck(
+            name="job_mix",
+            status="fail",
+            message="Worker job file does not define any jobs.",
+            remediation_steps=["Add at least one job with a topic before scheduling the file."],
+        )
+    if publish_count > 0 and handoff_count == 0:
+        return WorkerJobReadinessCheck(
+            name="job_mix",
+            status="warn",
+            message="Publishing jobs do not request homepage handoff evidence.",
+            remediation_steps=[
+                "Set homepage_handoff=true for scheduled publishing jobs that feed the portfolio.",
+            ],
+        )
+    return WorkerJobReadinessCheck(
+        name="job_mix",
+        status="pass",
+        message=(
+            f"{total} job(s): {publish_count} publish, "
+            f"{review_count} review, {handoff_count} homepage handoff."
+        ),
+    )
+
+
+def _readiness_status(checks: list[WorkerJobReadinessCheck]) -> str:
+    statuses = {check.status for check in checks}
+    if "fail" in statuses:
+        return "failed"
+    if "warn" in statuses:
+        return "warning"
+    return "ready"
+
+
+def _looks_like_cron(expression: str) -> bool:
+    fields = expression.split()
+    if len(fields) != 5:
+        return False
+    return all(field.strip() for field in fields)
 
 
 def _display_path(path: Path, pipeline_dir: Path) -> str:

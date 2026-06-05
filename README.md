@@ -234,11 +234,21 @@ Worker jobs are defined in YAML:
 
 ```yaml
 name: daily-ai-roundup
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 45
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: production-llm-systems
     topic: "AI engineering signals for production LLM systems"
-    publish: false
-    homepage_handoff: false
+    publish: true
+    homepage_handoff: true
     source_urls: []
     tags:
       - ai-engineering
@@ -249,6 +259,7 @@ Run a worker job:
 
 ```powershell
 contentops worker-jobs --json
+contentops worker-job-readiness --json
 contentops job-execution-summary <execution_id>
 contentops job-execution-trends --days 14
 contentops job-execution-alerts --days 14
@@ -260,6 +271,11 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
 
+`contentops worker-job-readiness` evaluates every YAML job file before it is wired into recurring
+automation. It checks schedule presence, cron shape, timezone, timeout, retry policy, concurrency
+policy, and whether publishing jobs create homepage handoff evidence. Use it as the preflight gate
+before connecting the same YAML to GitHub Actions schedules, EventBridge, cron, or another runner.
+
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
 and file list in the job execution receipt. Use `--release-evidence-dir` to choose a specific
@@ -268,8 +284,8 @@ worker receipt. Worker execution trends and alerts also report the latest succes
 latest action-required execution, the most common failure reasons, severity, and recommended actions
 so recurring automation issues can be triaged from the dashboard or release evidence bundle. Each
 top failure reason and alert signal includes `remediation_steps`, pointing operators to provider,
-homepage handoff, release evidence, dry-run, or recovery-plan fixes. Alert
-Failure reasons also include stable categories such as `provider_failure`,
+homepage handoff, release evidence, dry-run, or recovery-plan fixes. Failure reasons also include
+stable categories such as `provider_failure`,
 `content_distribution`, `delivery_summary`, `homepage_handoff`, and `release_evidence`, so
 operators can group recurring issues by failure domain instead of reading raw logs.
 notification attempts write `worker-alert-notification-log.json` beside worker execution receipts,

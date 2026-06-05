@@ -22,6 +22,7 @@ from contentops_core.jobs import (
     JobRunner,
     WorkerDeliverySummaryDelivery,
     WorkerJobCatalogResponse,
+    WorkerJobReadinessResponse,
     get_job_execution_report,
     job_execution_alert_notification_log,
     job_execution_alert_report,
@@ -35,6 +36,7 @@ from contentops_core.jobs import (
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     worker_delivery_summary_notification_log,
+    worker_job_readiness,
 )
 from contentops_core.models import (
     AuditEventListResponse,
@@ -261,6 +263,17 @@ def build_ops_router(
     )
     def list_worker_jobs() -> WorkerJobCatalogResponse:
         return list_worker_job_catalog(settings.pipeline_dir)
+
+    @router.get(
+        "/worker-jobs/readiness",
+        response_model=WorkerJobReadinessResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_worker_job_readiness(response: Response) -> WorkerJobReadinessResponse:
+        report = worker_job_readiness(settings.pipeline_dir)
+        if not report.can_schedule:
+            response.status_code = 409
+        return report
 
     @router.get(
         "/job-executions",

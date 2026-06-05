@@ -88,6 +88,10 @@ In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tr
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced
 for CI/CD release reviews.
+Before connecting a YAML pipeline to GitHub Actions schedules, EventBridge, cron, or another
+runner, execute `contentops worker-job-readiness --json`. Treat `failed_count > 0` as a scheduling
+blocker. Warnings should be reviewed by an operator, especially disabled schedules, one-attempt
+retry policies, very short timeouts, or `allow` concurrency on publishing jobs.
 Open `delivery_summary_markdown_path` when an operator needs the short human-readable outcome of a
 scheduled run. The Markdown summary lists published URLs, content distribution status, release
 evidence status, failures, and recommended actions; release evidence stores recent summaries in

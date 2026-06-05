@@ -828,6 +828,16 @@ def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:
     (pipeline_dir / "calendar.yaml").write_text(
         """
 name: portfolio-calendar
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 45
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: ai-roundup
     topic: AI engineering roundup
@@ -840,19 +850,26 @@ jobs:
     settings.pipeline_dir = pipeline_dir
     try:
         response = client.get("/worker-jobs")
+        readiness_response = client.get("/worker-jobs/readiness")
     finally:
         settings.pipeline_dir = original_pipeline_dir
 
     assert response.status_code == 200
+    assert readiness_response.status_code == 200
     payload = response.json()
+    readiness_payload = readiness_response.json()
     assert payload["total"] == 1
     assert payload["job_count"] == 1
     assert payload["publish_count"] == 1
     assert payload["handoff_count"] == 1
+    assert payload["ready_count"] == 1
     assert payload["items"][0]["path"] == "calendar.yaml"
+    assert payload["items"][0]["readiness_status"] == "ready"
     assert payload["items"][0]["handoff_count"] == 1
     assert payload["items"][0]["jobs"][0]["homepage_handoff"] is True
     assert payload["items"][0]["jobs"][0]["topic"] == "AI engineering roundup"
+    assert readiness_payload["can_schedule"] is True
+    assert readiness_payload["items"][0]["status"] == "ready"
 
 
 def test_dashboard_worker_jobs_shows_content_calendar(tmp_path: Path) -> None:
@@ -863,6 +880,16 @@ def test_dashboard_worker_jobs_shows_content_calendar(tmp_path: Path) -> None:
     (pipeline_dir / "project_updates.yaml").write_text(
         """
 name: project-updates
+schedule:
+  enabled: true
+  cron: "30 8 * * 1"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 60
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: github-project-update
     topic: GitHub project update for portfolio readers
@@ -888,6 +915,8 @@ jobs:
     assert calendar_response.status_code == 200
     assert "Open content calendar" in dashboard_response.text
     assert "Content Calendar" in calendar_response.text
+    assert "Automation Readiness" in calendar_response.text
+    assert "ready" in calendar_response.text
     assert "github-project-update" in calendar_response.text
     assert "Homepage handoffs" in calendar_response.text
     assert "review first" in calendar_response.text

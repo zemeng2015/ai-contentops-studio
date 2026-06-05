@@ -29,6 +29,7 @@ from contentops_core.jobs import (
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     worker_delivery_summary_notification_log,
+    worker_job_readiness,
 )
 from contentops_core.models import (
     ReleaseApprovalDecision,
@@ -566,6 +567,33 @@ def worker_jobs(
             f"{item.path}  {item.name:24}  {status:7}  "
             f"jobs={item.total} publish={item.publish_count} review={item.review_count}"
         )
+
+
+@app.command("worker-job-readiness")
+def worker_job_readiness_command(
+    pipeline_dir: Annotated[
+        Path | None,
+        typer.Option(help="Directory or YAML file containing worker job definitions."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report = worker_job_readiness(pipeline_dir or settings.pipeline_dir)
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.can_schedule else 1)
+    typer.echo(
+        f"Worker job readiness: ready={report.ready_count} "
+        f"warning={report.warning_count} failed={report.failed_count}"
+    )
+    for item in report.items:
+        typer.echo(f"{item.path}  {item.name:24}  {item.status}")
+        for check in item.checks:
+            typer.echo(f"  - {check.name}: {check.status} - {check.message}")
+    raise typer.Exit(0 if report.can_schedule else 1)
 
 
 @app.command("job-execution")

@@ -663,6 +663,16 @@ def test_cli_worker_jobs_command(
     (pipeline_dir / "calendar.yaml").write_text(
         """
 name: cli-calendar
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 45
+  concurrency_policy: forbid
+  retry:
+    max_attempts: 2
+    backoff_seconds: 300
 jobs:
   - name: aws-ai
     topic: AWS AI content operations
@@ -676,6 +686,7 @@ jobs:
     runner = CliRunner()
 
     result = runner.invoke(app, ["worker-jobs", "--json"])
+    readiness_result = runner.invoke(app, ["worker-job-readiness", "--json"])
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
@@ -684,8 +695,13 @@ jobs:
     assert payload["publish_count"] == 1
     assert payload["handoff_count"] == 1
     assert payload["items"][0]["name"] == "cli-calendar"
+    assert payload["items"][0]["readiness_status"] == "ready"
     assert payload["items"][0]["jobs"][0]["homepage_handoff"] is True
     assert payload["items"][0]["jobs"][0]["tags"] == ["aws", "ai"]
+    assert readiness_result.exit_code == 0
+    readiness_payload = json.loads(readiness_result.output)
+    assert readiness_payload["can_schedule"] is True
+    assert readiness_payload["items"][0]["status"] == "ready"
 
 
 def test_cli_approve_many_returns_per_run_results(
