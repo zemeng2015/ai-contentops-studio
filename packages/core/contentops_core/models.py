@@ -648,6 +648,25 @@ class ProviderHealthReport(BaseModel):
     summary: dict[str, int] = Field(default_factory=dict)
 
 
+class IntegrationSmokePlanItem(BaseModel):
+    name: str
+    category: str
+    status: str
+    command: str
+    required_env: list[str] = Field(default_factory=list)
+    missing_env: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class IntegrationSmokePlanReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    integration_enabled: bool
+    command: str
+    items: list[IntegrationSmokePlanItem]
+    summary: dict[str, int] = Field(default_factory=dict)
+
+
 class SystemStatus(BaseModel):
     status: str
     checks: list[ComponentCheck]

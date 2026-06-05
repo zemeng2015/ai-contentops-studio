@@ -55,6 +55,7 @@ def test_cli_doctor_reports_system_status(
     result = runner.invoke(app, ["doctor", "--json"])
     config_audit_result = runner.invoke(app, ["config-audit", "--json"])
     provider_health_result = runner.invoke(app, ["provider-health", "--json"])
+    smoke_plan_result = runner.invoke(app, ["integration-smoke-plan", "--json"])
     manifest_result = runner.invoke(app, ["deployment-manifest"])
     deployment_check_result = runner.invoke(app, ["deployment-check", "--json"])
     release_result = runner.invoke(app, ["release-readiness", "--json"])
@@ -62,9 +63,11 @@ def test_cli_doctor_reports_system_status(
     assert result.exit_code == 0
     assert config_audit_result.exit_code == 0
     assert provider_health_result.exit_code == 0
+    assert smoke_plan_result.exit_code == 0
     payload = json.loads(result.output)
     config_payload = json.loads(config_audit_result.output)
     provider_payload = json.loads(provider_health_result.output)
+    smoke_payload = json.loads(smoke_plan_result.output)
     assert config_payload["redacted"] is True
     assert "items" in config_payload
     assert {item["category"] for item in provider_payload["items"]} >= {
@@ -72,6 +75,12 @@ def test_cli_doctor_reports_system_status(
         "generator",
         "publisher",
     }
+    assert smoke_payload["status"] == "warn"
+    assert smoke_payload["command"] == "pytest -m integration tests/test_integration_smoke.py"
+    assert any(
+        item["name"] == "feed" and "CONTENTOPS_RUN_INTEGRATION" in item["missing_env"]
+        for item in smoke_payload["items"]
+    )
     assert payload["status"] in {"ok", "degraded"}
     assert {check["name"] for check in payload["checks"]} >= {
         "database",

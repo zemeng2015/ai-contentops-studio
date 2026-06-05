@@ -8,6 +8,7 @@ from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    integration_smoke_plan,
     provider_health,
     release_readiness,
     system_status,
@@ -53,6 +54,7 @@ from contentops_core.models import (
     DeploymentCheckReport,
     DeploymentManifest,
     IncidentReportListResponse,
+    IntegrationSmokePlanReport,
     JobExecutionPublishRequest,
     JobExecutionReviewRequest,
     OperationsConsoleReport,
@@ -163,6 +165,17 @@ def build_ops_router(
     )
     def get_provider_health(response: Response) -> ProviderHealthReport:
         report = provider_health(settings)
+        if report.status == "fail":
+            response.status_code = 409
+        return report
+
+    @router.get(
+        "/integration-smoke-plan",
+        response_model=IntegrationSmokePlanReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_integration_smoke_plan(response: Response) -> IntegrationSmokePlanReport:
+        report = integration_smoke_plan(settings)
         if report.status == "fail":
             response.status_code = 409
         return report

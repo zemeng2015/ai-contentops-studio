@@ -7,7 +7,12 @@ from zipfile import ZipFile
 
 import pytest
 from contentops_core.artifacts import S3MirroringArtifactStore
-from contentops_core.diagnostics import deployment_manifest, provider_health, system_status
+from contentops_core.diagnostics import (
+    deployment_manifest,
+    integration_smoke_plan,
+    provider_health,
+    system_status,
+)
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
     RunRecord,
@@ -774,6 +779,31 @@ def test_deployment_manifest_reports_scheduled_research_capability(tmp_path: Pat
     assert capability.status == "ok"
     assert "research_provider=github" in capability.evidence
     assert manifest.runtime["research_readiness"]["mode"] == "repository_intelligence"
+
+
+def test_integration_smoke_plan_reports_missing_live_credentials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CONTENTOPS_RUN_INTEGRATION", raising=False)
+    monkeypatch.delenv("CONTENTOPS_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CONTENTOPS_RESEARCH_SEARCH_API_KEY", raising=False)
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        research_provider="search",
+        research_search_api_key=None,
+        homepage_repo_path=None,
+    )
+
+    report = integration_smoke_plan(settings)
+
+    assert report.status == "warn"
+    assert report.integration_enabled is False
+    assert report.command == "pytest -m integration tests/test_integration_smoke.py"
+    search = next(item for item in report.items if item.name == "search")
+    assert search.status == "warn"
+    assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in search.missing_env
+    assert "pytest -m integration" in search.command
 
 
 def test_system_status_reports_static_publishing_readiness(tmp_path: Path) -> None:

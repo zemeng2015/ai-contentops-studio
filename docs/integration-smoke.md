@@ -4,6 +4,16 @@ The regular test suite is deterministic and does not require external credential
 integration smoke tests are available for operators who want to prove the live provider paths still
 work against real services.
 
+Plan the live smoke run from the current environment:
+
+```powershell
+contentops integration-smoke-plan --json
+```
+
+The same report is available from `GET /integration-smoke-plan`. It lists each provider smoke
+selector, the required environment variables, and any missing values before an operator opts into
+the live pytest run.
+
 Run all live smoke tests:
 
 ```powershell

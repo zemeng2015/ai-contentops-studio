@@ -11,6 +11,7 @@ from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    integration_smoke_plan,
     provider_health,
     release_readiness,
     system_status,
@@ -233,6 +234,26 @@ def show_provider_health(
         )
         for warning in item.warnings:
             typer.echo(f"  warning: {warning}")
+    raise typer.Exit(0 if report.status != "fail" else 1)
+
+
+@app.command("integration-smoke-plan")
+def show_integration_smoke_plan(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    report = integration_smoke_plan(Settings())
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.status != "fail" else 1)
+    typer.echo(f"Status: {report.status}")
+    typer.echo(f"Run all: {report.command}")
+    for item in report.items:
+        typer.echo(f"- {item.category}/{item.name}: {item.status} -> {item.command}")
+        if item.missing_env:
+            typer.echo(f"  missing env: {', '.join(item.missing_env)}")
     raise typer.Exit(0 if report.status != "fail" else 1)
 
 

@@ -164,10 +164,17 @@ After provider credentials are injected into the target environment, run the opt
 to verify external connectivity and response parsing before enabling scheduled jobs:
 
 ```powershell
+contentops integration-smoke-plan --json
+```
+
+```powershell
 $env:CONTENTOPS_RUN_INTEGRATION="1"
 pytest -m integration tests/test_integration_smoke.py
 ```
 
+`GET /integration-smoke-plan` exposes the same readiness plan through the API for deployment
+automation. Treat missing environment values as a warning until the operator intentionally opts
+into live tests with `CONTENTOPS_RUN_INTEGRATION=1`.
 Set `CONTENTOPS_OPENAI_API_KEY` for the OpenAI generation smoke test,
 `CONTENTOPS_RESEARCH_SEARCH_API_KEY` for the Brave-compatible search smoke test, and
 `CONTENTOPS_HOMEPAGE_REPO_PATH` for the read-only homepage publisher plan check. The homepage

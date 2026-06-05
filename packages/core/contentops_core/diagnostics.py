@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from contentops_core.config_templates import render_env_template
@@ -9,6 +10,8 @@ from contentops_core.models import (
     DeploymentCheckItem,
     DeploymentCheckReport,
     DeploymentManifest,
+    IntegrationSmokePlanItem,
+    IntegrationSmokePlanReport,
     OperationsSummary,
     ProviderHealthItem,
     ProviderHealthReport,
@@ -51,6 +54,63 @@ def provider_health(settings: Settings) -> ProviderHealthReport:
     }
     status = "fail" if summary["fail"] else "warn" if summary["warn"] else "pass"
     return ProviderHealthReport(status=status, items=items, summary=summary)
+
+
+def integration_smoke_plan(settings: Settings) -> IntegrationSmokePlanReport:
+    integration_enabled = os.getenv("CONTENTOPS_RUN_INTEGRATION") == "1"
+    items = [
+        _integration_smoke_item(
+            name="feed",
+            category="research",
+            selector="feed",
+            required_env=["CONTENTOPS_RUN_INTEGRATION"],
+            configured=bool(_research_feeds(settings)),
+            notes=["Uses the first configured research feed."],
+        ),
+        _integration_smoke_item(
+            name="search",
+            category="research",
+            selector="search",
+            required_env=[
+                "CONTENTOPS_RUN_INTEGRATION",
+                "CONTENTOPS_RESEARCH_SEARCH_API_KEY",
+            ],
+            configured=bool(settings.research_search_endpoint),
+            notes=["Uses the Brave-compatible search endpoint configured for research."],
+        ),
+        _integration_smoke_item(
+            name="openai",
+            category="generator",
+            selector="openai",
+            required_env=["CONTENTOPS_RUN_INTEGRATION", "CONTENTOPS_OPENAI_API_KEY"],
+            configured=settings.openai_timeout_seconds > 0 and settings.openai_retry_attempts > 0,
+            notes=[f"Uses model `{settings.openai_model}`."],
+        ),
+        _integration_smoke_item(
+            name="homepage",
+            category="publisher",
+            selector="homepage",
+            required_env=["CONTENTOPS_RUN_INTEGRATION", "CONTENTOPS_HOMEPAGE_REPO_PATH"],
+            configured=(
+                settings.homepage_repo_path is not None
+                and settings.homepage_repo_path.exists()
+            ),
+            notes=["Runs a read-only homepage publishing plan against the configured repo."],
+        ),
+    ]
+    summary = {
+        "pass": sum(1 for item in items if item.status == "pass"),
+        "warn": sum(1 for item in items if item.status == "warn"),
+        "fail": sum(1 for item in items if item.status == "fail"),
+    }
+    status = "fail" if summary["fail"] else "warn" if summary["warn"] else "pass"
+    return IntegrationSmokePlanReport(
+        status=status,
+        integration_enabled=integration_enabled,
+        command="pytest -m integration tests/test_integration_smoke.py",
+        items=items,
+        summary=summary,
+    )
 
 
 def deployment_manifest(
@@ -115,6 +175,33 @@ def deployment_check(
         checks=checks,
         deployment=deployment,
         release_readiness=readiness,
+    )
+
+
+def _integration_smoke_item(
+    *,
+    name: str,
+    category: str,
+    selector: str,
+    required_env: list[str],
+    configured: bool,
+    notes: list[str],
+) -> IntegrationSmokePlanItem:
+    missing = [name for name in required_env if not os.getenv(name)]
+    status = "pass"
+    if missing:
+        status = "warn"
+    if not configured:
+        status = "warn"
+    command = f"pytest -m integration tests/test_integration_smoke.py -k {selector}"
+    return IntegrationSmokePlanItem(
+        name=name,
+        category=category,
+        status=status,
+        command=command,
+        required_env=required_env,
+        missing_env=missing,
+        notes=notes,
     )
 
 

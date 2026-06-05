@@ -40,6 +40,7 @@ def test_health_endpoint() -> None:
     manifest_response = client.get("/deployment-manifest")
     config_audit_response = client.get("/config-audit")
     provider_health_response = client.get("/provider-health")
+    smoke_plan_response = client.get("/integration-smoke-plan")
     deployment_check_response = client.get("/deployment-check")
     env_template_response = client.get("/deployment-env-template")
     release_response = client.get("/release-readiness")
@@ -73,6 +74,15 @@ def test_health_endpoint() -> None:
         "research",
         "generator",
         "publisher",
+    }
+    assert smoke_plan_response.status_code == 200
+    smoke_payload = smoke_plan_response.json()
+    assert smoke_payload["command"] == "pytest -m integration tests/test_integration_smoke.py"
+    assert {item["name"] for item in smoke_payload["items"]} >= {
+        "feed",
+        "search",
+        "openai",
+        "homepage",
     }
     assert "openai_api_key" in config_audit_response.text
     assert "sk-" not in config_audit_response.text

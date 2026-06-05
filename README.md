@@ -214,6 +214,7 @@ GET  /content-assets/promotion-brief
 GET  /content-assets/manifest
 GET  /config-audit
 GET  /provider-health
+GET  /integration-smoke-plan
 GET  /retention-report
 POST /retention-archives
 GET  /retention-archives
@@ -252,6 +253,9 @@ placeholder checks.
 Use `contentops provider-health --json` or `GET /provider-health` to inspect research,
 generation, and publishing provider posture, including credentials, scheduled readiness, retries,
 cache configuration, and provider-specific warnings.
+Use `contentops integration-smoke-plan --json` or `GET /integration-smoke-plan` to see which
+optional live provider smoke tests are ready to run, which environment variables are missing, and
+the exact pytest selector for each provider path.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.
