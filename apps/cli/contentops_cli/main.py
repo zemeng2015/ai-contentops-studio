@@ -11,6 +11,7 @@ from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    provider_health,
     release_readiness,
     system_status,
 )
@@ -199,6 +200,28 @@ def show_config_audit(
     typer.echo(f"Status: {report.status}")
     for item in report.items:
         typer.echo(f"- {item.name}: {item.status} - {item.message}")
+    raise typer.Exit(0 if report.status != "fail" else 1)
+
+
+@app.command("provider-health")
+def show_provider_health(
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    report = provider_health(Settings())
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if report.status != "fail" else 1)
+    typer.echo(f"Status: {report.status}")
+    for item in report.items:
+        typer.echo(
+            f"- {item.category}/{item.name}: {item.status} "
+            f"mode={item.mode} scheduled={str(item.scheduled_ready).lower()}"
+        )
+        for warning in item.warnings:
+            typer.echo(f"  warning: {warning}")
     raise typer.Exit(0 if report.status != "fail" else 1)
 
 

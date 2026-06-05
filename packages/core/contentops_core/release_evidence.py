@@ -17,6 +17,7 @@ from contentops_core.artifacts import (
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    provider_health,
     release_readiness,
     system_status,
 )
@@ -63,6 +64,7 @@ def build_release_evidence(
     worker_delivery_summary_paths: list[Path] | None = None,
 ) -> ReleaseEvidenceBundle:
     doctor = system_status(settings, repository)
+    providers = provider_health(settings)
     manifest = deployment_manifest(settings, repository)
     operations = review_service.operations_summary(window_size=window_size)
     readiness = release_readiness(settings, repository, operations)
@@ -113,6 +115,7 @@ def build_release_evidence(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "provider_health.json",
         "publish_recovery_executions.json",
         "publish_verifications.json",
         "release_readiness.json",
@@ -136,6 +139,7 @@ def build_release_evidence(
     return ReleaseEvidenceBundle(
         summary=summary,
         doctor=doctor,
+        provider_health=providers,
         deployment_manifest=manifest,
         operations_summary=operations,
         release_readiness=readiness,
@@ -171,6 +175,7 @@ def write_release_evidence(
         "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
+        "provider_health": bundle.provider_health.model_dump(mode="json"),
         "publish_recovery_executions": bundle.publish_recovery_executions.model_dump(
             mode="json"
         ),

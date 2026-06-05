@@ -137,6 +137,7 @@ contentops content-assets --output-dir site
 contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
+contentops provider-health --json
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
@@ -188,6 +189,7 @@ GET  /content-assets/feed
 GET  /content-assets/promotion-brief
 GET  /content-assets/manifest
 GET  /config-audit
+GET  /provider-health
 GET  /deployment-manifest
 GET  /deployment-check
 GET  /deployment-env-template
@@ -216,6 +218,9 @@ Use `contentops init-config --profile production --path .env.production` or
 Use `contentops deployment-check --json` or `GET /deployment-check` as a pre-deploy gate that
 combines system readiness, deployment capabilities, release gates, API security, and env-template
 placeholder checks.
+Use `contentops provider-health --json` or `GET /provider-health` to inspect research,
+generation, and publishing provider posture, including credentials, scheduled readiness, retries,
+cache configuration, and provider-specific warnings.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.

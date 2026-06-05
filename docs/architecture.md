@@ -183,6 +183,10 @@ portfolio reviews or incident handoffs.
 URL research and search enrichment can use a persistent research cache. The cache stores normalized
 `Source` extracts by canonical URL and TTL, reducing repeated network fetches during scheduled
 worker reruns while keeping the source audit and research artifact contract unchanged.
+Provider health is a first-class diagnostic surface. It reports research, generator, and publisher
+status, credential posture, scheduled readiness, retry/cache settings, and provider-specific
+warnings through `contentops provider-health`, `GET /provider-health`, the deployment manifest
+health details, and release evidence `provider_health.json`.
 
 ```text
 needs_review -> approved -> publishing -> published

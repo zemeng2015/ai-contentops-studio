@@ -533,6 +533,26 @@ class ConfigAuditReport(BaseModel):
     summary: dict[str, int] = Field(default_factory=dict)
 
 
+class ProviderHealthItem(BaseModel):
+    name: str
+    category: str
+    status: str
+    mode: str
+    configured: bool
+    credential_required: bool = False
+    credential_configured: bool = True
+    scheduled_ready: bool = False
+    warnings: list[str] = Field(default_factory=list)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderHealthReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    items: list[ProviderHealthItem]
+    summary: dict[str, int] = Field(default_factory=dict)
+
+
 class SystemStatus(BaseModel):
     status: str
     checks: list[ComponentCheck]
@@ -696,6 +716,7 @@ class WorkerDeliverySummaryEvidence(BaseModel):
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
+    provider_health: ProviderHealthReport
     deployment_manifest: DeploymentManifest
     operations_summary: OperationsSummary
     release_readiness: ReleaseReadinessReport

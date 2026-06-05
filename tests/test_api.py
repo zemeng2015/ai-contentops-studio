@@ -33,6 +33,7 @@ def test_health_endpoint() -> None:
     ready_response = client.get("/ready")
     manifest_response = client.get("/deployment-manifest")
     config_audit_response = client.get("/config-audit")
+    provider_health_response = client.get("/provider-health")
     deployment_check_response = client.get("/deployment-check")
     env_template_response = client.get("/deployment-env-template")
     release_response = client.get("/release-readiness")
@@ -61,6 +62,12 @@ def test_health_endpoint() -> None:
     config_payload = config_audit_response.json()
     assert config_payload["redacted"] is True
     assert "items" in config_payload
+    assert provider_health_response.status_code == 200
+    assert {item["category"] for item in provider_health_response.json()["items"]} >= {
+        "research",
+        "generator",
+        "publisher",
+    }
     assert "openai_api_key" in config_audit_response.text
     assert "sk-" not in config_audit_response.text
     assert deployment_check_response.status_code == 200
@@ -215,6 +222,7 @@ def test_release_approval_api_and_dashboard(
     assert "Deployment Checklist" in dashboard_response.text
     assert "Publish Verification Evidence" in dashboard_response.text
     assert "Publish Recovery Executions" in dashboard_response.text
+    assert "Provider Health" in dashboard_response.text
     assert "Remediation" in dashboard_response.text
     assert "Recent Release Gates" in dashboard_response.text
     assert "Pass rate:" in dashboard_response.text

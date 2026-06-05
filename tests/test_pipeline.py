@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 import pytest
 from contentops_core.artifacts import S3MirroringArtifactStore
-from contentops_core.diagnostics import deployment_manifest, system_status
+from contentops_core.diagnostics import deployment_manifest, provider_health, system_status
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.models import (
     RunRecord,
@@ -729,6 +729,14 @@ def test_system_status_reports_missing_search_credentials(tmp_path: Path) -> Non
     assert "CONTENTOPS_RESEARCH_SEARCH_API_KEY" in provider_check.fields["failures"][0]
     assert provider_check.fields["research_readiness"]["scheduled_ready"] is False
     assert provider_check.fields["research_readiness"]["credential_required"] is True
+    health = provider_health(settings)
+    research = next(item for item in health.items if item.category == "research")
+    assert health.status == "fail"
+    assert research.name == "search"
+    assert research.status == "fail"
+    assert research.credential_required is True
+    assert research.credential_configured is False
+    assert provider_check.fields["provider_health"]["summary"]["fail"] >= 1
 
 
 def test_system_status_reports_github_research_readiness(tmp_path: Path) -> None:

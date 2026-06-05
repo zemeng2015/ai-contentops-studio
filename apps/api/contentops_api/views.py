@@ -1429,6 +1429,20 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         item.run_id: item.latest_reviewed_at.isoformat() if item.latest_reviewed_at else "n/a"
         for item in bundle.source_reviews.items
     }
+    provider_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.category)}</td>
+          <td>{escape(item.name)}</td>
+          <td><span class="pill">{escape(item.status)}</span></td>
+          <td>{escape(item.mode)}</td>
+          <td>{escape(str(item.scheduled_ready).lower())}</td>
+          <td>{escape(str(item.credential_configured).lower())}</td>
+          <td>{escape("; ".join(item.warnings) or "none")}</td>
+        </tr>
+        """
+        for item in bundle.provider_health.items
+    )
     source_review_rows = "".join(
         f"""
         <tr>
@@ -1667,6 +1681,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <div><strong>{deploy_status}</strong><span>Deploy status</span></div>
         <div><strong>{can_deploy}</strong><span>Can deploy</span></div>
         <div><strong>{escape(summary.doctor_status)}</strong><span>Doctor status</span></div>
+        <div>
+          <strong>{escape(bundle.provider_health.status)}</strong>
+          <span>Provider health</span>
+        </div>
         <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
@@ -1700,6 +1718,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
+      <h2>Provider Health</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th><th>Provider</th><th>Status</th><th>Mode</th>
+            <th>Scheduled</th><th>Credential</th><th>Warnings</th>
+          </tr>
+        </thead>
+        <tbody>{provider_rows}</tbody>
+      </table>
       <h2>Deployment Preflight</h2>
       <table>
         <thead>

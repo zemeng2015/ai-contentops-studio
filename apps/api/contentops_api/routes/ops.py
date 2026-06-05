@@ -8,6 +8,7 @@ from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    provider_health,
     release_readiness,
     system_status,
 )
@@ -49,6 +50,7 @@ from contentops_core.models import (
     JobExecutionReviewRequest,
     OperationsSummary,
     OpsTrendReport,
+    ProviderHealthReport,
     PublishedContentListResponse,
     ReleaseApprovalListResponse,
     ReleaseApprovalRecord,
@@ -132,6 +134,17 @@ def build_ops_router(
     )
     def get_config_audit(response: Response) -> ConfigAuditReport:
         report = config_audit(settings)
+        if report.status == "fail":
+            response.status_code = 409
+        return report
+
+    @router.get(
+        "/provider-health",
+        response_model=ProviderHealthReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_provider_health(response: Response) -> ProviderHealthReport:
+        report = provider_health(settings)
         if report.status == "fail":
             response.status_code = 409
         return report

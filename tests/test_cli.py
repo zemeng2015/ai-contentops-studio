@@ -52,16 +52,24 @@ def test_cli_doctor_reports_system_status(
 
     result = runner.invoke(app, ["doctor", "--json"])
     config_audit_result = runner.invoke(app, ["config-audit", "--json"])
+    provider_health_result = runner.invoke(app, ["provider-health", "--json"])
     manifest_result = runner.invoke(app, ["deployment-manifest"])
     deployment_check_result = runner.invoke(app, ["deployment-check", "--json"])
     release_result = runner.invoke(app, ["release-readiness", "--json"])
 
     assert result.exit_code == 0
     assert config_audit_result.exit_code == 0
+    assert provider_health_result.exit_code == 0
     payload = json.loads(result.output)
     config_payload = json.loads(config_audit_result.output)
+    provider_payload = json.loads(provider_health_result.output)
     assert config_payload["redacted"] is True
     assert "items" in config_payload
+    assert {item["category"] for item in provider_payload["items"]} >= {
+        "research",
+        "generator",
+        "publisher",
+    }
     assert payload["status"] in {"ok", "degraded"}
     assert {check["name"] for check in payload["checks"]} >= {
         "database",

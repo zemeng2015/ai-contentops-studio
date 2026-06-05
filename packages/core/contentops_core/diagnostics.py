@@ -10,6 +10,8 @@ from contentops_core.models import (
     DeploymentCheckReport,
     DeploymentManifest,
     OperationsSummary,
+    ProviderHealthItem,
+    ProviderHealthReport,
     ReleaseGateCheck,
     ReleaseReadinessReport,
     SystemStatus,
@@ -32,6 +34,23 @@ def system_status(settings: Settings, repository: RunRepository) -> SystemStatus
         _operator_security_check(settings),
     ]
     return SystemStatus(status=_overall_status(checks), checks=checks)
+
+
+def provider_health(settings: Settings) -> ProviderHealthReport:
+    items = [
+        _research_provider_health(settings),
+        _generator_provider_health(settings),
+        _publisher_provider_health(settings),
+    ]
+    summary = {
+        "pass": sum(1 for item in items if item.status == "pass"),
+        "warn": sum(1 for item in items if item.status == "warn"),
+        "fail": sum(1 for item in items if item.status == "fail"),
+        "scheduled_ready": sum(1 for item in items if item.scheduled_ready),
+        "credentialed": sum(1 for item in items if item.credential_configured),
+    }
+    status = "fail" if summary["fail"] else "warn" if summary["warn"] else "pass"
+    return ProviderHealthReport(status=status, items=items, summary=summary)
 
 
 def deployment_manifest(
@@ -164,6 +183,7 @@ def _local_artifact_store_check(root: Path) -> ComponentCheck:
 def _provider_config_check(settings: Settings) -> ComponentCheck:
     failures: list[str] = []
     warnings: list[str] = []
+    health = provider_health(settings)
     research_readiness = _research_provider_readiness(settings)
     publishing_readiness = _publishing_readiness(settings)
     if settings.research_provider not in RESEARCH_PROVIDERS:
@@ -216,6 +236,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             fields={
                 "failures": failures,
                 "warnings": warnings,
+                "provider_health": health.model_dump(mode="json"),
                 "research_readiness": research_readiness,
                 "publishing_readiness": publishing_readiness,
             },
@@ -228,6 +249,7 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
         message=message,
         fields={
             "research_provider": settings.research_provider,
+            "provider_health": health.model_dump(mode="json"),
             "research_readiness": research_readiness,
             "publishing_readiness": publishing_readiness,
             "research_retry_attempts": settings.research_retry_attempts,
@@ -292,6 +314,107 @@ def _operator_security_check(settings: Settings) -> ComponentCheck:
 
 def _research_feeds(settings: Settings) -> list[str]:
     return [feed.strip() for feed in settings.research_feeds.split(",") if feed.strip()]
+
+
+def _research_provider_health(settings: Settings) -> ProviderHealthItem:
+    readiness = _research_provider_readiness(settings)
+    warnings = _string_list_field(readiness.get("warnings"))
+    configured = settings.research_provider in RESEARCH_PROVIDERS
+    credential_required = bool(readiness.get("credential_required"))
+    credential_configured = bool(readiness.get("credential_configured"))
+    scheduled_ready = bool(readiness.get("scheduled_ready"))
+    status = "pass"
+    if not configured or (credential_required and not credential_configured):
+        status = "fail"
+    elif warnings or not scheduled_ready:
+        status = "warn"
+    return ProviderHealthItem(
+        name=settings.research_provider,
+        category="research",
+        status=status,
+        mode=str(readiness.get("mode", "unknown")),
+        configured=configured,
+        credential_required=credential_required,
+        credential_configured=credential_configured,
+        scheduled_ready=scheduled_ready,
+        warnings=warnings,
+        evidence={
+            "feeds_configured": readiness.get("feeds_configured"),
+            "feed_count": len(_research_feeds(settings)),
+            "max_sources": settings.research_max_sources,
+            "search_endpoint_configured": readiness.get("search_endpoint_configured"),
+            "search_enrich": settings.research_search_enrich,
+            "github_token_recommended": readiness.get("github_token_recommended"),
+            "retry_attempts": settings.research_retry_attempts,
+            "retry_backoff_seconds": settings.research_retry_backoff_seconds,
+            "cache_enabled": settings.research_cache_dir is not None,
+            "cache_ttl_seconds": settings.research_cache_ttl_seconds,
+        },
+    )
+
+
+def _generator_provider_health(settings: Settings) -> ProviderHealthItem:
+    warnings: list[str] = []
+    configured = settings.generator_provider in GENERATOR_PROVIDERS
+    credential_required = settings.generator_provider == "openai"
+    credential_configured = not credential_required or settings.openai_api_key is not None
+    if settings.generator_provider == "template":
+        warnings.append("Template generator is deterministic but not a real model provider.")
+    if settings.openai_fallback_on_failure and settings.generator_provider == "openai":
+        warnings.append("OpenAI generation fallback is enabled; receipts should be reviewed.")
+    status = "pass"
+    if not configured or not credential_configured:
+        status = "fail"
+    elif warnings:
+        status = "warn"
+    return ProviderHealthItem(
+        name=settings.generator_provider,
+        category="generator",
+        status=status,
+        mode="llm" if settings.generator_provider == "openai" else "deterministic",
+        configured=configured,
+        credential_required=credential_required,
+        credential_configured=credential_configured,
+        scheduled_ready=configured and credential_configured,
+        warnings=warnings,
+        evidence={
+            "model": settings.openai_model if settings.generator_provider == "openai" else "n/a",
+            "timeout_seconds": settings.openai_timeout_seconds,
+            "retry_attempts": settings.openai_retry_attempts,
+            "retry_backoff_seconds": settings.openai_retry_backoff_seconds,
+            "fallback_on_failure": settings.openai_fallback_on_failure,
+        },
+    )
+
+
+def _publisher_provider_health(settings: Settings) -> ProviderHealthItem:
+    readiness = _publishing_readiness(settings)
+    warnings = _string_list_field(readiness.get("warnings"))
+    configured = settings.publisher_provider in PUBLISHER_PROVIDERS
+    ready = bool(readiness.get("ready"))
+    status = "fail" if not configured or not ready else "warn" if warnings else "pass"
+    return ProviderHealthItem(
+        name=settings.publisher_provider,
+        category="publisher",
+        status=status,
+        mode=str(readiness.get("mode", "unknown")),
+        configured=configured,
+        credential_required=False,
+        credential_configured=True,
+        scheduled_ready=ready,
+        warnings=warnings,
+        evidence={
+            "target_url": readiness.get("target_url"),
+            "output_dir": readiness.get("output_dir"),
+            "homepage_repo_path": readiness.get("homepage_repo_path"),
+        },
+    )
+
+
+def _string_list_field(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item)]
 
 
 def _research_provider_readiness(settings: Settings) -> dict[str, object]:
