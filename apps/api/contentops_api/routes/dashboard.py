@@ -21,6 +21,8 @@ from contentops_core.jobs import (
     list_job_execution_reports,
     list_worker_job_catalog,
     notify_job_execution_alert,
+    notify_worker_delivery_summary,
+    worker_delivery_summary_notification_log,
 )
 from contentops_core.models import (
     ArtifactMirrorRecord,
@@ -86,6 +88,7 @@ from contentops_api.views import (
     _status_options,
     _system_status_html,
     _timeline_rows,
+    _worker_delivery_summary_deliveries_html,
     _worker_jobs_html,
     _workflow_context_html,
 )
@@ -352,6 +355,9 @@ def build_dashboard_router(
         report = job_execution_trends(job_execution_dir(settings.artifact_root), days=days)
         alerts = job_execution_alert_report(job_execution_dir(settings.artifact_root), days=days)
         deliveries = job_execution_alert_notification_log(job_execution_dir(settings.artifact_root))
+        summary_deliveries = worker_delivery_summary_notification_log(
+            job_execution_dir(settings.artifact_root)
+        )
         notify_action = (
             f"/dashboard/job-execution-alerts/notify{_api_key_query(api_key)}"
         )
@@ -374,6 +380,8 @@ def build_dashboard_router(
                   {_job_execution_alerts_html(alerts)}
                   <h2>Worker Alert Notifications</h2>
                   {_job_execution_alert_deliveries_html(deliveries)}
+                  <h2>Delivery Summary Notifications</h2>
+                  {_worker_delivery_summary_deliveries_html(summary_deliveries)}
                   {_job_execution_trends_html(report)}
                 </section>
                 """,
@@ -396,6 +404,25 @@ def build_dashboard_router(
         )
         return RedirectResponse(
             f"/dashboard/job-execution-trends{_api_key_query(api_key)}",
+            status_code=303,
+        )
+
+    @router.post(
+        "/dashboard/job-executions/{execution_id}/delivery-summary/notify",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_notify_worker_delivery_summary(
+        execution_id: str,
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        report = get_job_execution_report(job_execution_dir(settings.artifact_root), execution_id)
+        notify_worker_delivery_summary(
+            report,
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
+        )
+        return RedirectResponse(
+            f"/dashboard/job-executions/{escape(execution_id)}{_api_key_query(api_key)}",
             status_code=303,
         )
 
@@ -559,7 +586,7 @@ def build_dashboard_router(
                 f"""
                 <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
                 <section class="hero">
-                  {_job_execution_detail_html(report, recovery_plan)}
+                  {_job_execution_detail_html(report, recovery_plan, api_key)}
                   {execution_review_forms}
                   {recovery_form}
                   <h3>S3 Mirror Log</h3>

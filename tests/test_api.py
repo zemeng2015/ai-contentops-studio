@@ -354,6 +354,9 @@ def test_run_artifact_and_publish_endpoints() -> None:
     worker_alerts_response = client.get("/job-executions/alerts?days=7")
     worker_alert_notify_response = client.post("/job-executions/alerts/notify?days=7")
     worker_alert_notifications_response = client.get("/job-executions/alerts/notifications")
+    worker_delivery_notifications_response = client.get(
+        "/job-executions/delivery-summaries/notifications"
+    )
     release_readiness_response = client.get("/release-readiness")
     release_evidence_response = client.get("/release-evidence")
     retention_response = client.get("/retention-report?days=3650")
@@ -426,6 +429,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert worker_alert_notify_response.json()["status"] in {"skipped", "delivered", "failed"}
     assert worker_alert_notifications_response.status_code == 200
     assert worker_alert_notifications_response.json()
+    assert worker_delivery_notifications_response.status_code == 200
     assert release_readiness_response.status_code == 200
     assert release_readiness_response.json()["operations"]["total_runs"] >= 1
     assert release_evidence_response.status_code == 200
@@ -669,10 +673,20 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     trends_response = client.get("/job-executions/trends?days=1")
     detail_response = client.get(f"/job-executions/{report.execution_id}")
     summary_response = client.get(f"/job-executions/{report.execution_id}/summary")
+    delivery_notify_response = client.post(
+        f"/job-executions/{report.execution_id}/delivery-summary/notify"
+    )
+    delivery_notifications_response = client.get(
+        "/job-executions/delivery-summaries/notifications"
+    )
     recovery_response = client.get(f"/job-executions/{report.execution_id}/recovery-plan")
     dashboard_response = client.get("/dashboard")
     dashboard_detail_response = client.get(
         f"/dashboard/job-executions/{report.execution_id}"
+    )
+    dashboard_delivery_notify_response = client.post(
+        f"/dashboard/job-executions/{report.execution_id}/delivery-summary/notify",
+        follow_redirects=False,
     )
 
     assert list_response.status_code == 200
@@ -687,6 +701,13 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert summary_response.status_code == 200
     assert summary_response.json()["total_jobs"] == 1
     assert summary_response.json()["generated_runs"] == 0
+    assert delivery_notify_response.status_code == 200
+    assert delivery_notify_response.json()["execution_id"] == report.execution_id
+    assert delivery_notifications_response.status_code == 200
+    assert any(
+        item["execution_id"] == report.execution_id
+        for item in delivery_notifications_response.json()
+    )
     assert recovery_response.status_code == 200
     assert recovery_response.json()["failed_count"] == 0
     assert dashboard_response.status_code == 200
@@ -711,6 +732,8 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert "S3 Mirror Log" in dashboard_detail_response.text
     assert "job-bucket" in dashboard_detail_response.text
     assert "Run recovery jobs" in dashboard_detail_response.text
+    assert "Notify delivery summary" in dashboard_detail_response.text
+    assert dashboard_delivery_notify_response.status_code == 303
 
 
 def test_job_execution_recovery_can_be_run_from_api_and_dashboard(

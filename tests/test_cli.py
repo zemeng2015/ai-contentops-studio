@@ -533,6 +533,14 @@ def test_cli_job_execution_commands(
     alerts_result = runner.invoke(app, ["job-execution-alerts", "--days", "1"])
     notify_result = runner.invoke(app, ["job-execution-alert-notify", "--days", "1"])
     notifications_result = runner.invoke(app, ["job-execution-alert-notifications"])
+    delivery_notify_result = runner.invoke(
+        app,
+        ["job-execution-delivery-notify", report.execution_id],
+    )
+    delivery_notifications_result = runner.invoke(
+        app,
+        ["job-execution-delivery-notifications"],
+    )
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
     recovery_run_result = runner.invoke(app, ["job-recovery-plan", report.execution_id, "--run"])
 
@@ -578,6 +586,15 @@ def test_cli_job_execution_commands(
     assert notifications_result.exit_code == 0
     notifications_payload = json.loads(notifications_result.output)
     assert notifications_payload[0]["delivery_id"] == notify_payload["delivery_id"]
+    assert delivery_notify_result.exit_code == 0
+    delivery_notify_payload = json.loads(delivery_notify_result.output)
+    assert delivery_notify_payload["execution_id"] == report.execution_id
+    assert delivery_notify_payload["status"] == "skipped"
+    assert delivery_notifications_result.exit_code == 0
+    delivery_notifications_payload = json.loads(delivery_notifications_result.output)
+    assert delivery_notifications_payload[0]["delivery_id"] == (
+        delivery_notify_payload["delivery_id"]
+    )
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

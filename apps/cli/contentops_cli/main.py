@@ -27,6 +27,8 @@ from contentops_core.jobs import (
     list_job_execution_reports,
     list_worker_job_catalog,
     notify_job_execution_alert,
+    notify_worker_delivery_summary,
+    worker_delivery_summary_notification_log,
 )
 from contentops_core.models import (
     ReleaseApprovalDecision,
@@ -628,6 +630,33 @@ def job_execution_alert_notify_command(
 def job_execution_alert_notifications_command() -> None:
     settings = Settings()
     deliveries = job_execution_alert_notification_log(job_execution_dir(settings.artifact_root))
+    typer.echo(json.dumps([delivery.model_dump(mode="json") for delivery in deliveries], indent=2))
+
+
+@app.command("job-execution-delivery-notify")
+def job_execution_delivery_notify_command(execution_id: str) -> None:
+    settings = Settings()
+    try:
+        report = get_job_execution_report(
+            job_execution_dir(settings.artifact_root),
+            execution_id,
+        )
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    delivery = notify_worker_delivery_summary(
+        report,
+        endpoint=settings.notification_webhook_url,
+        timeout_seconds=settings.notification_timeout_seconds,
+    )
+    typer.echo(delivery.model_dump_json(indent=2))
+
+
+@app.command("job-execution-delivery-notifications")
+def job_execution_delivery_notifications_command() -> None:
+    settings = Settings()
+    deliveries = worker_delivery_summary_notification_log(
+        job_execution_dir(settings.artifact_root)
+    )
     typer.echo(json.dumps([delivery.model_dump(mode="json") for delivery in deliveries], indent=2))
 
 

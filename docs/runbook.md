@@ -92,6 +92,10 @@ evidence status, failures, and recommended actions; release evidence stores rece
 Check `worker-delivery-summary-notification-log.json` beside the worker receipts to confirm whether
 the summary notification was skipped locally, delivered to the configured webhook, or failed. A
 configured `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` receives both the JSON summary and Markdown body.
+Use `contentops job-execution-delivery-notify <execution_id>`, the dashboard execution detail
+button, or `POST /job-executions/{execution_id}/delivery-summary/notify` when a stakeholder needs
+the latest summary resent. Use `GET /job-executions/delivery-summaries/notifications` to audit the
+delivery history without opening artifact files.
 When a scheduled execution publishes content, check `content_assets_status` in the same receipt.
 `generated` means the worker refreshed `feed.xml`, `promotion-brief.md`, and
 `content-distribution-manifest.json` before release evidence was built; `failed` means the publish

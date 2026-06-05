@@ -10,6 +10,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobExecutionTrendReport,
     JobRecoveryPlan,
+    WorkerDeliverySummaryDelivery,
     WorkerJobCatalogItem,
     job_execution_summary,
 )
@@ -420,10 +421,15 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
 def _job_execution_detail_html(
     report: JobExecutionReport,
     recovery_plan: JobRecoveryPlan | None = None,
+    api_key: str = "",
 ) -> str:
     release_evidence = report.release_evidence_path or "not recorded"
     release_evidence_status = report.release_evidence_status or "n/a"
     release_evidence_error = report.release_evidence_error or "none"
+    delivery_notify_action = (
+        f"/dashboard/job-executions/{escape(report.execution_id)}/delivery-summary/notify"
+        f"{_api_key_query(api_key)}"
+    )
     content_assets = report.content_assets_path or "not recorded"
     content_assets_status = report.content_assets_status or "n/a"
     content_assets_error = report.content_assets_error or "none"
@@ -455,6 +461,10 @@ def _job_execution_detail_html(
         <a href="/job-executions/{escape(report.execution_id)}">Execution JSON</a> |
         <a href="/job-executions/{escape(report.execution_id)}/recovery-plan">Recovery plan JSON</a>
       </p>
+      <form method="post" action="{delivery_notify_action}">
+        {_api_key_hidden(api_key)}
+        <button type="submit">Notify delivery summary</button>
+      </form>
       <div class="metrics">
         <div><strong>{report.total}</strong><span>Total jobs</span></div>
         <div><strong>{report.succeeded}</strong><span>Succeeded</span></div>
@@ -993,6 +1003,49 @@ def _job_execution_alert_deliveries_html(
           <tr>
             <th>Delivered at</th><th>Provider</th><th>Status</th>
             <th>Severity</th><th>Action</th><th>Endpoint</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _worker_delivery_summary_deliveries_html(
+    deliveries: list[WorkerDeliverySummaryDelivery],
+) -> str:
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(delivery.delivered_at.isoformat())}</td>
+          <td>{escape(delivery.execution_id)}</td>
+          <td>{escape(delivery.provider)}</td>
+          <td><span class="pill">{escape(delivery.status)}</span></td>
+          <td>{escape(str(delivery.action_required).lower())}</td>
+          <td>{escape(delivery.endpoint or "local")}</td>
+          <td>{escape(delivery.error or "none")}</td>
+        </tr>
+        """
+        for delivery in deliveries[:10]
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="7">
+            <span class="muted">No delivery summary notifications recorded.</span>
+          </td>
+        </tr>
+        """
+    return f"""
+      <p>
+        <a href="/job-executions/delivery-summaries/notifications">
+          Delivery summary notifications JSON
+        </a>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Delivered at</th><th>Execution</th><th>Provider</th><th>Status</th>
+            <th>Action</th><th>Endpoint</th><th>Error</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>

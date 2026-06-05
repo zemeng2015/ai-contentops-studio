@@ -20,6 +20,7 @@ from contentops_core.jobs import (
     JobExecutionTrendReport,
     JobRecoveryPlan,
     JobRunner,
+    WorkerDeliverySummaryDelivery,
     WorkerJobCatalogResponse,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -32,6 +33,8 @@ from contentops_core.jobs import (
     list_job_execution_reports,
     list_worker_job_catalog,
     notify_job_execution_alert,
+    notify_worker_delivery_summary,
+    worker_delivery_summary_notification_log,
 )
 from contentops_core.models import (
     AuditEventListResponse,
@@ -313,6 +316,35 @@ def build_ops_router(
         return notify_job_execution_alert(
             job_execution_dir(settings.artifact_root),
             days=days,
+            endpoint=settings.notification_webhook_url,
+            timeout_seconds=settings.notification_timeout_seconds,
+        )
+
+    @router.get(
+        "/job-executions/delivery-summaries/notifications",
+        response_model=list[WorkerDeliverySummaryDelivery],
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_worker_delivery_summary_notifications() -> list[WorkerDeliverySummaryDelivery]:
+        return worker_delivery_summary_notification_log(job_execution_dir(settings.artifact_root))
+
+    @router.post(
+        "/job-executions/{execution_id}/delivery-summary/notify",
+        response_model=WorkerDeliverySummaryDelivery,
+        dependencies=[Depends(require_operator)],
+    )
+    def notify_worker_execution_delivery_summary(
+        execution_id: str,
+    ) -> WorkerDeliverySummaryDelivery:
+        try:
+            report = get_job_execution_report(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return notify_worker_delivery_summary(
+            report,
             endpoint=settings.notification_webhook_url,
             timeout_seconds=settings.notification_timeout_seconds,
         )

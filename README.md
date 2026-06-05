@@ -254,6 +254,8 @@ contentops job-execution-trends --days 14
 contentops job-execution-alerts --days 14
 contentops job-execution-alert-notify --days 14
 contentops job-execution-alert-notifications
+contentops job-execution-delivery-notify <execution_id>
+contentops job-execution-delivery-notifications
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
@@ -276,6 +278,10 @@ release evidence records recent summaries in `worker_delivery_summaries.json`. T
 auditable `worker-delivery-summary-notification-log.json` after each summary; when
 `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, the JSON summary plus Markdown body are posted
 to the webhook. Use `--skip-delivery-notification` for local runs that should not notify.
+Operators can resend a delivery summary with `contentops job-execution-delivery-notify` or
+`POST /job-executions/{execution_id}/delivery-summary/notify`, and review delivery history through
+`contentops job-execution-delivery-notifications` or
+`GET /job-executions/delivery-summaries/notifications`.
 Set `homepage_handoff: true` on a job when the homepage publisher is configured and the scheduled
 run should prepare a reviewable GitHub Pages handoff zip after the draft is generated. The handoff
 path and any handoff error are stored on that job's execution result, and the post-run release
