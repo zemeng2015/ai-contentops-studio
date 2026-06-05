@@ -312,6 +312,8 @@ def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
         total=1,
         succeeded=0,
         failed=1,
+        content_assets_error="publish index missing",
+        delivery_summary_error="receipt path missing",
         release_evidence_error="release evidence archive failed",
         completed_at=completed_at,
         results=[
@@ -343,13 +345,26 @@ def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
     assert report.summary.latest_success_at == first.completed_at
     assert report.summary.latest_failure_at == second.completed_at
     assert [reason.reason for reason in report.summary.top_failure_reasons] == [
+        "content assets: publish index missing",
+        "delivery summary: receipt path missing",
         "release evidence: release evidence archive failed",
         "failed: provider failed",
         "failed homepage handoff: missing homepage repo",
     ]
-    assert "release-evidence" in report.summary.top_failure_reasons[0].remediation_steps[0]
-    assert "provider" in report.summary.top_failure_reasons[1].remediation_steps[0]
-    assert "HOMEPAGE_REPO_PATH" in report.summary.top_failure_reasons[2].remediation_steps[0]
+    assert [reason.category for reason in report.summary.top_failure_reasons] == [
+        "content_distribution",
+        "delivery_summary",
+        "release_evidence",
+        "provider_failure",
+        "homepage_handoff",
+    ]
+    assert "content-assets" in report.summary.top_failure_reasons[0].remediation_steps[0]
+    assert "job-execution-delivery-notify" in (
+        report.summary.top_failure_reasons[1].remediation_steps[1]
+    )
+    assert "release-evidence" in report.summary.top_failure_reasons[2].remediation_steps[0]
+    assert "provider" in report.summary.top_failure_reasons[3].remediation_steps[0]
+    assert "HOMEPAGE_REPO_PATH" in report.summary.top_failure_reasons[4].remediation_steps[0]
     assert report.buckets[-1].execution_count == 2
     assert report.buckets[-1].top_failure_reasons[0].latest_execution_id == second.execution_id
 

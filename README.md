@@ -269,6 +269,9 @@ latest action-required execution, the most common failure reasons, severity, and
 so recurring automation issues can be triaged from the dashboard or release evidence bundle. Each
 top failure reason and alert signal includes `remediation_steps`, pointing operators to provider,
 homepage handoff, release evidence, dry-run, or recovery-plan fixes. Alert
+Failure reasons also include stable categories such as `provider_failure`,
+`content_distribution`, `delivery_summary`, `homepage_handoff`, and `release_evidence`, so
+operators can group recurring issues by failure domain instead of reading raw logs.
 notification attempts write `worker-alert-notification-log.json` beside worker execution receipts,
 recording whether delivery was skipped locally, delivered to a webhook, or failed.
 Non-dry-run executions also write `<execution_id>-delivery-summary.json` and

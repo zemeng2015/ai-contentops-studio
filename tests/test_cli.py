@@ -563,6 +563,7 @@ def test_cli_job_execution_commands(
     assert trends_payload["summary"]["latest_failure_at"] is not None
     assert trends_payload["summary"]["top_failure_reasons"] == [
         {
+            "category": "dry_run_preview",
             "reason": "dry run: execution did not generate persisted runs",
             "count": 1,
             "latest_execution_id": report.execution_id,

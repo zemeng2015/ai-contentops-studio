@@ -130,6 +130,7 @@ class JobExecutionTrendBucket(BaseModel):
 
 
 class JobExecutionFailureReason(BaseModel):
+    category: str
     reason: str
     count: int = Field(ge=0)
     latest_execution_id: str | None = None
@@ -751,6 +752,7 @@ def job_execution_summary(report: JobExecutionReport) -> JobExecutionSummary:
         report.failed > 0
         or handoff_failed > 0
         or report.content_assets_error is not None
+        or report.delivery_summary_error is not None
         or report.release_evidence_error is not None
         or generated_runs < report.total
     )
@@ -972,50 +974,92 @@ def _top_failure_reasons(
     reports: list[JobExecutionReport],
     limit: int = 5,
 ) -> list[JobExecutionFailureReason]:
-    counts: Counter[str] = Counter()
-    latest: dict[str, tuple[str, datetime]] = {}
+    counts: Counter[tuple[str, str]] = Counter()
+    latest: dict[tuple[str, str], tuple[str, datetime]] = {}
     for report in reports:
-        for reason in _job_execution_failure_reasons(report):
-            counts[reason] += 1
-            current = latest.get(reason)
+        for category, reason in _job_execution_failure_reasons(report):
+            key = (category, reason)
+            counts[key] += 1
+            current = latest.get(key)
             if current is None or report.completed_at > current[1]:
-                latest[reason] = (report.execution_id, report.completed_at)
+                latest[key] = (report.execution_id, report.completed_at)
     return [
         JobExecutionFailureReason(
+            category=category,
             reason=reason,
             count=count,
-            latest_execution_id=latest[reason][0],
-            latest_at=latest[reason][1],
-            remediation_steps=_job_failure_remediation_steps(reason),
+            latest_execution_id=latest[(category, reason)][0],
+            latest_at=latest[(category, reason)][1],
+            remediation_steps=_job_failure_remediation_steps(category, reason),
         )
-        for reason, count in counts.most_common(limit)
+        for (category, reason), count in counts.most_common(limit)
     ]
 
 
-def _job_execution_failure_reasons(report: JobExecutionReport) -> list[str]:
-    reasons: list[str] = []
+def _job_execution_failure_reasons(report: JobExecutionReport) -> list[tuple[str, str]]:
+    reasons: list[tuple[str, str]] = []
     if report.dry_run:
-        reasons.append("dry run: execution did not generate persisted runs")
+        reasons.append(("dry_run_preview", "dry run: execution did not generate persisted runs"))
+    if report.content_assets_error:
+        reasons.append(
+            (
+                "content_distribution",
+                f"content assets: {_normalize_failure_reason(report.content_assets_error)}",
+            )
+        )
+    if report.delivery_summary_error:
+        reasons.append(
+            (
+                "delivery_summary",
+                f"delivery summary: {_normalize_failure_reason(report.delivery_summary_error)}",
+            )
+        )
     if report.release_evidence_error:
         reasons.append(
-            f"release evidence: {_normalize_failure_reason(report.release_evidence_error)}"
+            (
+                "release_evidence",
+                f"release evidence: {_normalize_failure_reason(report.release_evidence_error)}",
+            )
         )
     for result in report.results:
         if result.error:
-            reasons.append(f"{result.job_name}: {_normalize_failure_reason(result.error)}")
+            reasons.append(
+                (
+                    _job_result_failure_category(result.error),
+                    f"{result.job_name}: {_normalize_failure_reason(result.error)}",
+                )
+            )
         if result.homepage_handoff_error:
             reasons.append(
-                f"{result.job_name} homepage handoff: "
-                f"{_normalize_failure_reason(result.homepage_handoff_error)}"
+                (
+                    "homepage_handoff",
+                    f"{result.job_name} homepage handoff: "
+                    f"{_normalize_failure_reason(result.homepage_handoff_error)}",
+                )
             )
         if not result.error and str(result.status) == "failed":
-            reasons.append(f"{result.job_name}: failed status without error detail")
+            reasons.append(
+                ("worker_failure", f"{result.job_name}: failed status without error detail")
+            )
     return reasons
 
 
 def _normalize_failure_reason(reason: str) -> str:
     normalized = " ".join(reason.strip().split())
     return normalized[:180] if normalized else "unknown failure"
+
+
+def _job_result_failure_category(reason: str) -> str:
+    lowered = reason.lower()
+    if "provider" in lowered or "research" in lowered or "source" in lowered:
+        return "provider_failure"
+    if "approval" in lowered:
+        return "approval_gate"
+    if "publish" in lowered:
+        return "publishing"
+    if "config" in lowered or "environment" in lowered:
+        return "configuration"
+    return "worker_failure"
 
 
 def _deliver_job_execution_alert(
@@ -1230,36 +1274,46 @@ def _worker_signal_remediation_steps(
     return ["Inspect the worker execution receipt and rerun after resolving the failure."]
 
 
-def _job_failure_remediation_steps(reason: str) -> list[str]:
-    lowered = reason.lower()
-    if "dry run" in lowered:
+def _job_failure_remediation_steps(category: str, reason: str) -> list[str]:
+    if category == "dry_run_preview":
         return [
             "Rerun the worker without `--dry-run` when a real execution is intended.",
             "Use dry-run receipts only for schedule validation, not release readiness.",
         ]
-    if "release evidence" in lowered:
+    if category == "content_distribution":
+        return [
+            "Regenerate content distribution assets with `contentops content-assets`.",
+            "Confirm the publishing target contains contentops-publish-index.json.",
+            "Rerun the worker so release evidence can index the distribution manifest.",
+        ]
+    if category == "delivery_summary":
+        return [
+            "Open the worker receipt and confirm delivery_summary_path is writable.",
+            "Retry `contentops job-execution-delivery-notify <execution_id>` after repair.",
+        ]
+    if category == "release_evidence":
         return [
             "Run `contentops release-evidence` locally to reproduce the evidence failure.",
             "Fix missing artifacts, deployment checks, or artifact store settings.",
             "Rerun the worker so a fresh post-run release evidence bundle is written.",
         ]
-    if "homepage handoff" in lowered or "homepage repo" in lowered:
+    if category == "homepage_handoff":
         return [
             "Check CONTENTOPS_HOMEPAGE_REPO_PATH and homepage repository permissions.",
             "Inspect homepage handoff artifacts for missing files or git write errors.",
             "Rerun the failed job after the homepage checkout is writable.",
         ]
-    if "provider" in lowered or "research" in lowered or "source" in lowered:
+    if category == "provider_failure":
         return [
             "Check provider API keys, network access, and source URL reachability.",
             "Rerun the failed job with the same topic after provider access is restored.",
         ]
-    if "approval" in lowered or "publish" in lowered:
+    if category in {"approval_gate", "publishing"}:
         return [
             "Open the generated run in the dashboard and review approval or publish gates.",
             "Approve the run or fix publish configuration before rerunning publication.",
         ]
-    if "config" in lowered or "environment" in lowered:
+    if category == "configuration":
         return [
             "Run `contentops config-audit --json` to identify missing settings.",
             "Populate required environment variables or secret references.",

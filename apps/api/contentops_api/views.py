@@ -843,6 +843,7 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     failure_rows = "".join(
         f"""
         <tr>
+          <td><span class="pill">{escape(reason.category)}</span></td>
           <td>{escape(reason.reason)}</td>
           <td>{reason.count}</td>
           <td>{escape(reason.latest_execution_id or "n/a")}</td>
@@ -855,7 +856,7 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     if not failure_rows:
         failure_rows = """
         <tr>
-          <td colspan="5"><span class="muted">No worker failure reasons recorded.</span></td>
+          <td colspan="6"><span class="muted">No worker failure reasons recorded.</span></td>
         </tr>
         """
     rows = "".join(
@@ -904,8 +905,8 @@ def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
       <table>
         <thead>
           <tr>
-            <th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th>
-            <th>Remediation</th>
+            <th>Category</th><th>Reason</th><th>Count</th><th>Latest execution</th>
+            <th>Latest at</th><th>Remediation</th>
           </tr>
         </thead>
         <tbody>{failure_rows}</tbody>
@@ -1464,6 +1465,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     worker_failure_rows = "".join(
         f"""
         <tr>
+          <td>{escape(str(reason.get("category", "worker_failure")))}</td>
           <td>{escape(str(reason.get("reason", "n/a")))}</td>
           <td>{escape(str(reason.get("count", 0)))}</td>
           <td>{escape(str(reason.get("latest_execution_id") or "n/a"))}</td>
@@ -1477,7 +1479,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     if not worker_failure_rows:
         worker_failure_rows = """
         <tr>
-          <td colspan="5"><span class="muted">No worker failure reasons recorded.</span></td>
+          <td colspan="6"><span class="muted">No worker failure reasons recorded.</span></td>
         </tr>
         """
     worker_alert_signal_rows = "".join(
@@ -1648,8 +1650,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
       <table>
         <thead>
           <tr>
-            <th>Reason</th><th>Count</th><th>Latest execution</th><th>Latest at</th>
-            <th>Remediation</th>
+            <th>Category</th><th>Reason</th><th>Count</th><th>Latest execution</th>
+            <th>Latest at</th><th>Remediation</th>
           </tr>
         </thead>
         <tbody>{worker_failure_rows}</tbody>

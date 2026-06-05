@@ -77,6 +77,9 @@ on-call review. Use `contentops job-execution-alert-notify --days 14` or
 configured the receipt is local and skipped, while a configured webhook records delivered or failed.
 Top failure reasons and alert signals include remediation steps for provider failures, homepage
 handoff failures, release evidence failures, dry-run receipts, and generic recovery-plan reruns.
+Use the failure `category` field in job execution trends and release evidence to separate
+provider, publishing, content distribution, delivery summary, homepage handoff, and release
+evidence failures before choosing a recovery path.
 The same trend, alert, and notification payloads are written to release evidence as
 `worker_execution_trends.json`, `worker_execution_alerts.json`, and
 `worker_execution_alert_deliveries.json`, so compare the dashboard with the latest CI evidence
