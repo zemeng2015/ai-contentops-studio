@@ -86,13 +86,13 @@ Use `contentops job-execution-summary <execution_id>` or
 readiness, release evidence readiness, and whether operator action is required.
 Use `contentops scheduled-workflow-summary` after a GitHub Actions or cron run to generate the
 same review packet shown in the Actions step summary. It lists published URLs, homepage handoff
-zip files, delivery summaries, release evidence paths, the Operations Console summary, failure
-reasons, and next actions for the latest worker receipts. Use the `PR Handoff` section as the
-starting PR title and checklist when publishing generated site or homepage changes. The
-`--pr-metadata-output` JSON file is the machine-readable version for a later draft PR creation step
-and includes the same Operations Console summary. The scheduled GitHub workflow also uploads
-`daily-operations-console.json` or `project-updates-operations-console.json` as structured
-artifact data.
+zip files, delivery summaries, release evidence paths, content distribution asset status, the
+Operations Console summary, failure reasons, and next actions for the latest worker receipts. Use
+the `PR Handoff` section as the starting PR title and checklist when publishing generated site or
+homepage changes. The `--pr-metadata-output` JSON file is the machine-readable version for a later
+draft PR creation step and includes the same Operations Console summary plus content asset fields.
+The scheduled GitHub workflow also uploads `daily-operations-console.json` or
+`project-updates-operations-console.json` as structured artifact data.
 Use `contentops job-execution-trends --days 14`, `GET /job-executions/trends?days=14`, or
 `/dashboard/job-execution-trends` to check recurring automation success, publish, handoff, and
 action-required rates before changing the EventBridge schedule. The trend view also lists the

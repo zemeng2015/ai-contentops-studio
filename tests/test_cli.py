@@ -711,6 +711,13 @@ def test_cli_job_execution_commands(
     path = tmp_path / "job.yaml"
     path.write_text("name: cli-job-history\ntopic: CLI job history\n", encoding="utf-8")
     report = JobRunner.dry_run_report(load_job_file(path))
+    report.content_assets_path = str(tmp_path / "site")
+    report.content_assets_status = "generated"
+    report.content_assets_files = [
+        "feed.xml",
+        "promotion-brief.md",
+        "content-distribution-manifest.json",
+    ]
     write_job_execution_report(report, job_execution_dir(Settings().artifact_root))
     runner = CliRunner()
 
@@ -805,6 +812,8 @@ def test_cli_job_execution_commands(
         "warn",
         "fail",
     }
+    assert scheduled_summary_payload["content_assets_count"] == 1
+    assert scheduled_summary_payload["items"][0]["content_assets_status"] == "generated"
     assert scheduled_summary_payload["items"][0]["execution_id"] == report.execution_id
     assert scheduled_summary_payload["items"][0]["pr_title"].startswith(
         "Publish scheduled ContentOps output"
@@ -815,6 +824,7 @@ def test_cli_job_execution_commands(
         encoding="utf-8"
     )
     assert "Operations Console" in scheduled_summary_markdown.read_text(encoding="utf-8")
+    assert "Distribution Assets" in scheduled_summary_markdown.read_text(encoding="utf-8")
     assert "PR Handoff" in scheduled_summary_markdown.read_text(encoding="utf-8")
     pr_metadata_payload = json.loads(scheduled_pr_metadata.read_text(encoding="utf-8"))
     assert pr_metadata_payload["title"].startswith("Review scheduled ContentOps output")
@@ -823,6 +833,9 @@ def test_cli_job_execution_commands(
         "warn",
         "fail",
     }
+    assert "Review generated feed, promotion brief, and distribution manifest." in (
+        pr_metadata_payload["body"]
+    )
     assert pr_metadata_payload["checklist"]
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)

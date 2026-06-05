@@ -290,6 +290,13 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
         total=1,
         succeeded=1,
         failed=0,
+        content_assets_path=str(tmp_path / "site"),
+        content_assets_status="generated",
+        content_assets_files=[
+            "feed.xml",
+            "promotion-brief.md",
+            "content-distribution-manifest.json",
+        ],
         release_evidence_path=str(tmp_path / "release-evidence"),
         delivery_summary_markdown_path=str(tmp_path / "summary.md"),
         results=[
@@ -343,14 +350,24 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert review.total == 1
     assert review.published_count == 1
     assert review.handoff_count == 1
+    assert review.content_assets_count == 1
+    assert review.content_assets_failed_count == 0
     assert review.operations_console_summary["status"] == "warn"
     assert review.operations_console_summary["action_required"] is True
     assert review.items[0].published_urls == ["https://example.com/posts/scheduled.html"]
+    assert review.items[0].content_assets_status == "generated"
+    assert review.items[0].content_assets_files == [
+        "feed.xml",
+        "promotion-brief.md",
+        "content-distribution-manifest.json",
+    ]
     assert review.items[0].pr_title.startswith("Publish scheduled ContentOps output")
     assert any("homepage handoff" in item for item in review.items[0].pr_checklist)
     assert "Scheduled ContentOps Review" in markdown
     assert "Operations Console" in markdown
     assert "Release gate: `pass`" in markdown
+    assert "Distribution Assets" in markdown
+    assert "content-distribution-manifest.json" in markdown
     assert "https://example.com/posts/scheduled.html" in markdown
     assert "run-scheduled-homepage-handoff.zip" in markdown
     assert "PR Handoff" in markdown
@@ -361,6 +378,10 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert metadata["operations_console_summary"]["retention_gate_status"] == "warn"
     assert metadata["source_execution_ids"] == [report.execution_id]
     assert "Scheduled ContentOps Publish Review" in metadata["body"]
+    assert "Content asset sets: `1`" in metadata["body"]
+    assert "Review generated feed, promotion brief, and distribution manifest." in metadata[
+        "body"
+    ]
     assert "Resolve Operations Console action-required signals." in metadata["body"]
     assert metadata["checklist"]
 

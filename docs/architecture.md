@@ -266,7 +266,7 @@ published run, handoff, release evidence, and action-required counts from the re
 can scan a scheduled execution before opening individual runs.
 `contentops scheduled-workflow-summary` layers the recent worker receipts with the Operations
 Console summary to produce review Markdown and PR metadata for GitHub Actions handoffs, including
-release gate, retention gate, worker alert, and queue pressure signals.
+release gate, retention gate, worker alert, content distribution assets, and queue pressure signals.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
 dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
 handoff success rate, and action-required counts.

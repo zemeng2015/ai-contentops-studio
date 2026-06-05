@@ -243,6 +243,10 @@ class ScheduledWorkflowReviewItem(BaseModel):
     total: int = Field(ge=0)
     published_urls: list[str] = Field(default_factory=list)
     homepage_handoff_paths: list[str] = Field(default_factory=list)
+    content_assets_path: str | None = None
+    content_assets_status: str | None = None
+    content_assets_files: list[str] = Field(default_factory=list)
+    content_assets_error: str | None = None
     release_evidence_path: str | None = None
     delivery_summary_markdown_path: str | None = None
     failure_reasons: list[str] = Field(default_factory=list)
@@ -257,6 +261,8 @@ class ScheduledWorkflowReviewReport(BaseModel):
     action_required_count: int = Field(ge=0)
     published_count: int = Field(ge=0)
     handoff_count: int = Field(ge=0)
+    content_assets_count: int = Field(ge=0)
+    content_assets_failed_count: int = Field(ge=0)
     operations_console_summary: dict[str, Any] = Field(default_factory=dict)
     items: list[ScheduledWorkflowReviewItem] = Field(default_factory=list)
 
@@ -882,6 +888,12 @@ def scheduled_workflow_review_report(
         action_required_count=sum(1 for item in items if item.action_required),
         published_count=sum(len(item.published_urls) for item in items),
         handoff_count=sum(len(item.homepage_handoff_paths) for item in items),
+        content_assets_count=sum(
+            1 for item in items if item.content_assets_status == "generated"
+        ),
+        content_assets_failed_count=sum(
+            1 for item in items if item.content_assets_status == "failed"
+        ),
         operations_console_summary=operations_console_summary,
         items=items,
     )
@@ -1213,6 +1225,10 @@ def _scheduled_workflow_review_item(report: JobExecutionReport) -> ScheduledWork
             for result in report.results
             if result.homepage_handoff_path is not None
         ],
+        content_assets_path=report.content_assets_path,
+        content_assets_status=report.content_assets_status,
+        content_assets_files=report.content_assets_files,
+        content_assets_error=report.content_assets_error,
         release_evidence_path=report.release_evidence_path,
         delivery_summary_markdown_path=report.delivery_summary_markdown_path,
         failure_reasons=failure_reasons,
@@ -1231,6 +1247,8 @@ def _scheduled_workflow_review_markdown(report: ScheduledWorkflowReviewReport) -
         f"- Action required: `{report.action_required_count}`",
         f"- Published URLs: `{report.published_count}`",
         f"- Homepage handoffs: `{report.handoff_count}`",
+        f"- Content asset sets: `{report.content_assets_count}`",
+        f"- Failed content asset sets: `{report.content_assets_failed_count}`",
         "",
     ]
     if report.operations_console_summary:
@@ -1287,6 +1305,15 @@ def _scheduled_workflow_review_markdown(report: ScheduledWorkflowReviewReport) -
             lines.extend(f"- `{path}`" for path in item.homepage_handoff_paths)
         else:
             lines.append("- None")
+        lines.extend(["", "### Distribution Assets", ""])
+        lines.extend(
+            [
+                f"- Status: `{item.content_assets_status or 'not recorded'}`",
+                f"- Path: `{item.content_assets_path or 'not recorded'}`",
+                f"- Files: `{', '.join(item.content_assets_files) or 'none'}`",
+                f"- Error: `{item.content_assets_error or 'none'}`",
+            ]
+        )
         lines.extend(["", "### Failures", ""])
         if item.failure_reasons:
             lines.extend(f"- {reason}" for reason in item.failure_reasons)
@@ -1358,6 +1385,10 @@ def _scheduled_workflow_pr_checklist(report: ScheduledWorkflowReviewReport) -> l
             checklist.append("Resolve Operations Console action-required signals.")
     if report.published_count:
         checklist.append("Verify published URLs and generated content assets.")
+    if report.content_assets_count:
+        checklist.append("Review generated feed, promotion brief, and distribution manifest.")
+    if report.content_assets_failed_count:
+        checklist.append("Regenerate failed content distribution assets before merge.")
     if report.handoff_count:
         checklist.append("Apply homepage handoff artifacts in the target homepage repository.")
     if report.action_required_count:
@@ -1382,6 +1413,8 @@ def _scheduled_workflow_pr_body(
         f"- Action required: `{report.action_required_count}`",
         f"- Published URLs: `{report.published_count}`",
         f"- Homepage handoffs: `{report.handoff_count}`",
+        f"- Content asset sets: `{report.content_assets_count}`",
+        f"- Failed content asset sets: `{report.content_assets_failed_count}`",
         "",
     ]
     if report.operations_console_summary:
