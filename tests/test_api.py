@@ -237,6 +237,8 @@ def test_release_approval_api_and_dashboard(
     assert evidence_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
     assert "release_approval.json" in evidence_payload["summary"]["artifact_files"]
     assert "source_reviews.json" in evidence_payload["summary"]["artifact_files"]
+    assert "content_calendar_lineage.json" in evidence_payload["summary"]["artifact_files"]
+    assert "content_calendar_lineage" in evidence_payload
     assert evidence_payload["source_reviews"]["total_decisions"] >= 0
     assert evidence_payload["publish_verifications"]["total"] >= 0
     assert evidence_bundle_response.status_code == 200
@@ -246,6 +248,9 @@ def test_release_approval_api_and_dashboard(
     assert "Deployment Checklist" in dashboard_response.text
     assert "Publish Verification Evidence" in dashboard_response.text
     assert "Publish Recovery Executions" in dashboard_response.text
+    assert "Content Calendar Lineage Evidence" in dashboard_response.text
+    assert "Calendar actions" in dashboard_response.text
+    assert "Calendar runs" in dashboard_response.text
     assert "Provider Health" in dashboard_response.text
     assert "Integration Smoke Plan" in dashboard_response.text
     assert "Remediation" in dashboard_response.text
@@ -1631,6 +1636,9 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
+    assert "Content Calendar Lineage Evidence" in response.text
+    assert "Content calendar lineage JSON" in response.text
+    assert "Calendar actions" in response.text
     assert "Scheduled Review Package Evidence" in response.text
     assert "Source Review Evidence" in response.text
     assert "Worker Execution Trends" in response.text

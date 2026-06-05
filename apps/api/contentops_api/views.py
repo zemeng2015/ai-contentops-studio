@@ -971,6 +971,97 @@ def _calendar_latest_run_link(item: object) -> str:
     return f'<a href="/dashboard/runs/{escaped}">{escaped}</a>'
 
 
+def _release_calendar_lineage_html(payload: dict[str, object]) -> str:
+    raw_items = payload.get("items", [])
+    items = (
+        [item for item in raw_items if isinstance(item, dict)]
+        if isinstance(raw_items, list)
+        else []
+    )
+    rows = "".join(_release_calendar_lineage_row(item) for item in items)
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="9">
+            <span class="muted">No content calendar lineage recorded.</span>
+          </td>
+        </tr>
+        """
+    metrics = "".join(
+        _release_calendar_metric_card(payload, key, label)
+        for key, label in (
+            ("total_items", "Items"),
+            ("tracked_run_count", "Tracked runs"),
+            ("untouched_count", "Not started"),
+            ("needs_review_count", "Needs review"),
+            ("published_count", "Published"),
+            ("failed_count", "Failed"),
+            ("action_required_count", "Action required"),
+        )
+    )
+    return f"""
+      <p><a href="/content-calendar/lineage">Content calendar lineage JSON</a></p>
+      <div class="metrics">{metrics}</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th><th>Intent</th><th>Status</th><th>Runs</th><th>Latest run</th>
+            <th>Latest status</th><th>Published URL</th><th>Action required</th><th>Next</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _release_calendar_metric(payload: dict[str, object], key: str) -> str:
+    value = payload.get(key, 0)
+    return escape(str(value if isinstance(value, int) else 0))
+
+
+def _release_calendar_metric_card(
+    payload: dict[str, object],
+    key: str,
+    label: str,
+) -> str:
+    return (
+        f"<div><strong>{_release_calendar_metric(payload, key)}</strong>"
+        f"<span>{escape(label)}</span></div>"
+    )
+
+
+def _release_calendar_lineage_row(item: dict[object, object]) -> str:
+    return f"""
+        <tr>
+          <td>{escape(str(item.get("item_key", "n/a")))}</td>
+          <td>{escape(str(item.get("intent", "n/a")))}</td>
+          <td>{escape(str(item.get("status", "n/a")))}</td>
+          <td>{escape(str(item.get("run_count", 0)))}</td>
+          <td>{_release_calendar_latest_run_link(item)}</td>
+          <td>{escape(str(item.get("latest_run_status") or "none"))}</td>
+          <td>{_release_calendar_published_url(item)}</td>
+          <td>{escape(str(item.get("action_required", False)).lower())}</td>
+          <td>{escape(str(item.get("recommendation") or "No action required."))}</td>
+        </tr>
+        """
+
+
+def _release_calendar_latest_run_link(item: dict[object, object]) -> str:
+    latest_run_id = item.get("latest_run_id")
+    if not latest_run_id:
+        return "none"
+    escaped = escape(str(latest_run_id))
+    return f'<a href="/dashboard/runs/{escaped}">{escaped}</a>'
+
+
+def _release_calendar_published_url(item: dict[object, object]) -> str:
+    published_url = item.get("latest_published_url")
+    if not published_url:
+        return "not published"
+    escaped = escape(str(published_url))
+    return f'<a href="{escaped}">{escaped}</a>'
+
+
 def _worker_job_readiness_html(report: WorkerJobReadinessResponse) -> str:
     if not report.items:
         return """
@@ -1840,6 +1931,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
     worker_buckets = bundle.worker_execution_trends.get("buckets", [])
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
+    calendar_lineage = bundle.content_calendar_lineage
+    calendar_lineage_html = _release_calendar_lineage_html(calendar_lineage)
     source_review_latest = {
         item.run_id: item.latest_reviewed_at.isoformat() if item.latest_reviewed_at else "n/a"
         for item in bundle.source_reviews.items
@@ -2181,6 +2274,14 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <span>Distribution manifests</span>
         </div>
         <div>
+          <strong>{_release_calendar_metric(calendar_lineage, "action_required_count")}</strong>
+          <span>Calendar actions</span>
+        </div>
+        <div>
+          <strong>{_release_calendar_metric(calendar_lineage, "tracked_run_count")}</strong>
+          <span>Calendar runs</span>
+        </div>
+        <div>
           <strong>{bundle.publish_verifications.drift_count}</strong>
           <span>Publish drifts</span>
         </div>
@@ -2294,6 +2395,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{distribution_rows}</tbody>
       </table>
+      <h2>Content Calendar Lineage Evidence</h2>
+      {calendar_lineage_html}
       <h2>Publish Verification Evidence</h2>
       <table>
         <thead>

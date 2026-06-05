@@ -40,6 +40,8 @@ Expected result:
   review, and which planned publish items still need a publish action.
 - Release evidence stores the same snapshot in `content_calendar_lineage.json`; attach it to
   campaign release reviews when content plan completeness matters.
+- The Release Evidence dashboard also shows this lineage as a campaign table with latest run,
+  publish status, and next-action columns for reviewer sign-off.
 - If `contentops release-gate` reports `content_calendar_lineage=warn`, finish the campaign review
   items that are in scope for the release. If it reports `fail`, recover or rerun failed calendar
   items before deploying.
