@@ -224,6 +224,48 @@ def test_release_approval_api_and_dashboard(
     assert dashboard_post_response.status_code == 303
 
 
+def test_publish_recovery_api_rolls_back_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = TestClient(app)
+    original_artifact_root = settings.artifact_root
+    original_database_url = settings.database_url
+    original_site_output_dir = settings.site_output_dir
+    settings.artifact_root = tmp_path / "artifacts"
+    settings.database_url = f"sqlite:///{tmp_path / 'contentops.db'}"
+    settings.site_output_dir = tmp_path / "site"
+    try:
+        create_response = client.post("/runs", json={"topic": "API publish recovery"})
+        run_id = create_response.json()["id"]
+        client.post(f"/runs/{run_id}/approve?reviewer=zack")
+        client.post(f"/runs/{run_id}/publish")
+        receipt = client.get(f"/runs/{run_id}/publish-receipt").json()
+        target = Path(receipt["file_changes"][0]["path"])
+        target.write_text("api drift", encoding="utf-8")
+        plan_response = client.get(f"/runs/{run_id}/publish-recovery-plan")
+        execute_response = client.post(
+            f"/runs/{run_id}/publish-recovery",
+            json={
+                "action": "rollback",
+                "actor": "zack",
+                "notes": "API drift recovery.",
+            },
+        )
+    finally:
+        settings.artifact_root = original_artifact_root
+        settings.database_url = original_database_url
+        settings.site_output_dir = original_site_output_dir
+
+    assert plan_response.status_code == 200
+    assert plan_response.json()["runnable"] is True
+    assert execute_response.status_code == 200
+    payload = execute_response.json()
+    assert payload["status"] == "completed"
+    assert payload["action"] == "rollback"
+    assert payload["rollback"]["errors"] == []
+
+
 def test_read_routes_can_require_operator_key() -> None:
     client = TestClient(app)
     run = client.post("/runs", json={"topic": "Read route protection"}).json()

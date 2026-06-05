@@ -1253,6 +1253,29 @@ def publish_recovery_plan(run_id: str) -> None:
     typer.echo(plan.model_dump_json(indent=2))
 
 
+@app.command("run-publish-recovery")
+def run_publish_recovery(
+    run_id: str,
+    action: Annotated[
+        str,
+        typer.Option(help="Recovery action to execute. Currently supported: rollback."),
+    ] = "rollback",
+    actor: Annotated[str, typer.Option(help="Operator name for audit log.")] = "operator",
+    notes: Annotated[str, typer.Option(help="Execution notes for the recovery record.")] = "",
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        result = service.execute_publish_recovery(
+            run_id,
+            action=action,
+            actor=actor,
+            notes=notes,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(result.model_dump_json(indent=2))
+
+
 @app.command("generation-receipt")
 def generation_receipt(run_id: str) -> None:
     service = build_review_service(Settings())

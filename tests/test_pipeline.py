@@ -498,6 +498,12 @@ def test_publish_verification_detects_modified_files(tmp_path: Path) -> None:
 
     verification = review_service.verify_publish(result.run.id)
     recovery_plan = review_service.publish_recovery_plan(result.run.id)
+    recovery_execution = review_service.execute_publish_recovery(
+        result.run.id,
+        action="rollback",
+        actor="zack",
+        notes="Remove drifted publish.",
+    )
     incident = review_service.incident_report(result.run.id)
 
     assert verification.verified is False
@@ -508,9 +514,13 @@ def test_publish_verification_detects_modified_files(tmp_path: Path) -> None:
     assert recovery_plan.file_actions[0].status == "mismatch"
     assert "rollback-publish" in recovery_plan.steps[3]
     assert (result.run.artifact_dir / "publish-recovery-plan.json").exists()
-    assert incident.severity.value == "critical"
-    assert incident.requires_action is True
-    assert any(signal.category == "publish" for signal in incident.signals)
+    assert recovery_execution.status == "completed"
+    assert recovery_execution.action == "rollback"
+    assert recovery_execution.rollback is not None
+    assert recovery_execution.rollback.errors == []
+    assert (result.run.artifact_dir / "publish-recovery-execution.json").exists()
+    assert incident.severity.value == "info"
+    assert incident.requires_action is False
 
 
 def test_review_service_rejects_run(tmp_path: Path) -> None:

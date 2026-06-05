@@ -10,6 +10,8 @@ from contentops_core.models import (
     GenerationReceipt,
     NotificationDelivery,
     PublishReceipt,
+    PublishRecoveryExecutionRequest,
+    PublishRecoveryExecutionResult,
     PublishRecoveryPlan,
     PublishRollbackResult,
     PublishVerificationReport,
@@ -328,6 +330,28 @@ def build_runs_router(
     def get_publish_recovery_plan(run_id: str) -> PublishRecoveryPlan:
         try:
             return review_service.publish_recovery_plan(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+    @router.post(
+        "/runs/{run_id}/publish-recovery",
+        response_model=PublishRecoveryExecutionResult,
+        dependencies=[Depends(operator_dependency)],
+    )
+    def run_publish_recovery(
+        run_id: str,
+        request: PublishRecoveryExecutionRequest,
+    ) -> PublishRecoveryExecutionResult:
+        try:
+            return review_service.execute_publish_recovery(
+                run_id,
+                action=request.action,
+                actor=request.actor,
+                notes=request.notes,
+            )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:

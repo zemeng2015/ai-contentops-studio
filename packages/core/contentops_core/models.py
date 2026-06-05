@@ -268,6 +268,23 @@ class PublishRecoveryPlan(BaseModel):
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class PublishRecoveryExecutionRequest(BaseModel):
+    action: str
+    actor: str = "operator"
+    notes: str = ""
+
+
+class PublishRecoveryExecutionResult(BaseModel):
+    run_id: str
+    action: str
+    actor: str
+    status: str
+    plan: PublishRecoveryPlan
+    rollback: PublishRollbackResult | None = None
+    message: str
+    executed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class PublishedContentItem(BaseModel):
     run_id: str
     topic: str

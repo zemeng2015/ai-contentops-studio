@@ -170,6 +170,10 @@ Use `contentops publish-recovery-plan <run_id>` or
 `GET /runs/{id}/publish-recovery-plan` before changing files. The plan writes
 `publish-recovery-plan.json` and classifies each target file as `ok`, `missing`, or `mismatch` with
 recommended restore, republish, or rollback actions.
+To remove a drifted publish through the governed recovery path, run
+`contentops run-publish-recovery <run_id> --action rollback --actor <name>` or call
+`POST /runs/{id}/publish-recovery` with `{"action":"rollback"}`. This writes
+`publish-recovery-execution.json` and uses the existing rollback audit and notification path.
 When preparing a deployment handoff, run
 `contentops release-gate --git-sha <sha> --json --record --checklist-output release-gate-checklist.md`
 and review the Markdown checklist with the JSON report. The checklist translates failed or warning

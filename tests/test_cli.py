@@ -287,6 +287,49 @@ def test_cli_approve_then_publish(
     assert '"action": "rollback_publish"' in notifications_result.output
 
 
+def test_cli_run_publish_recovery_rolls_back_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(artifact_root))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+
+    run_result = runner.invoke(app, ["run", "--topic", "CLI publish recovery"])
+    run_id = next(
+        line.split(":", 1)[1].strip()
+        for line in run_result.output.splitlines()
+        if line.startswith("Run:")
+    )
+    runner.invoke(app, ["approve", run_id, "--reviewer", "zack"])
+    runner.invoke(app, ["publish", run_id])
+    target = next((tmp_path / "site").glob("*.html"))
+    target.write_text("manual drift", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "run-publish-recovery",
+            run_id,
+            "--action",
+            "rollback",
+            "--actor",
+            "zack",
+            "--notes",
+            "CLI drift recovery.",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "completed"
+    assert payload["action"] == "rollback"
+    assert payload["rollback"]["errors"] == []
+    assert next(artifact_root.rglob("publish-recovery-execution.json")).exists()
+
+
 def test_cli_demo_seed_creates_reviewable_dashboard_data(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

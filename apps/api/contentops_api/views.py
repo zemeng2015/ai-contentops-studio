@@ -371,6 +371,10 @@ def _publish_verification_html(report: PublishVerificationReport) -> str:
         </a>
       </p>
       <p>
+        Execute recovery through <code>POST /runs/{escape(report.run_id)}/publish-recovery</code>
+        with action <code>rollback</code>.
+      </p>
+      <p>
         Provider: <strong>{escape(report.provider)}</strong> |
         Verified: <strong>{_pass_label(report.verified)}</strong> |
         URL: <a href="{escape(report.url)}">{escape(report.url)}</a>

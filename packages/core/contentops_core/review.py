@@ -36,6 +36,7 @@ from contentops_core.models import (
     PublishFileChange,
     PublishPlan,
     PublishReceipt,
+    PublishRecoveryExecutionResult,
     PublishRecoveryFileAction,
     PublishRecoveryPlan,
     PublishRollbackResult,
@@ -552,6 +553,37 @@ class ReviewService:
         self._write_publish_recovery_plan(run, plan)
         return plan
 
+    def execute_publish_recovery(
+        self,
+        run_id: str,
+        *,
+        action: str,
+        actor: str = "operator",
+        notes: str = "",
+    ) -> PublishRecoveryExecutionResult:
+        normalized_action = action.strip().casefold()
+        if normalized_action != "rollback":
+            raise ValueError("Unsupported publish recovery action. Supported actions: rollback.")
+        plan = self.publish_recovery_plan(run_id)
+        if not plan.runnable:
+            raise ValueError(plan.blocked_reason or "Publish recovery plan is not runnable.")
+        rollback = self.rollback_publish(run_id, actor=actor)
+        result = PublishRecoveryExecutionResult(
+            run_id=run_id,
+            action=normalized_action,
+            actor=actor,
+            status="completed",
+            plan=plan,
+            rollback=rollback,
+            message=(
+                notes
+                or "Publish recovery rollback completed; regenerate release evidence next."
+            ),
+        )
+        run = self._get_run(run_id)
+        self._write_publish_recovery_execution(run, result)
+        return result
+
     def published_content(
         self,
         limit: int = 20,
@@ -976,6 +1008,14 @@ class ReviewService:
     ) -> None:
         path = run.artifact_dir / "publish-recovery-plan.json"
         path.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _write_publish_recovery_execution(
+        run: RunRecord,
+        result: PublishRecoveryExecutionResult,
+    ) -> None:
+        path = run.artifact_dir / "publish-recovery-execution.json"
+        path.write_text(result.model_dump_json(indent=2), encoding="utf-8")
 
     def _published_content_item(self, run: RunRecord) -> PublishedContentItem:
         draft = self._load_json(run, "draft.json", Draft)

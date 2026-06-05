@@ -100,6 +100,7 @@ Each run writes inspectable artifacts such as:
 - `publish-receipt.json`
 - `publish-verification.json`
 - `publish-recovery-plan.json`
+- `publish-recovery-execution.json`
 - `audit-log.json`
 
 ## Features
@@ -130,6 +131,8 @@ contentops publish-plan <run_id>
 contentops approve <run_id> --reviewer "operator"
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops publish-recovery-plan <run_id>
+contentops run-publish-recovery <run_id> --action rollback --actor "operator"
 contentops content-assets --output-dir site
 contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops s3-mirror-log <run_id>
@@ -175,6 +178,7 @@ GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/publish-recovery-plan
+POST /runs/{run_id}/publish-recovery
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
 GET  /ops-trends
