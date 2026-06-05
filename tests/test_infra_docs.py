@@ -114,8 +114,9 @@ def test_ci_validates_terraform() -> None:
     assert "scripts/compare_release_evidence.py" in workflow
     assert "python -m pip_audit --skip-editable" in workflow
     assert "Container image vulnerability scan" in workflow
-    assert "anchore/scan-action/download-grype@v5" in workflow
-    assert "--fail-on high" in workflow
+    assert "anchore/scan-action@v7" in workflow
+    assert "severity-cutoff: high" in workflow
+    assert "container-image-grype.json" in workflow
     assert "security-baseline" in workflow
 
 

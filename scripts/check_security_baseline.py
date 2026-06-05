@@ -161,8 +161,8 @@ def _container_image_scan_checks(path: Path, workflow: dict[str, Any]) -> list[S
     text = path.read_text(encoding="utf-8")
     docker_job = workflow.get("jobs", {}).get("docker", {})
     docker_steps = docker_job.get("steps", []) if isinstance(docker_job, dict) else []
-    grype_action_present = any(
-        step.get("uses") == "anchore/scan-action/download-grype@v5"
+    scan_action_present = any(
+        step.get("uses") == "anchore/scan-action@v7"
         for step in docker_steps
         if isinstance(step, dict)
     )
@@ -173,12 +173,14 @@ def _container_image_scan_checks(path: Path, workflow: dict[str, Any]) -> list[S
             "CI builds the API container image before scanning it.",
         ),
         _pass_if(
-            grype_action_present,
+            scan_action_present,
             "ci:container-scanner-versioned",
-            "CI installs a versioned Grype scanner action.",
+            "CI uses a versioned Anchore scan action.",
         ),
         _pass_if(
-            "grype ai-contentops-studio:ci" in text and "--fail-on high" in text,
+            "image: ai-contentops-studio:ci" in text
+            and "fail-build: true" in text
+            and "severity-cutoff: high" in text,
             "ci:container-image-vulnerability-scan",
             "CI blocks container images with high or critical vulnerabilities.",
         ),
