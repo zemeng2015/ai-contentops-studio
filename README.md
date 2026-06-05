@@ -264,6 +264,8 @@ and calendar item metadata in `request.json` and `workflow-context.json`.
 `contentops content-calendar-lineage --json` and `GET /content-calendar/lineage` connect planned
 calendar items back to recent runs, showing which items have not started, which need review, which
 published, and what the next operator action should be.
+Release evidence also writes `content_calendar_lineage.json`, so deployment reviewers can inspect
+the campaign state that the release gate evaluated.
 `config-audit` exposes a redacted runtime and secret posture report, so production operators can
 verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or

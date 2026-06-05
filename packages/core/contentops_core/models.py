@@ -921,6 +921,7 @@ class ReleaseEvidenceBundle(BaseModel):
     deployment_check: DeploymentCheckReport
     homepage_handoffs: HomepageHandoffEvidence
     content_distribution: ContentDistributionEvidence
+    content_calendar_lineage: dict[str, Any] = Field(default_factory=dict)
     publish_verifications: PublishVerificationEvidence
     publish_recovery_executions: PublishRecoveryExecutionEvidence
     source_reviews: SourceReviewEvidence

@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from contentops_core.config_audit import config_audit
-from contentops_core.jobs import content_calendar_lineage
 from contentops_core.models import (
     ConfigAuditReport,
     ReleaseApprovalDecision,
@@ -47,7 +46,7 @@ def release_gate(
         _source_review_governance_check(bundle),
         _publish_verification_check(bundle),
         _content_distribution_check(bundle),
-        _content_calendar_lineage_check(settings, repository, window_size),
+        _content_calendar_lineage_check(bundle),
         _scheduled_review_package_check(bundle),
         _retention_archive_governance_check(bundle, review_service),
         _worker_automation_health_check(bundle),
@@ -492,50 +491,55 @@ def _content_distribution_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
     )
 
 
-def _content_calendar_lineage_check(
-    settings: Settings,
-    repository: RunRepository,
-    window_size: int,
-) -> ReleaseGateItem:
-    lineage = content_calendar_lineage(
-        settings.pipeline_dir,
-        repository.list(limit=max(window_size, 200)),
-    )
+def _content_calendar_lineage_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    lineage = bundle.content_calendar_lineage
+    items = lineage.get("items", [])
+    if not isinstance(items, list):
+        items = []
     publish_pending = [
-        item.item_key
-        for item in lineage.items
-        if item.intent == "publish" and item.status != "published"
+        str(item.get("item_key"))
+        for item in items
+        if isinstance(item, dict)
+        and item.get("intent") == "publish"
+        and item.get("status") != "published"
     ]
     failed_items = [
-        item.item_key for item in lineage.items if item.latest_run_status == RunStatus.FAILED
+        str(item.get("item_key"))
+        for item in items
+        if isinstance(item, dict) and item.get("latest_run_status") == RunStatus.FAILED.value
     ]
     needs_review = [
-        item.item_key
-        for item in lineage.items
-        if item.latest_run_status == RunStatus.NEEDS_REVIEW
+        str(item.get("item_key"))
+        for item in items
+        if isinstance(item, dict)
+        and item.get("latest_run_status") == RunStatus.NEEDS_REVIEW.value
     ]
-    untouched = [item.item_key for item in lineage.items if item.run_count == 0]
+    untouched = [
+        str(item.get("item_key"))
+        for item in items
+        if isinstance(item, dict) and item.get("run_count") == 0
+    ]
     evidence = {
-        "total_items": lineage.total_items,
-        "tracked_run_count": lineage.tracked_run_count,
-        "untouched_count": lineage.untouched_count,
-        "needs_review_count": lineage.needs_review_count,
-        "published_count": lineage.published_count,
-        "failed_count": lineage.failed_count,
-        "action_required_count": lineage.action_required_count,
+        "total_items": _int_field(lineage, "total_items"),
+        "tracked_run_count": _int_field(lineage, "tracked_run_count"),
+        "untouched_count": _int_field(lineage, "untouched_count"),
+        "needs_review_count": _int_field(lineage, "needs_review_count"),
+        "published_count": _int_field(lineage, "published_count"),
+        "failed_count": _int_field(lineage, "failed_count"),
+        "action_required_count": _int_field(lineage, "action_required_count"),
         "publish_pending": publish_pending,
         "failed_items": failed_items,
         "needs_review": needs_review,
         "untouched": untouched,
     }
-    if lineage.total_items == 0:
+    if evidence["total_items"] == 0:
         return ReleaseGateItem(
             name="content_calendar_lineage",
             status="pass",
             message="No content calendar items are configured for this release.",
             evidence=evidence,
         )
-    if lineage.failed_count:
+    if evidence["failed_count"]:
         return ReleaseGateItem(
             name="content_calendar_lineage",
             status="fail",
@@ -547,7 +551,7 @@ def _content_calendar_lineage_check(
                 "Regenerate release evidence and rerun `contentops release-gate`.",
             ],
         )
-    if lineage.action_required_count:
+    if evidence["action_required_count"]:
         return ReleaseGateItem(
             name="content_calendar_lineage",
             status="warn",

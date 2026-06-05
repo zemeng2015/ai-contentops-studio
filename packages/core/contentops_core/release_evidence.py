@@ -24,6 +24,7 @@ from contentops_core.diagnostics import (
     system_status,
 )
 from contentops_core.jobs import (
+    content_calendar_lineage,
     job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
@@ -95,6 +96,10 @@ def build_release_evidence(
     approval = _latest_release_approval(settings.artifact_root)
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
     content_distribution = _content_distribution_evidence(settings)
+    calendar_lineage = content_calendar_lineage(
+        settings.pipeline_dir,
+        repository.list(limit=max(window_size, 200)),
+    )
     publish_verifications = _publish_verification_evidence(repository, review_service)
     publish_recovery_executions = _publish_recovery_execution_evidence(settings.artifact_root)
     worker_delivery_summaries = _worker_delivery_summary_evidence(
@@ -141,6 +146,7 @@ def build_release_evidence(
         "doctor.json",
         "deployment_check.json",
         "deployment_manifest.json",
+        "content_calendar_lineage.json",
         "content_distribution.json",
         "evidence_manifest.json",
         "homepage_handoffs.json",
@@ -189,6 +195,7 @@ def build_release_evidence(
         deployment_check=preflight,
         homepage_handoffs=homepage_handoffs,
         content_distribution=content_distribution,
+        content_calendar_lineage=calendar_lineage.model_dump(mode="json"),
         publish_verifications=publish_verifications,
         publish_recovery_executions=publish_recovery_executions,
         source_reviews=source_reviews,
@@ -218,6 +225,7 @@ def write_release_evidence(
         "doctor": bundle.doctor.model_dump(mode="json"),
         "deployment_check": bundle.deployment_check.model_dump(mode="json"),
         "deployment_manifest": bundle.deployment_manifest.model_dump(mode="json"),
+        "content_calendar_lineage": bundle.content_calendar_lineage,
         "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),

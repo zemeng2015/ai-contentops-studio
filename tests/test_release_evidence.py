@@ -10,6 +10,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
+    content_calendar_run_request,
     create_scheduled_workflow_review_archive,
     job_execution_dir,
     notify_worker_delivery_summary,
@@ -25,11 +26,17 @@ from contentops_core.models import (
     ArtifactMirrorRecord,
     ReleaseApprovalDecision,
     ReleaseApprovalRequest,
+    RunRecord,
     RunRequest,
+    RunStatus,
 )
 from contentops_core.ops_brief import build_ops_brief
 from contentops_core.release_approvals import approve_release
-from contentops_core.release_evidence import create_release_evidence_archive
+from contentops_core.release_evidence import (
+    build_release_evidence,
+    create_release_evidence_archive,
+    write_release_evidence,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 
@@ -83,6 +90,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
     bundle = generate_release_evidence(output_dir)
 
     expected_files = {
+        "content_calendar_lineage.json",
         "content_distribution.json",
         "doctor.json",
         "deployment_check.json",
@@ -142,6 +150,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     source_reviews = json.loads(
         (output_dir / "source_reviews.json").read_text(encoding="utf-8")
     )
+    content_calendar_lineage = json.loads(
+        (output_dir / "content_calendar_lineage.json").read_text(encoding="utf-8")
+    )
     assert worker_recovery["total_failed_executions"] >= 0
     scheduled_review_packages = json.loads(
         (output_dir / "scheduled_review_packages.json").read_text(encoding="utf-8")
@@ -187,6 +198,10 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert worker_delivery_summaries["total"] == 0
     assert source_reviews["total_runs"] == 0
     assert source_reviews["total_decisions"] == 0
+    assert content_calendar_lineage["total_items"] >= 0
+    assert bundle.content_calendar_lineage["total_items"] == (
+        content_calendar_lineage["total_items"]
+    )
     assert scheduled_review_packages["total"] == 0
     assert bundle.scheduled_review_packages.total == 0
     assert publish_verifications["total"] == 0
@@ -229,6 +244,60 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.worker_delivery_summaries.total == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
+
+
+def test_release_evidence_includes_content_calendar_lineage(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: release-calendar
+jobs:
+  - name: launch-post
+    topic: Launch post for release evidence
+    publish: false
+""",
+        encoding="utf-8",
+    )
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        pipeline_dir=pipeline_dir,
+    )
+    repository = RunRepository(settings.database_url)
+    request = content_calendar_run_request(
+        pipeline_dir,
+        workflow_name="release-calendar",
+        job_name="launch-post",
+    )
+    run = RunRecord.create(request, settings.artifact_root)
+    run.artifact_dir.mkdir(parents=True)
+    (run.artifact_dir / "request.json").write_text(
+        request.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    run.touch(RunStatus.NEEDS_REVIEW)
+    repository.save(run)
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = build_release_evidence(
+        settings=settings,
+        repository=repository,
+        review_service=build_review_service(settings),
+    )
+    write_release_evidence(bundle, output_dir)
+
+    payload = json.loads(
+        (output_dir / "content_calendar_lineage.json").read_text(encoding="utf-8")
+    )
+    assert payload["total_items"] == 1
+    assert payload["tracked_run_count"] == 1
+    assert payload["needs_review_count"] == 1
+    assert payload["items"][0]["latest_run_id"] == run.id
+    assert payload["items"][0]["item_key"] == "release-calendar/launch-post"
+    assert bundle.content_calendar_lineage["tracked_run_count"] == 1
+    assert "content_calendar_lineage.json" in bundle.summary.artifact_files
 
 
 def test_release_evidence_indexes_publish_verification(

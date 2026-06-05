@@ -38,6 +38,8 @@ Expected result:
   normal schedule.
 - `content-calendar-lineage` shows which calendar items have no runs yet, which latest runs need
   review, and which planned publish items still need a publish action.
+- Release evidence stores the same snapshot in `content_calendar_lineage.json`; attach it to
+  campaign release reviews when content plan completeness matters.
 - If `contentops release-gate` reports `content_calendar_lineage=warn`, finish the campaign review
   items that are in scope for the release. If it reports `fail`, recover or rerun failed calendar
   items before deploying.

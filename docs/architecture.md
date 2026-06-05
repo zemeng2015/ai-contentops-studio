@@ -253,6 +253,8 @@ run detail page and artifacts retain lineage back to the content calendar.
 `contentops content-calendar-lineage` and `GET /content-calendar/lineage` read those persisted run
 artifacts and enrich every planned item with run count, latest run id, latest status, published URL,
 action-required state, and the next recommended operator action.
+Release evidence persists the same snapshot as `content_calendar_lineage.json`, making campaign
+state part of the auditable deployment bundle.
 The release gate includes a `content_calendar_lineage` check. Failed latest runs block deployment;
 untouched items, pending review runs, and publish-intent items that have not shipped yet produce a
 warning with remediation steps for campaign review.
