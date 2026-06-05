@@ -416,6 +416,52 @@ def test_release_gate_fails_with_pending_source_reviews(tmp_path: Path) -> None:
     assert report.release_evidence.can_release is False
 
 
+def test_release_gate_fails_when_worker_automation_has_failed_jobs(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    receipt = JobExecutionReport(
+        name="worker-failure-gate",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="failed-provider-job",
+                topic="Worker failure gate",
+                publish=False,
+                status="failed",
+                error="model provider timeout",
+            )
+        ],
+    )
+    write_job_execution_report(receipt, job_execution_dir(settings.artifact_root))
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="worker-failure-sha",
+        require_approval=False,
+    )
+
+    worker_check = next(
+        check for check in report.checks if check.name == "worker_automation_health"
+    )
+    assert report.status == "fail"
+    assert report.can_deploy is False
+    assert worker_check.status == "fail"
+    assert worker_check.evidence["failed_jobs"] == 1
+    assert worker_check.evidence["latest_execution_ids"] == [receipt.execution_id]
+    assert "job-recovery-plan" in worker_check.remediation_steps[1]
+
+
 def test_release_gate_fails_when_scheduled_review_package_verification_fails(
     tmp_path: Path,
 ) -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
 
 from contentops_core.config_audit import config_audit
@@ -46,6 +47,7 @@ def release_gate(
         _content_distribution_check(bundle),
         _scheduled_review_package_check(bundle),
         _retention_archive_governance_check(bundle, review_service),
+        _worker_automation_health_check(bundle),
         _deployment_preflight_check(bundle),
         _integration_smoke_plan_check(bundle),
         _integration_smoke_history_check(bundle),
@@ -158,6 +160,64 @@ def _deployment_preflight_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
                 "Rerun the release gate after the deployment preflight is pass or warn.",
             ]
         ),
+    )
+
+
+def _worker_automation_health_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    alerts = bundle.worker_execution_alerts
+    trend_summary = alerts.get("trend_summary", {})
+    signals = alerts.get("signals", [])
+    severity = str(alerts.get("severity", "info"))
+    action_required = bool(alerts.get("action_required", False))
+    failed_jobs = _int_field(trend_summary, "failed_jobs")
+    failed_executions = _int_field(trend_summary, "action_required")
+    top_failure_reasons = _string_field_list(
+        reason.get("reason")
+        for reason in trend_summary.get("top_failure_reasons", [])
+        if isinstance(reason, dict)
+    )
+    latest_execution_ids = _string_field_list(
+        signal.get("latest_execution_id")
+        for signal in signals
+        if isinstance(signal, dict)
+    )
+    evidence = {
+        "severity": severity,
+        "action_required": action_required,
+        "failed_jobs": failed_jobs,
+        "failed_executions": failed_executions,
+        "latest_execution_ids": latest_execution_ids,
+        "top_failure_reasons": top_failure_reasons,
+    }
+    if severity == "critical" or failed_jobs > 0:
+        return ReleaseGateItem(
+            name="worker_automation_health",
+            status="fail",
+            message="Recent worker automation failures block deployment.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `/dashboard/job-execution-trends` and review worker alert signals.",
+                "Run `contentops job-recovery-plan <execution_id>` for failed worker jobs.",
+                "Rerun failed jobs, regenerate release evidence, and rerun the release gate.",
+            ],
+        )
+    if action_required or severity == "warning" or failed_executions > 0:
+        return ReleaseGateItem(
+            name="worker_automation_health",
+            status="warn",
+            message="Recent worker automation requires operator review.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `/dashboard/job-execution-trends` and review action-required receipts.",
+                "Resolve homepage handoff, delivery summary, or scheduled workflow warnings.",
+                "Record a clean worker execution before the next production deployment.",
+            ],
+        )
+    return ReleaseGateItem(
+        name="worker_automation_health",
+        status="pass",
+        message="Recent worker automation has no release-blocking alerts.",
+        evidence=evidence,
     )
 
 
@@ -722,6 +782,17 @@ def _gate_status(checks: list[ReleaseGateItem]) -> str:
     if any(check.status == "warn" for check in checks):
         return "warn"
     return "pass"
+
+
+def _int_field(payload: object, key: str) -> int:
+    if not isinstance(payload, dict):
+        return 0
+    value = payload.get(key, 0)
+    return value if isinstance(value, int) else 0
+
+
+def _string_field_list(values: Iterable[object]) -> list[str]:
+    return [str(value) for value in values if value]
 
 
 def _deployment_checklist(
