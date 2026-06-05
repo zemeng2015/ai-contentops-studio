@@ -17,6 +17,7 @@ from contentops_core.models import (
     Source,
 )
 from contentops_core.settings import Settings
+from contentops_core.source_audit import audit_sources
 from contentops_providers.openai_generator import OpenAIResponsesGenerator
 from contentops_providers.research import (
     DiscoveryResearchProvider,
@@ -25,6 +26,8 @@ from contentops_providers.research import (
     HybridResearchProvider,
     SearchResearchProvider,
     URLResearchProvider,
+    dedupe_sources,
+    enrich_source,
 )
 from contentops_publishing.homepage import HomepagePublisher
 
@@ -597,6 +600,106 @@ def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch
     assert packet.sources[0].extraction_status == "ok"
     assert packet.sources[0].extraction_quality >= 0.85
     assert packet.sources[0].content_length > 1000
+    assert packet.sources[0].source_type == "web_source"
+    assert packet.sources[0].authority_score > 0.6
+    assert packet.sources[0].relevance_score > 0.3
+
+
+def test_source_intelligence_normalizes_and_merges_duplicate_urls() -> None:
+    sources = dedupe_sources(
+        [
+            Source(
+                title="AWS Bedrock agents",
+                url="https://aws.amazon.com/bedrock/agents/?utm_source=x#top",
+                publisher="aws.amazon.com",
+                summary="Official AWS documentation and product detail for agent workflow systems.",
+                extraction_status="ok",
+                extraction_quality=0.86,
+                content_length=1200,
+            ),
+            Source(
+                title="AWS Bedrock agents copy",
+                url="https://aws.amazon.com/bedrock/agents",
+                publisher="aws.amazon.com",
+                summary="Short copy.",
+                extraction_status="search",
+                extraction_quality=0.45,
+                content_length=80,
+            ),
+        ],
+        topic="AWS agent workflow systems",
+    )
+
+    assert len(sources) == 1
+    assert sources[0].canonical_url == "https://aws.amazon.com/bedrock/agents"
+    assert sources[0].duplicate_count == 2
+    assert sources[0].source_type == "official_docs"
+    assert sources[0].authority_score >= 0.9
+    assert sources[0].relevance_score >= 0.5
+
+
+def test_enrich_source_classifies_repository_and_research_sources() -> None:
+    repo = enrich_source(
+        Source(
+            title="GitHub repository: owner/repo",
+            url="https://github.com/owner/repo",
+            publisher="github",
+            summary="Repository evidence for an AI evaluation workflow.",
+            extraction_status="github_repo",
+            extraction_quality=0.8,
+        ),
+        topic="AI evaluation workflow",
+    )
+    paper = enrich_source(
+        Source(
+            title="Agent evaluation paper",
+            url="https://arxiv.org/abs/2601.00001",
+            publisher="arxiv.org",
+            summary="A research paper about agent evaluation workflows.",
+            extraction_status="ok",
+            extraction_quality=0.82,
+        ),
+        topic="agent evaluation workflow",
+    )
+
+    assert repo.source_type == "repository"
+    assert repo.authority_score >= 0.86
+    assert paper.source_type == "research_paper"
+    assert paper.authority_score >= 0.88
+
+
+def test_source_audit_explains_authority_relevance_and_deduplication() -> None:
+    source = Source(
+        title="AWS Bedrock agents",
+        url="https://aws.amazon.com/bedrock/agents",
+        canonical_url="https://aws.amazon.com/bedrock/agents",
+        publisher="aws.amazon.com",
+        source_type="official_docs",
+        summary="Official AWS agent workflow source.",
+        credibility=0.9,
+        authority_score=0.94,
+        relevance_score=0.2,
+        duplicate_count=2,
+        extraction_status="ok",
+        extraction_quality=0.86,
+        content_length=900,
+    )
+    packet = ResearchPacket(
+        topic="Unrelated topic",
+        sources=[source],
+        claims=[],
+        engineering_signals=[],
+        risks=[],
+        project_implications=[],
+    )
+
+    report = audit_sources(packet)
+    reasons = report.assessments[0].reasons
+
+    assert report.source_count == 1
+    assert any("high-authority" in reason for reason in reasons)
+    assert "Topic relevance is weak." in reasons
+    assert "2 duplicate source records were merged." in reasons
 
 
 def test_url_research_retries_transient_fetch_errors(

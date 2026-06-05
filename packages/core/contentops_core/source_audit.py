@@ -42,9 +42,11 @@ def _source_score(source: Source) -> float:
     content_score = min(source.content_length / 1500, 1.0)
     status_bonus = 0.08 if source.extraction_status in {"ok", "search_enriched"} else 0.0
     score = (
-        source.extraction_quality * 0.5
-        + source.credibility * 0.3
-        + content_score * 0.2
+        source.extraction_quality * 0.35
+        + source.credibility * 0.25
+        + source.authority_score * 0.18
+        + source.relevance_score * 0.12
+        + content_score * 0.1
         + status_bonus
     )
     return min(round(score, 3), 1.0)
@@ -70,6 +72,14 @@ def _source_reasons(source: Source) -> list[str]:
         reasons.append("Search result was enriched with fetched page content.")
     elif source.extraction_status == "feed":
         reasons.append("Source came from feed discovery.")
+    if source.source_type in {"official_docs", "repository", "research_paper"}:
+        reasons.append(f"Source type is high-authority: {source.source_type}.")
+    if source.authority_score < 0.55:
+        reasons.append("Authority score is low.")
+    if source.relevance_score < 0.35:
+        reasons.append("Topic relevance is weak.")
+    if source.duplicate_count > 1:
+        reasons.append(f"{source.duplicate_count} duplicate source records were merged.")
     if source.extraction_quality < 0.55:
         reasons.append("Extraction quality is low.")
     if source.credibility < 0.55:

@@ -29,8 +29,12 @@ class Source(BaseModel):
     url: str | None = None
     canonical_url: str | None = None
     publisher: str = "unknown"
+    source_type: str = "unknown"
     summary: str
     credibility: float = Field(ge=0, le=1, default=0.75)
+    authority_score: float = Field(ge=0, le=1, default=0.5)
+    relevance_score: float = Field(ge=0, le=1, default=0.5)
+    duplicate_count: int = Field(ge=1, default=1)
     extraction_status: str = "synthetic"
     extraction_quality: float = Field(ge=0, le=1, default=0.75)
     content_length: int = Field(ge=0, default=0)

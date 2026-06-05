@@ -252,6 +252,9 @@ activity summaries. The discovery provider is the low-cost recurring path for cu
 operator URLs. These providers let the worker start from a topic, retrieve current entries or
 repository activity, rank or normalize the evidence, deduplicate canonical URLs, and persist the
 discovered sources into `research.json`.
+Each normalized source includes source type, authority score, topic relevance score, canonical URL,
+and duplicate count. `source-audit.json` uses those fields to explain whether the evidence is
+strong enough for publication or needs human review.
 Network-backed research providers share a bounded retry policy for transient timeouts,
 connection errors, `429`, and `5xx` responses so scheduled workers degrade gracefully when an
 upstream source is briefly unavailable.

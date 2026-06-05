@@ -128,7 +128,10 @@ class URLResearchProvider:
         self.retry_backoff_seconds = retry_backoff_seconds
 
     def collect(self, request: RunRequest) -> ResearchPacket:
-        sources = dedupe_sources([self.fetch_source(url) for url in request.source_urls])
+        sources = dedupe_sources(
+            [self.fetch_source(url) for url in request.source_urls],
+            topic=request.topic,
+        )
         claims = [
             Claim(
                 text=f"{source.title} is relevant to {request.topic} because {source.summary}",
@@ -290,7 +293,10 @@ class FeedResearchProvider:
         ][: self.max_sources]
         if not selected:
             selected = scored_entries[: self.max_sources]
-        sources = dedupe_sources([self._entry_to_source(entry) for entry in selected])
+        sources = dedupe_sources(
+            [self._entry_to_source(entry) for entry in selected],
+            topic=request.topic,
+        )
         claims = [
             Claim(
                 text=f"{source.title} is a discovered signal for {request.topic}.",
@@ -453,7 +459,7 @@ class SearchResearchProvider:
     def collect(self, request: RunRequest) -> ResearchPacket:
         results = self._search(request.topic)
         selected = results[: self.max_sources]
-        sources = dedupe_sources(self._sources_from_results(selected))
+        sources = dedupe_sources(self._sources_from_results(selected), topic=request.topic)
         claims = [
             Claim(
                 text=f"{source.title} is a search-discovered source for {request.topic}.",
@@ -622,7 +628,8 @@ class GitHubResearchProvider:
             ]
         else:
             sources = dedupe_sources(
-                [source for repo_ref in refs for source in self._collect_repo_sources(repo_ref)]
+                [source for repo_ref in refs for source in self._collect_repo_sources(repo_ref)],
+                topic=request.topic,
             )
         claims = [
             Claim(
@@ -845,7 +852,10 @@ class DiscoveryResearchProvider:
         packets = [feed_packet, local_packet]
         if url_packet is not None:
             packets.insert(1, url_packet)
-        sources = dedupe_sources([source for packet in packets for source in packet.sources])
+        sources = dedupe_sources(
+            [source for packet in packets for source in packet.sources],
+            topic=request.topic,
+        )
         source_titles = {source.title for source in sources}
         claims = [
             claim
@@ -884,7 +894,7 @@ class HybridResearchProvider:
         if not request.source_urls:
             return local_packet
         url_packet = self.url.collect(request)
-        sources = dedupe_sources(url_packet.sources + local_packet.sources)
+        sources = dedupe_sources(url_packet.sources + local_packet.sources, topic=request.topic)
         source_titles = {source.title for source in sources}
         claims = [
             claim
@@ -1063,17 +1073,152 @@ def _number_value(item: dict[str, object], key: str) -> int:
     return 0
 
 
-def dedupe_sources(sources: list[Source]) -> list[Source]:
+def dedupe_sources(sources: list[Source], topic: str = "") -> list[Source]:
     by_key: dict[str, Source] = {}
     for source in sources:
+        source = enrich_source(source, topic=topic)
         key = source.canonical_url or _normalize_url(source.url)
         if not key:
             key = f"{source.publisher}:{source.title}".lower()
         existing = by_key.get(key)
-        if existing is None or _source_rank(source) > _source_rank(existing):
+        if existing is None:
             by_key[key] = source.model_copy(update={"canonical_url": key if source.url else None})
+            continue
+        duplicate_count = existing.duplicate_count + source.duplicate_count
+        if _source_rank(source) > _source_rank(existing):
+            by_key[key] = source.model_copy(
+                update={
+                    "canonical_url": key if source.url else None,
+                    "duplicate_count": duplicate_count,
+                }
+            )
+        else:
+            by_key[key] = existing.model_copy(update={"duplicate_count": duplicate_count})
     return list(by_key.values())
 
 
-def _source_rank(source: Source) -> tuple[float, float, int]:
-    return (source.extraction_quality, source.credibility, source.content_length)
+def enrich_source(source: Source, topic: str = "") -> Source:
+    publisher = source.publisher
+    if publisher in {"unknown", "web"} and source.url:
+        publisher = _publisher_from_url(source.url)
+    source_type = _source_type(source, publisher)
+    authority_score = _authority_score(source, publisher, source_type)
+    relevance_score = _relevance_score(source, topic)
+    credibility = _credibility_score(source, authority_score, relevance_score)
+    canonical_url = source.canonical_url or _normalize_url(source.url)
+    return source.model_copy(
+        update={
+            "canonical_url": canonical_url,
+            "publisher": publisher,
+            "source_type": source_type,
+            "authority_score": authority_score,
+            "relevance_score": relevance_score,
+            "credibility": credibility,
+        }
+    )
+
+
+def _source_rank(source: Source) -> tuple[int, int, float, float, float, float, int]:
+    return (
+        _status_rank(source.extraction_status),
+        _type_rank(source.source_type),
+        source.extraction_quality,
+        source.authority_score,
+        source.relevance_score,
+        source.credibility,
+        source.content_length,
+    )
+
+
+def _status_rank(status: str) -> int:
+    if status in {"ok", "search_enriched", "github_repo", "github_readme"}:
+        return 3
+    if status.startswith("github_") or status == "feed":
+        return 2
+    if status in {"search", "synthetic"}:
+        return 1
+    return 0
+
+
+def _type_rank(source_type: str) -> int:
+    ranks = {
+        "official_docs": 7,
+        "repository": 6,
+        "research_paper": 6,
+        "engineering_blog": 5,
+        "web_source": 4,
+        "web_discovery": 3,
+        "operator_context": 2,
+        "local_context": 1,
+    }
+    return ranks.get(source_type, 0)
+
+
+def _source_type(source: Source, publisher: str) -> str:
+    status = source.extraction_status
+    canonical_url = source.canonical_url or _normalize_url(source.url) or ""
+    if publisher in {"contentops-local", "user-input", "operator"}:
+        return "operator_context" if publisher != "contentops-local" else "local_context"
+    if status.startswith("github") or "github.com" in canonical_url:
+        return "repository"
+    if "arxiv.org" in canonical_url or "doi.org" in canonical_url:
+        return "research_paper"
+    if "/docs" in canonical_url or publisher in {
+        "aws.amazon.com",
+        "docs.aws.amazon.com",
+        "docs.github.com",
+        "openai.com",
+        "platform.openai.com",
+    }:
+        return "official_docs"
+    if "blog" in canonical_url or publisher.startswith(("engineering.", "developer.")):
+        return "engineering_blog"
+    if status == "feed" or status == "search":
+        return "web_discovery"
+    return "web_source"
+
+
+def _authority_score(source: Source, publisher: str, source_type: str) -> float:
+    base_scores = {
+        "official_docs": 0.92,
+        "repository": 0.86,
+        "research_paper": 0.88,
+        "engineering_blog": 0.78,
+        "operator_context": 0.82,
+        "local_context": 0.76,
+        "web_discovery": 0.64,
+        "web_source": 0.62,
+    }
+    score = base_scores.get(source_type, 0.55)
+    if source.extraction_status == "failed":
+        score = min(score, 0.3)
+    if source.url and source.url.startswith("https://"):
+        score += 0.04
+    if publisher.endswith((".gov", ".edu")):
+        score += 0.08
+    return min(round(score, 3), 1.0)
+
+
+def _relevance_score(source: Source, topic: str) -> float:
+    text = f"{source.title} {source.summary}".casefold()
+    topic_terms = [term for term in re.split(r"\W+", topic.casefold()) if len(term) >= 4]
+    if not topic_terms:
+        return 0.5
+    matched = sum(1 for term in set(topic_terms) if term in text)
+    base = matched / len(set(topic_terms))
+    ai_terms = {"agent", "eval", "llm", "model", "observability", "rag", "workflow"}
+    ai_bonus = min(sum(1 for term in ai_terms if term in text) * 0.04, 0.16)
+    summary_bonus = 0.08 if len(source.summary) >= 120 else 0.0
+    return min(round(base * 0.78 + ai_bonus + summary_bonus, 3), 1.0)
+
+
+def _credibility_score(source: Source, authority_score: float, relevance_score: float) -> float:
+    if source.extraction_status == "failed":
+        return min(source.credibility, 0.3)
+    score = (
+        source.credibility * 0.35
+        + authority_score * 0.35
+        + relevance_score * 0.15
+        + source.extraction_quality * 0.15
+    )
+    return min(round(score, 3), 1.0)

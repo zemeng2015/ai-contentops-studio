@@ -304,6 +304,9 @@ CONTENTOPS_RESEARCH_GITHUB_TOKEN=...
 Then pass repository URLs in `source_urls`, for example `https://github.com/owner/repo`.
 The provider collects repository metadata, README text, open issues, and open pull requests as
 reviewable research sources.
+Research providers normalize canonical URLs, merge duplicates, classify source types, and attach
+authority/relevance scores so `research.json` and `source-audit.json` explain why a source is
+strong, weak, or needs reviewer spot-checking.
 
 Use S3 artifact mirroring:
 

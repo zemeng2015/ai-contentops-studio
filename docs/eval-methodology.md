@@ -7,7 +7,8 @@ Current scores:
 
 - `groundedness`: generated claims reference known source titles
 - `source_coverage`: generated article uses available sources
-- `source_quality`: extracted sources have usable titles, summaries, and readable content
+- `source_quality`: extracted sources have usable titles, summaries, readable content,
+  source-type classification, authority scoring, topic relevance scoring, and duplicate handling
 - `career_relevance`: article connects to Zack's target AI engineering positioning
 - `technical_depth`: article contains architecture and workflow concepts
 - `publish_ready`: all score dimensions meet the configured threshold
