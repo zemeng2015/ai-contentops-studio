@@ -250,6 +250,10 @@ GitHub Actions workflow. It runs `contentops worker-job-readiness --json`, worke
 worker executions, alert notification, and artifact upload for the daily and weekly YAML calendars.
 Use `workflow_dispatch` with `dry_run_only=true` for the first runs, then add repository secrets
 for live providers and notifications before relying on scheduled executions.
+When a reviewer should explicitly triage a run, dispatch the workflow with
+`create_review_issue=true`. The workflow uses the repository `GITHUB_TOKEN` with `issues: write` to
+open a review issue containing the scheduled summary and the Actions run URL. Keep that switch off
+for unattended schedules unless the team wants every run to become a tracked review item.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes

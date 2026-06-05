@@ -73,6 +73,8 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
 
     assert "name: Scheduled ContentOps" in workflow
     assert "workflow_dispatch:" in workflow
+    assert "create_review_issue" in workflow
+    assert "issues: write" in workflow
     assert 'cron: "0 0 * * *"' in workflow
     assert 'cron: "30 0 * * 1"' in workflow
     assert "contentops worker-job-readiness --json" in workflow
@@ -84,6 +86,9 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "contentops scheduled-workflow-summary" in workflow
     assert "GITHUB_STEP_SUMMARY" in workflow
     assert "scheduled-worker/daily-review.md" in workflow
+    assert "gh issue create" in workflow
+    assert "daily-review-issue.md" in workflow
+    assert "project-updates-review-issue.md" in workflow
     assert "actions/upload-artifact@v7" in workflow
     assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in workflow
 

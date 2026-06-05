@@ -53,6 +53,9 @@ For GitHub-hosted automation, use the `Scheduled ContentOps` workflow. It runs d
 be started manually with `workflow_dispatch`. Keep `dry_run_only=true` until repository secrets are
 configured and the uploaded `scheduled-contentops-*` artifacts show the expected receipts, release
 evidence, and alert notification log.
+For a manual review loop, set `create_review_issue=true` on the workflow dispatch. The workflow
+creates a GitHub issue with the same review packet shown in the Actions step summary plus a link to
+the run, giving reviewers a durable place to approve follow-up work or request changes.
 
 For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
 durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs

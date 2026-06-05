@@ -20,6 +20,11 @@ on:
         required: true
         default: true
         type: boolean
+      create_review_issue:
+        description: "Create a GitHub issue with the workflow review packet"
+        required: true
+        default: false
+        type: boolean
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -34,6 +39,7 @@ env:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   daily-ai-roundup:
@@ -79,6 +85,19 @@ jobs:
             --limit 5 \
             --output scheduled-worker/daily-review.md
           cat scheduled-worker/daily-review.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Create review issue
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            cat scheduled-worker/daily-review.md
+          } > scheduled-worker/daily-review-issue.md
+          gh issue create \
+            --title "Scheduled ContentOps review: daily AI roundup #${GITHUB_RUN_NUMBER}" \
+            --body-file scheduled-worker/daily-review-issue.md
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -132,6 +151,19 @@ jobs:
             --limit 5 \
             --output scheduled-worker/project-updates-review.md
           cat scheduled-worker/project-updates-review.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Create review issue
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            cat scheduled-worker/project-updates-review.md
+          } > scheduled-worker/project-updates-review-issue.md
+          gh issue create \
+            --title "Scheduled ContentOps review: project updates #${GITHUB_RUN_NUMBER}" \
+            --body-file scheduled-worker/project-updates-review-issue.md
       - uses: actions/upload-artifact@v7
         if: always()
         with:
