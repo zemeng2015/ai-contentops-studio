@@ -20,7 +20,7 @@ from contentops_core.artifacts import (
     mirror_files_to_s3,
     write_s3_mirror_log,
 )
-from contentops_core.models import IncidentSeverity, RunRequest, RunStatus
+from contentops_core.models import ArtifactMirrorRecord, IncidentSeverity, RunRequest, RunStatus
 from contentops_core.pipeline import ContentOpsPipeline
 
 
@@ -1310,6 +1310,22 @@ def get_scheduled_workflow_review_package(
         if item.id == package_id:
             return item
     raise FileNotFoundError(f"Scheduled review package not found: {package_id}")
+
+
+def scheduled_workflow_review_package_s3_mirror_log(
+    artifact_root: Path,
+    package_id: str,
+) -> list[ArtifactMirrorRecord]:
+    item = get_scheduled_workflow_review_package(artifact_root, package_id)
+    if not item.s3_mirror_log_path:
+        raise FileNotFoundError(f"S3 mirror log not found for scheduled review: {package_id}")
+    path = Path(item.s3_mirror_log_path)
+    if not path.exists():
+        raise FileNotFoundError(f"S3 mirror log not found: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, list):
+        raise ValueError(f"S3 mirror log is invalid: {path}")
+    return [ArtifactMirrorRecord.model_validate(record) for record in payload]
 
 
 def _scheduled_review_manifest_paths(artifact_root: Path) -> list[Path]:

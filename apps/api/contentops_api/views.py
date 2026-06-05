@@ -448,7 +448,7 @@ def _scheduled_review_packages_html(
           <td>{item.artifact_count}</td>
           <td>{str(item.action_required).lower()}</td>
           <td>{escape(str(item.archive_size_bytes))}</td>
-          <td>{escape(item.s3_mirror_status)}</td>
+          <td>{_scheduled_review_s3_mirror_cell(item)}</td>
           <td>{_scheduled_review_archive_link(item)}</td>
           <td>{_scheduled_review_archive_action(item, api_key)}</td>
           <td>{escape(item.updated_at.isoformat() if item.updated_at else "n/a")}</td>
@@ -477,6 +477,15 @@ def _scheduled_review_archive_link(item: ScheduledWorkflowReviewPackageItem) -> 
     return (
         f'<a href="/scheduled-reviews/{escape(item.id)}/archive">'
         f"{escape(item.archive_path or 'download zip')}</a>"
+    )
+
+
+def _scheduled_review_s3_mirror_cell(item: ScheduledWorkflowReviewPackageItem) -> str:
+    if not item.s3_mirror_log_path:
+        return escape(item.s3_mirror_status)
+    return (
+        f"{escape(item.s3_mirror_status)} "
+        f'<a href="/scheduled-reviews/{escape(item.id)}/s3-mirror-log">log</a>'
     )
 
 

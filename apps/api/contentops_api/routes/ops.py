@@ -41,10 +41,12 @@ from contentops_core.jobs import (
     list_worker_job_catalog,
     notify_job_execution_alert,
     notify_worker_delivery_summary,
+    scheduled_workflow_review_package_s3_mirror_log,
     worker_delivery_summary_notification_log,
     worker_job_readiness,
 )
 from contentops_core.models import (
+    ArtifactMirrorRecord,
     AuditEventListResponse,
     ConfigAuditReport,
     CostReportListResponse,
@@ -354,6 +356,24 @@ def build_ops_router(
             media_type="application/zip",
             filename=archive_path.name,
         )
+
+    @router.get(
+        "/scheduled-reviews/{package_id}/s3-mirror-log",
+        response_model=list[ArtifactMirrorRecord],
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_scheduled_review_s3_mirror_log(
+        package_id: str,
+    ) -> list[ArtifactMirrorRecord]:
+        try:
+            return scheduled_workflow_review_package_s3_mirror_log(
+                settings.artifact_root,
+                package_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @router.post(
         "/scheduled-reviews/{package_id}/archive",

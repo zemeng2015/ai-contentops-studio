@@ -23,7 +23,7 @@ from contentops_core.jobs import (
     write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
-from contentops_core.models import RunStatus
+from contentops_core.models import ArtifactMirrorRecord, RunStatus
 from contentops_core.release_gate import release_gate, write_release_gate_report
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -883,6 +883,22 @@ def test_scheduled_review_package_endpoints_and_dashboard(tmp_path: Path) -> Non
             archive_report.model_dump_json(indent=2),
             encoding="utf-8",
         )
+        (scheduled_dir / "s3-mirror-log.json").write_text(
+            json.dumps(
+                [
+                    ArtifactMirrorRecord(
+                        run_id="scheduled-reviews/api-package",
+                        artifact_name="daily-review-package.zip",
+                        provider="s3",
+                        bucket="contentops-artifacts",
+                        key="contentops-artifacts/scheduled-reviews/api-package.zip",
+                        content_type="application/zip",
+                        status="mirrored",
+                    ).model_dump(mode="json")
+                ]
+            ),
+            encoding="utf-8",
+        )
 
         list_response = client.get("/scheduled-reviews")
         dashboard_response = client.get("/dashboard")
@@ -897,6 +913,7 @@ def test_scheduled_review_package_endpoints_and_dashboard(tmp_path: Path) -> Non
         assert item["archive_exists"] is True
         assert item["archive_sha256"] == archive_report.archive_sha256
         archive_response = client.get(f"/scheduled-reviews/{item['id']}/archive")
+        mirror_log_response = client.get(f"/scheduled-reviews/{item['id']}/s3-mirror-log")
         rebuild_response = client.post(f"/scheduled-reviews/{item['id']}/archive")
         dashboard_rebuild_response = client.post(
             f"/dashboard/scheduled-reviews/{item['id']}/archive",
@@ -904,6 +921,8 @@ def test_scheduled_review_package_endpoints_and_dashboard(tmp_path: Path) -> Non
         )
         assert archive_response.status_code == 200
         assert archive_response.headers["content-type"] == "application/zip"
+        assert mirror_log_response.status_code == 200
+        assert mirror_log_response.json()[0]["artifact_name"] == "daily-review-package.zip"
         assert rebuild_response.status_code == 200
         assert rebuild_response.json()["status"] == "archived"
         assert dashboard_rebuild_response.status_code == 303
@@ -914,6 +933,7 @@ def test_scheduled_review_package_endpoints_and_dashboard(tmp_path: Path) -> Non
         assert dashboard_packages_response.status_code == 200
         assert "Archives ready" in dashboard_packages_response.text
         assert "daily-review-package.zip" in dashboard_packages_response.text
+        assert f"/scheduled-reviews/{item['id']}/s3-mirror-log" in dashboard_packages_response.text
         assert "Rebuild archive" in dashboard_packages_response.text
     finally:
         settings.artifact_root = original_artifact_root
