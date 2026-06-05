@@ -1211,6 +1211,8 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
                     "Open packages",
                     f"/dashboard/scheduled-reviews/{escape(package.id)}/archive",
                     "Rebuild package",
+                    operation_receipt_url="/dashboard/scheduled-reviews",
+                    operation_receipt_label="View package receipts",
                 )
             )
         remaining = bundle.scheduled_review_packages.action_required_count - len(
@@ -1243,12 +1245,21 @@ def _release_risk_operation_cell(item: dict[str, str], api_key: str) -> str:
     operation_label = item.get("operation_label")
     if not operation_url or not operation_label:
         return '<span class="muted">Use evidence link</span>'
+    receipt_url = item.get("operation_receipt_url")
+    receipt_link = ""
+    if receipt_url:
+        receipt_label = item.get("operation_receipt_label") or "View receipts"
+        receipt_link = (
+            f'<div><a href="{escape(receipt_url)}{_api_key_query(api_key)}">'
+            f"{escape(receipt_label)}</a></div>"
+        )
     return f"""
       <form method="post" action="{escape(operation_url)}{_api_key_query(api_key)}">
         {_api_key_hidden(api_key)}
         {_release_risk_operation_hidden_inputs(item)}
         <button type="submit">{escape(operation_label)}</button>
       </form>
+      {receipt_link}
     """
 
 
@@ -1271,6 +1282,8 @@ def _release_risk_item(
     operation_label: str = "",
     operation_hidden_name: str = "",
     operation_hidden_value: str = "",
+    operation_receipt_url: str = "",
+    operation_receipt_label: str = "",
 ) -> dict[str, str]:
     return {
         "area": area,
@@ -1283,6 +1296,8 @@ def _release_risk_item(
         "operation_label": operation_label,
         "operation_hidden_name": operation_hidden_name,
         "operation_hidden_value": operation_hidden_value,
+        "operation_receipt_url": operation_receipt_url,
+        "operation_receipt_label": operation_receipt_label,
     }
 
 
@@ -1355,6 +1370,8 @@ def _append_worker_risks(
                 "Notify worker alert",
                 "days",
                 "14",
+                operation_receipt_url="/dashboard/job-execution-trends",
+                operation_receipt_label="View alert receipts",
             )
         )
     unrecovered = _release_payload_int(worker_recovery, "unrecovered_execution_count")

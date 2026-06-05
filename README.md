@@ -274,6 +274,8 @@ Each risk links back to the relevant evidence section or operations dashboard so
 from summary to investigation without searching the bundle by hand.
 When a safe dashboard action already exists, the summary renders the protected operation directly,
 such as notifying worker alerts or rebuilding scheduled review packages.
+Operation rows also link to the matching receipt view, so release reviewers can verify that the
+action was delivered or that the package archive was rebuilt.
 `config-audit` exposes a redacted runtime and secret posture report, so production operators can
 verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or

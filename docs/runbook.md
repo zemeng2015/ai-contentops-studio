@@ -49,6 +49,8 @@ Expected result:
   behind the signal, then return to the summary before recording a release approval.
 - Use the risk row's operation button when it is present. These buttons reuse protected dashboard
   actions, such as worker alert notification and scheduled review package archive rebuilds.
+- After using an operation button, follow the receipt link in the same row to confirm the
+  notification delivery or regenerated package evidence before approving the release.
 - If `contentops release-gate` reports `content_calendar_lineage=warn`, finish the campaign review
   items that are in scope for the release. If it reports `fail`, recover or rerun failed calendar
   items before deploying.

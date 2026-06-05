@@ -1649,6 +1649,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert 'href="/dashboard/job-execution-trends"' in response.text
     assert "Notify worker alert" in response.text
     assert 'name="days" value="14"' in response.text
+    assert "View alert receipts" in response.text
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
