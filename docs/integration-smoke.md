@@ -36,6 +36,13 @@ duration, missing environment variables, and stdout/stderr tails. Use `--dry-run
 planned commands without executing pytest, or `--force` to run pytest even when the planner sees
 missing environment variables.
 
+GitHub Actions includes a manual `Integration Smoke` workflow. It defaults to dry-run mode and
+uploads `plan.json`, `report.json`, and the command stdout as workflow artifacts. To run live
+provider checks from GitHub, add repository secrets named `CONTENTOPS_OPENAI_API_KEY` and
+`CONTENTOPS_RESEARCH_SEARCH_API_KEY`, then trigger the workflow with `dry_run=false`. If a runner
+has access to a checked-out homepage repository, set the repository variable
+`CONTENTOPS_HOMEPAGE_REPO_PATH` before selecting the `homepage` smoke check.
+
 Environment variables:
 
 - `CONTENTOPS_RUN_INTEGRATION=1`: required opt-in flag for every live smoke test

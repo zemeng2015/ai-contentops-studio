@@ -1,0 +1,75 @@
+name: Integration Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      selector:
+        description: "Optional comma-separated smoke selectors: feed,search,openai,homepage"
+        required: false
+        default: ""
+      dry_run:
+        description: "Plan commands without executing pytest"
+        required: true
+        type: boolean
+        default: true
+      force:
+        description: "Run pytest even when the planner sees missing environment variables"
+        required: true
+        type: boolean
+        default: false
+      python_version:
+        description: "Python version"
+        required: true
+        default: "3.13"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  CONTENTOPS_OPENAI_API_KEY: ${{ secrets.CONTENTOPS_OPENAI_API_KEY }}
+  CONTENTOPS_RESEARCH_SEARCH_API_KEY: ${{ secrets.CONTENTOPS_RESEARCH_SEARCH_API_KEY }}
+  CONTENTOPS_HOMEPAGE_REPO_PATH: ${{ vars.CONTENTOPS_HOMEPAGE_REPO_PATH }}
+  CONTENTOPS_RUN_INTEGRATION: ${{ inputs.dry_run && '0' || '1' }}
+
+permissions:
+  contents: read
+
+jobs:
+  integration-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Plan live provider smoke tests
+        run: |
+          mkdir -p artifacts/integration-smoke
+          contentops integration-smoke-plan --json > artifacts/integration-smoke/plan.json
+      - name: Run selected smoke tests
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/integration-smoke
+          cmd=(contentops integration-smoke-run --output artifacts/integration-smoke/report.json --json)
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            cmd+=(--dry-run)
+          fi
+          if [ "${{ inputs.force }}" = "true" ]; then
+            cmd+=(--force)
+          fi
+          if [ -n "${{ inputs.selector }}" ]; then
+            IFS=',' read -ra selectors <<< "${{ inputs.selector }}"
+            for selector in "${selectors[@]}"; do
+              selector="${selector//[[:space:]]/}"
+              if [ -n "$selector" ]; then
+                cmd+=(--selector "$selector")
+              fi
+            done
+          fi
+          "${cmd[@]}" | tee artifacts/integration-smoke/report.stdout.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: integration-smoke
+          path: artifacts/integration-smoke/*.json

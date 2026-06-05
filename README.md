@@ -260,6 +260,8 @@ the exact pytest selector for each provider path.
 Use `contentops integration-smoke-run --output artifacts/integration-smoke/report.json --json`
 after setting live credentials to execute those provider checks and keep a JSON evidence report
 with per-provider exit codes and output tails.
+The manual GitHub Actions `Integration Smoke` workflow runs the same command in dry-run mode by
+default and can be switched to live provider validation once repository secrets are configured.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.
