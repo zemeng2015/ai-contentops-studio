@@ -60,7 +60,9 @@ Postgres metadata database, database URL secret, ECS task definitions, scheduled
 EventBridge Scheduler rule, log groups, log-derived metrics, CloudWatch alarms, an operations
 dashboard, and scheduler group needed for the first production deployment shape.
 It also includes disabled-by-default scheduled tasks for worker alerts, operations briefs, release
-gates, and retention archive creation so operational checks can be enabled gradually.
+gates, and retention archive creation so operational checks can be enabled gradually. Scheduler
+targets share an encrypted SQS dead-letter queue and DLQ depth alarm, which gives missed ECS task
+invocations a concrete recovery path instead of relying only on log discovery.
 
 ## Provider environment variables
 
@@ -271,6 +273,11 @@ terraform apply \
   -var='worker_schedule_enabled=true' \
   -var='worker_schedule_expression=cron(0 13 * * ? *)'
 ```
+
+If a scheduled invocation fails before ECS starts the task, inspect the Terraform
+`scheduler_dlq_url` output and the `scheduler_dlq_alarm_name` CloudWatch alarm. The DLQ retains
+failed invocation payloads so operators can distinguish IAM, subnet, ECS capacity, and task
+definition failures from application-level worker errors.
 
 For repository-hosted automation before a full AWS rollout, enable the `Scheduled ContentOps`
 GitHub Actions workflow. It runs `contentops worker-job-readiness --json`, worker dry-runs, live

@@ -73,6 +73,16 @@ output "retention_archive_schedule_arn" {
   value       = aws_scheduler_schedule.retention_archive.arn
 }
 
+output "scheduler_dlq_url" {
+  description = "SQS dead-letter queue URL for failed EventBridge Scheduler invocations."
+  value       = aws_sqs_queue.scheduler_dlq.url
+}
+
+output "scheduler_dlq_arn" {
+  description = "SQS dead-letter queue ARN for failed EventBridge Scheduler invocations."
+  value       = aws_sqs_queue.scheduler_dlq.arn
+}
+
 output "operations_dashboard_name" {
   description = "CloudWatch dashboard for ContentOps operations."
   value       = aws_cloudwatch_dashboard.operations.dashboard_name
@@ -86,4 +96,9 @@ output "api_error_alarm_name" {
 output "worker_failure_alarm_name" {
   description = "CloudWatch alarm for scheduled worker failures."
   value       = aws_cloudwatch_metric_alarm.worker_failures.alarm_name
+}
+
+output "scheduler_dlq_alarm_name" {
+  description = "CloudWatch alarm for EventBridge Scheduler DLQ messages."
+  value       = aws_cloudwatch_metric_alarm.scheduler_dlq_messages.alarm_name
 }

@@ -333,7 +333,9 @@ default so deployments can validate networking, RDS connectivity, and publishing
 before recurring content generation is turned on.
 The same Terraform layer provisions disabled-by-default schedules for worker alerts, operations
 brief delivery, release gates, and retention archive creation, keeping operational automation
-explicit until the artifact bucket and metadata database are ready.
+explicit until the artifact bucket and metadata database are ready. Every scheduler target points
+to an encrypted SQS dead-letter queue, and the operations dashboard tracks DLQ depth so failed ECS
+invocations remain inspectable after EventBridge retries are exhausted.
 
 ## Stage 2 provider boundaries
 

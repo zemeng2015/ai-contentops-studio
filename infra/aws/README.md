@@ -35,6 +35,7 @@ before Terraform or CDK resources are added.
 - CloudWatch log metric filters for API errors and worker failures
 - CloudWatch alarms for API errors, worker failures, and high RDS connections
 - CloudWatch operations dashboard for errors, ECS resources, RDS health, and recent failure logs
+- EventBridge Scheduler dead-letter queue with a CloudWatch alarm for failed invocations
 - EventBridge Scheduler recurring worker run, worker alert notification check, operations brief
   notification check, release gate check, and retention archive creation
 
@@ -55,6 +56,9 @@ terraform plan \
 
 The recurring worker schedule is disabled by default. Set `worker_schedule_enabled=true` after the
 image, networking, RDS metadata store, and publishing target are ready.
+All EventBridge Scheduler targets share an encrypted SQS dead-letter queue exposed as
+`scheduler_dlq_url`. Inspect that queue when a schedule fails to invoke ECS, and wire
+`scheduler_dlq_alarm_name` to `alarm_actions` so missed automations can page operators.
 The worker alert notifier schedule is also disabled by default. Set
 `worker_alert_schedule_enabled=true` after the worker has produced receipts in S3 and
 `notification_webhook_url_secret_arn` is configured when external delivery is required. The notifier

@@ -123,6 +123,27 @@ resource "aws_cloudwatch_metric_alarm" "database_connections" {
   tags = local.tags
 }
 
+resource "aws_cloudwatch_metric_alarm" "scheduler_dlq_messages" {
+  alarm_name          = "${local.name}-scheduler-dlq-messages"
+  alarm_description   = "EventBridge Scheduler failed invocations are waiting in the DLQ."
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = var.alarm_evaluation_periods
+  threshold           = var.scheduler_dlq_alarm_threshold
+  period              = var.alarm_period_seconds
+  statistic           = "Sum"
+  namespace           = "AWS/SQS"
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = var.alarm_actions
+  ok_actions          = var.alarm_actions
+
+  dimensions = {
+    QueueName = aws_sqs_queue.scheduler_dlq.name
+  }
+
+  tags = local.tags
+}
+
 resource "random_password" "db" {
   length  = 32
   special = false
@@ -743,6 +764,14 @@ resource "aws_scheduler_schedule_group" "contentops" {
   tags = local.tags
 }
 
+resource "aws_sqs_queue" "scheduler_dlq" {
+  name                       = "${local.name}-scheduler-dlq"
+  message_retention_seconds  = var.scheduler_dlq_message_retention_seconds
+  sqs_managed_sse_enabled    = true
+  visibility_timeout_seconds = 60
+  tags                       = local.tags
+}
+
 resource "aws_iam_role" "scheduler" {
   name = "${local.name}-scheduler"
   assume_role_policy = jsonencode({
@@ -786,6 +815,13 @@ resource "aws_iam_role_policy" "scheduler_run_worker" {
           aws_iam_role.task.arn,
           aws_iam_role.task_execution.arn
         ]
+      },
+      {
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Effect   = "Allow"
+        Resource = aws_sqs_queue.scheduler_dlq.arn
       }
     ]
   })
@@ -805,6 +841,10 @@ resource "aws_scheduler_schedule" "daily_worker" {
   target {
     arn      = aws_ecs_cluster.main.arn
     role_arn = aws_iam_role.scheduler.arn
+
+    dead_letter_config {
+      arn = aws_sqs_queue.scheduler_dlq.arn
+    }
 
     ecs_parameters {
       launch_type         = "FARGATE"
@@ -835,6 +875,10 @@ resource "aws_scheduler_schedule" "worker_alert_notifier" {
     arn      = aws_ecs_cluster.main.arn
     role_arn = aws_iam_role.scheduler.arn
 
+    dead_letter_config {
+      arn = aws_sqs_queue.scheduler_dlq.arn
+    }
+
     ecs_parameters {
       launch_type         = "FARGATE"
       task_count          = 1
@@ -863,6 +907,10 @@ resource "aws_scheduler_schedule" "ops_brief_notifier" {
   target {
     arn      = aws_ecs_cluster.main.arn
     role_arn = aws_iam_role.scheduler.arn
+
+    dead_letter_config {
+      arn = aws_sqs_queue.scheduler_dlq.arn
+    }
 
     ecs_parameters {
       launch_type         = "FARGATE"
@@ -893,6 +941,10 @@ resource "aws_scheduler_schedule" "release_gate" {
     arn      = aws_ecs_cluster.main.arn
     role_arn = aws_iam_role.scheduler.arn
 
+    dead_letter_config {
+      arn = aws_sqs_queue.scheduler_dlq.arn
+    }
+
     ecs_parameters {
       launch_type         = "FARGATE"
       task_count          = 1
@@ -921,6 +973,10 @@ resource "aws_scheduler_schedule" "retention_archive" {
   target {
     arn      = aws_ecs_cluster.main.arn
     role_arn = aws_iam_role.scheduler.arn
+
+    dead_letter_config {
+      arn = aws_sqs_queue.scheduler_dlq.arn
+    }
 
     ecs_parameters {
       launch_type         = "FARGATE"
@@ -993,7 +1049,7 @@ resource "aws_cloudwatch_dashboard" "operations" {
         type   = "metric"
         x      = 0
         y      = 8
-        width  = 12
+        width  = 8
         height = 6
         properties = {
           title   = "ECS API task resources"
@@ -1009,9 +1065,9 @@ resource "aws_cloudwatch_dashboard" "operations" {
       },
       {
         type   = "metric"
-        x      = 12
+        x      = 8
         y      = 8
-        width  = 12
+        width  = 8
         height = 6
         properties = {
           title   = "ECS worker task resources"
@@ -1027,6 +1083,24 @@ resource "aws_cloudwatch_dashboard" "operations" {
             [".", "MemoryUtilization", ".", ".", ".", "."]
           ]
           period = 300
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 8
+        width  = 8
+        height = 6
+        properties = {
+          title   = "Scheduler DLQ depth"
+          region  = var.aws_region
+          view    = "timeSeries"
+          stacked = false
+          metrics = [
+            ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.scheduler_dlq.name],
+            [".", "ApproximateAgeOfOldestMessage", ".", "."]
+          ]
+          period = var.alarm_period_seconds
         }
       },
       {

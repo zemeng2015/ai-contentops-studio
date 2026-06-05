@@ -17,6 +17,11 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "aws_cloudwatch_log_metric_filter" in main
     assert "aws_cloudwatch_metric_alarm" in main
     assert "aws_cloudwatch_dashboard" in main
+    assert "aws_sqs_queue" in main
+    assert "scheduler_dlq" in main
+    assert "dead_letter_config" in main
+    assert "sqs:SendMessage" in main
+    assert "ApproximateNumberOfMessagesVisible" in main
     assert "aws_scheduler_schedule_group" in main
     assert "aws_scheduler_schedule" in main
     assert "ecs:RunTask" in main
@@ -55,6 +60,10 @@ def test_terraform_skeleton_contains_core_resources() -> None:
     assert "ops_brief_schedule_enabled" in variables
     assert "ops_brief_notifier_schedule_arn" in outputs
     assert "ops_brief_notifier_task_definition_arn" in outputs
+    assert "scheduler_dlq_message_retention_seconds" in variables
+    assert "scheduler_dlq_alarm_threshold" in variables
+    assert "scheduler_dlq_url" in outputs
+    assert "scheduler_dlq_alarm_name" in outputs
     assert "var.research_provider" in main
     assert "CONTENTOPS_RUN_MIGRATIONS" in main
     assert "CONTENTOPS_REQUIRE_READ_API_KEY" in main
@@ -224,3 +233,15 @@ def test_aws_docs_describe_retention_archive_schedule() -> None:
     assert "contentops retention-archive" in deployment
     assert "retention_archive_schedule_expression" in deployment
     assert "retention_archives.json" in aws_readme
+
+
+def test_aws_docs_describe_scheduler_dead_letter_queue() -> None:
+    aws_readme = Path("infra/aws/README.md").read_text(encoding="utf-8")
+    deployment = Path("docs/deployment.md").read_text(encoding="utf-8")
+    architecture = Path("docs/architecture.md").read_text(encoding="utf-8")
+
+    assert "EventBridge Scheduler dead-letter queue" in aws_readme
+    assert "scheduler_dlq_url" in aws_readme
+    assert "scheduler_dlq_alarm_name" in deployment
+    assert "failed invocation payloads" in deployment
+    assert "dead-letter queue" in architecture

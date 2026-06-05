@@ -265,6 +265,18 @@ variable "alarm_actions" {
   default     = []
 }
 
+variable "scheduler_dlq_message_retention_seconds" {
+  description = "Seconds that failed EventBridge Scheduler invocations remain in the dead-letter queue."
+  type        = number
+  default     = 1209600
+}
+
+variable "scheduler_dlq_alarm_threshold" {
+  description = "Visible messages in the scheduler dead-letter queue that trigger an alarm."
+  type        = number
+  default     = 1
+}
+
 variable "alarm_period_seconds" {
   description = "CloudWatch alarm period in seconds."
   type        = number
