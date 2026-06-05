@@ -82,7 +82,9 @@ surfaces as the API, so operators can script review checks without scraping dash
 Source review is a first-class review artifact. Operators can mark individual sources as included,
 excluded, or still needing review through the API, CLI, or dashboard. Decisions are persisted to
 `source-review.json` with reviewer, notes, and timestamp fields, and each source decision writes an
-audit event so source curation is visible during later approval and publishing checks.
+audit event so source curation is visible during later approval and publishing checks. Excluded
+sources are removed from the effective source count used by scorecards, and any source explicitly
+marked as still needing review blocks the source SLO and approval gate until it is resolved.
 
 Run comparison is part of the review layer. It compares duration, source counts, source overlap,
 publish readiness, and evaluation score deltas between a base run and a candidate run. This makes

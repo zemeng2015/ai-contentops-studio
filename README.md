@@ -145,6 +145,9 @@ metadata for every evidence artifact, so CI output can be archived and compared 
 reviews.
 When a release approval exists, the evidence bundle also includes `release_approval.json` and the
 API response includes `latest_release_approval`, closing the audit loop between review and deploy.
+Source review decisions are operational gates, not just notes: excluded sources are removed from
+the scorecard's effective source count, and `needs_review` source decisions block approval until a
+reviewer resolves them.
 
 ## API Surface
 

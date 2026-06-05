@@ -9,7 +9,13 @@ import pytest
 from contentops_core.artifacts import S3MirroringArtifactStore
 from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.factory import build_pipeline, build_review_service
-from contentops_core.models import RunRecord, RunRequest, RunStatus
+from contentops_core.models import (
+    RunRecord,
+    RunRequest,
+    RunStatus,
+    SourceReviewDecision,
+    SourceReviewRequest,
+)
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
 from pydantic import SecretStr
@@ -287,6 +293,68 @@ def test_review_service_blocks_approval_when_scorecard_fails(tmp_path: Path) -> 
     result = pipeline.run(RunRequest(topic="Approval scorecard gate"))
     review_service = build_review_service(settings)
 
+    with pytest.raises(ValueError, match="scorecard did not pass"):
+        review_service.approve(result.run.id)
+
+
+def test_source_review_exclusions_affect_scorecard_gate(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        min_publish_score=0.5,
+        min_source_count=3,
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Source review gate"))
+    review_service = build_review_service(settings)
+
+    initial = review_service.scorecard(result.run.id)
+    review_service.review_source(
+        result.run.id,
+        SourceReviewRequest(
+            source_key="AI engineering pattern library",
+            decision=SourceReviewDecision.EXCLUDE,
+            reviewer="zack",
+            notes="Not specific enough for this run.",
+        ),
+    )
+    updated = review_service.scorecard(result.run.id)
+
+    assert initial.source_count == 3
+    assert initial.sources_slo_pass is True
+    assert updated.source_count == 2
+    assert updated.sources_slo_pass is False
+    assert updated.overall_pass is False
+    assert any("excluded by reviewer" in warning for warning in updated.warnings)
+    with pytest.raises(ValueError, match="scorecard did not pass"):
+        review_service.approve(result.run.id)
+
+
+def test_pending_source_review_blocks_approval(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        min_publish_score=0.5,
+    )
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Pending source review gate"))
+    review_service = build_review_service(settings)
+
+    review_service.review_source(
+        result.run.id,
+        SourceReviewRequest(
+            source_key="AI engineering pattern library",
+            decision=SourceReviewDecision.NEEDS_REVIEW,
+            reviewer="zack",
+            notes="Needs source owner confirmation.",
+        ),
+    )
+    scorecard = review_service.scorecard(result.run.id)
+
+    assert scorecard.sources_slo_pass is False
+    assert any("still pending" in warning for warning in scorecard.warnings)
     with pytest.raises(ValueError, match="scorecard did not pass"):
         review_service.approve(result.run.id)
 

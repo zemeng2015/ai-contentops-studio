@@ -56,6 +56,7 @@ from contentops_core.models import (
     ScorecardListResponse,
     Source,
     SourceOverlap,
+    SourceReviewDecision,
     SourceReviewRecord,
     SourceReviewRequest,
 )
@@ -120,13 +121,7 @@ class ReviewService:
 
     def source_reviews(self, run_id: str) -> list[SourceReviewRecord]:
         run = self._get_run(run_id)
-        path = run.artifact_dir / "source-review.json"
-        if not path.exists():
-            return []
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, list):
-            return []
-        return [SourceReviewRecord.model_validate(item) for item in data]
+        return self._load_source_reviews(run)
 
     def review_source(
         self,
@@ -968,10 +963,14 @@ class ReviewService:
                 warnings.append(
                     f"Run exceeded latency SLO of {self.latency_slo_ms}ms."
                 )
-        sources_slo_pass = metrics.source_count >= self.min_source_count
+        effective_source_count, source_review_pass, review_warnings = (
+            self._review_adjusted_source_count(run, metrics.source_count)
+        )
+        warnings.extend(review_warnings)
+        sources_slo_pass = effective_source_count >= self.min_source_count and source_review_pass
         if not sources_slo_pass:
             warnings.append(
-                f"Run has fewer than {self.min_source_count} source(s)."
+                f"Run has fewer than {self.min_source_count} approved source(s)."
             )
         return RunScorecard(
             run_id=run.id,
@@ -979,7 +978,7 @@ class ReviewService:
             topic=run.topic,
             slug=run.slug,
             published_url=run.published_url,
-            source_count=metrics.source_count,
+            source_count=effective_source_count,
             total_duration_ms=metrics.total_duration_ms,
             latency_slo_ms=self.latency_slo_ms,
             min_source_count=self.min_source_count,
@@ -1236,6 +1235,37 @@ class ReviewService:
             return []
         packet = ResearchPacket.model_validate(json.loads(path.read_text(encoding="utf-8")))
         return packet.sources
+
+    @staticmethod
+    def _load_source_reviews(run: RunRecord) -> list[SourceReviewRecord]:
+        path = run.artifact_dir / "source-review.json"
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        return [SourceReviewRecord.model_validate(item) for item in data]
+
+    @classmethod
+    def _review_adjusted_source_count(
+        cls,
+        run: RunRecord,
+        raw_source_count: int,
+    ) -> tuple[int, bool, list[str]]:
+        reviews = cls._load_source_reviews(run)
+        excluded_count = sum(
+            1 for review in reviews if review.decision == SourceReviewDecision.EXCLUDE
+        )
+        pending_count = sum(
+            1 for review in reviews if review.decision == SourceReviewDecision.NEEDS_REVIEW
+        )
+        effective_source_count = max(raw_source_count - excluded_count, 0)
+        warnings: list[str] = []
+        if excluded_count:
+            warnings.append(f"{excluded_count} source(s) were excluded by reviewer decision.")
+        if pending_count:
+            warnings.append(f"{pending_count} source review decision(s) are still pending.")
+        return effective_source_count, pending_count == 0, warnings
 
     @staticmethod
     def _load_optional_json(run: RunRecord, artifact_name: str, model: type[T]) -> T | None:
