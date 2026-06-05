@@ -44,7 +44,8 @@ contentops integration-smoke-runs --json
 ```
 
 The same history is available from `GET /integration-smoke-runs` and
-`/dashboard/integration-smoke`.
+`/dashboard/integration-smoke`. Release evidence also writes `integration_smoke_runs.json` so
+deployment reviewers can see recent smoke history beside the current readiness plan.
 
 GitHub Actions includes a manual `Integration Smoke` workflow. It defaults to dry-run mode and
 uploads `plan.json`, `report.json`, and the command stdout as workflow artifacts. To run live

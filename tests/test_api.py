@@ -1462,6 +1462,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Ops Brief Notifications" in response.text
     assert "Retention Archives" in response.text
     assert "Deployment Gate" in response.text
+    assert "Integration Smoke Runs" in response.text
     assert "Deployment Preflight" in response.text
     assert "Release Gate Checks" in response.text
     assert "Deployment Capabilities" in response.text
@@ -1477,6 +1478,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Download evidence bundle" in response.text
     assert "environment_template" in response.text
     assert "evidence_manifest.json" in response.text
+    assert "integration_smoke_runs.json" in response.text
 
 
 def test_dashboard_filters_runs() -> None:

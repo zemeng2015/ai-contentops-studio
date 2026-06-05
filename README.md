@@ -266,6 +266,9 @@ default and can be switched to live provider validation once repository secrets 
 Recorded smoke reports are stored under `artifacts/integration-smoke` and exposed through
 `contentops integration-smoke-runs --json`, `GET /integration-smoke-runs`, and
 `/dashboard/integration-smoke`.
+Release evidence includes both `integration_smoke_plan.json` and
+`integration_smoke_runs.json`, so deployment reviewers can compare planned live checks with recent
+provider validation history.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.

@@ -908,6 +908,7 @@ class ReleaseEvidenceBundle(BaseModel):
     doctor: SystemStatus
     provider_health: ProviderHealthReport
     integration_smoke_plan: IntegrationSmokePlanReport
+    integration_smoke_runs: IntegrationSmokeRunListResponse
     operations_console: OperationsConsoleReport
     ops_brief: OpsBriefReport
     ops_brief_deliveries: list[OpsBriefDelivery] = Field(default_factory=list)

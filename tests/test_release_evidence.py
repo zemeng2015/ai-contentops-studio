@@ -61,6 +61,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "ops_brief_deliveries.json",
         "provider_health.json",
         "integration_smoke_plan.json",
+        "integration_smoke_runs.json",
         "publish_recovery_executions.json",
         "publish_verifications.json",
         "release_readiness.json",
@@ -118,6 +119,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     smoke_plan = json.loads(
         (output_dir / "integration_smoke_plan.json").read_text(encoding="utf-8")
     )
+    smoke_runs = json.loads(
+        (output_dir / "integration_smoke_runs.json").read_text(encoding="utf-8")
+    )
     ops_brief = json.loads((output_dir / "ops_brief.json").read_text(encoding="utf-8"))
     operations_console = json.loads(
         (output_dir / "operations_console.json").read_text(encoding="utf-8")
@@ -168,6 +172,8 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert bundle.publish_recovery_executions.total == 0
     assert bundle.provider_health.status in {"pass", "warn", "fail"}
     assert bundle.integration_smoke_plan.status in {"pass", "warn", "fail"}
+    assert smoke_runs["summary"]["total_reports"] == 0
+    assert bundle.integration_smoke_runs.total == 0
     assert operations_console["summary"]["status"] in {"pass", "warn", "fail"}
     assert operations_console["summary"]["release_gate_status"] == "not_evaluated"
     assert ops_brief["status"] in {"pass", "warn", "fail"}

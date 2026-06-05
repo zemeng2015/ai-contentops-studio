@@ -1898,6 +1898,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <strong>{escape(bundle.integration_smoke_plan.status)}</strong>
           <span>Smoke plan</span>
         </div>
+        <div>
+          <strong>{bundle.integration_smoke_runs.summary.total_reports}</strong>
+          <span>Smoke runs</span>
+        </div>
         <div><strong>{escape(summary.git_sha or "n/a")}</strong><span>Git SHA</span></div>
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
@@ -1972,6 +1976,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </thead>
         <tbody>{smoke_rows}</tbody>
       </table>
+      <h2>Integration Smoke Runs</h2>
+      {_integration_smoke_runs_html(bundle.integration_smoke_runs)}
       <h2>Deployment Preflight</h2>
       <table>
         <thead>
