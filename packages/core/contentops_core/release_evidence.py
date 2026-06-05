@@ -59,6 +59,8 @@ def build_release_evidence(
     approval = _latest_release_approval(settings.artifact_root)
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
     source_reviews = _source_review_evidence(settings.artifact_root)
+    release_status = "fail" if source_reviews.needs_review_count else readiness.status
+    can_release = readiness.can_release and source_reviews.needs_review_count == 0
     worker_execution_trends = job_execution_trends(
         job_execution_dir(settings.artifact_root),
         days=14,
@@ -89,8 +91,8 @@ def build_release_evidence(
     summary = ReleaseEvidenceSummary(
         git_sha=git_sha or os.getenv("GITHUB_SHA") or os.getenv("CONTENTOPS_GIT_SHA"),
         doctor_status=doctor.status,
-        release_status=readiness.status,
-        can_release=readiness.can_release,
+        release_status=release_status,
+        can_release=can_release,
         artifact_files=artifact_files,
     )
     return ReleaseEvidenceBundle(

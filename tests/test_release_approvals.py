@@ -77,3 +77,36 @@ def test_release_approval_blocks_failed_release_without_force(tmp_path: Path) ->
 
     assert forced.force is True
     assert forced.can_release is False
+
+
+def test_release_approval_blocks_pending_source_reviews_without_force(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    run_dir = settings.artifact_root / "20260605-source-approval-block-run123"
+    run_dir.mkdir(parents=True)
+    (run_dir / "source-review.json").write_text(
+        json.dumps(
+            [
+                {
+                    "source_key": "https://example.com/pending",
+                    "source_title": "Pending source",
+                    "decision": "needs_review",
+                    "reviewer": "zack",
+                    "notes": "Resolve before release.",
+                    "decided_at": "2026-06-05T00:00:00Z",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Release readiness must pass"):
+        approve_release(
+            settings=settings,
+            repository=RunRepository(settings.database_url),
+            review_service=build_review_service(settings),
+            request=ReleaseApprovalRequest(decision=ReleaseApprovalDecision.APPROVED),
+        )

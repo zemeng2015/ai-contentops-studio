@@ -38,6 +38,7 @@ def release_gate(
     )
     checks = [
         _release_readiness_check(bundle),
+        _source_review_governance_check(bundle),
         _deployment_preflight_check(bundle),
         _configuration_audit_check(audit),
         _approval_check(bundle, require_approval),
@@ -116,6 +117,42 @@ def _deployment_preflight_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
         evidence={
             "deployment_status": bundle.deployment_check.status,
             "can_deploy": bundle.deployment_check.can_deploy,
+        },
+    )
+
+
+def _source_review_governance_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    source_reviews = bundle.source_reviews
+    if source_reviews.needs_review_count:
+        return ReleaseGateItem(
+            name="source_review_governance",
+            status="fail",
+            message="Pending source review decisions block deployment.",
+            evidence={
+                "total_decisions": source_reviews.total_decisions,
+                "include_count": source_reviews.include_count,
+                "exclude_count": source_reviews.exclude_count,
+                "needs_review_count": source_reviews.needs_review_count,
+            },
+        )
+    if source_reviews.exclude_count:
+        return ReleaseGateItem(
+            name="source_review_governance",
+            status="pass",
+            message="Source review decisions are resolved; excluded sources are documented.",
+            evidence={
+                "total_decisions": source_reviews.total_decisions,
+                "include_count": source_reviews.include_count,
+                "exclude_count": source_reviews.exclude_count,
+            },
+        )
+    return ReleaseGateItem(
+        name="source_review_governance",
+        status="pass",
+        message="No pending source review decisions block deployment.",
+        evidence={
+            "total_decisions": source_reviews.total_decisions,
+            "needs_review_count": source_reviews.needs_review_count,
         },
     )
 

@@ -289,4 +289,5 @@ Publishing providers:
   time, keeping personal-site publish packages tied to the deployment evidence trail.
   Release evidence also indexes source review decisions in `source_reviews.json`, summarizing
   include, exclude, and pending-review decisions by run so source curation is part of the final
-  deployment evidence bundle.
+  deployment evidence bundle. Any pending source review decision marks release evidence as not
+  releasable and fails the release gate's `source_review_governance` check.

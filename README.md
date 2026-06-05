@@ -147,7 +147,8 @@ When a release approval exists, the evidence bundle also includes `release_appro
 API response includes `latest_release_approval`, closing the audit loop between review and deploy.
 Source review decisions are operational gates, not just notes: excluded sources are removed from
 the scorecard's effective source count, and `needs_review` source decisions block approval until a
-reviewer resolves them.
+reviewer resolves them. Pending source reviews also mark release evidence as not releasable and
+make the deployment gate fail until the review is resolved.
 
 ## API Surface
 

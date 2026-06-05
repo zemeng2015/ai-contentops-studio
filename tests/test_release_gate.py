@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from contentops_core.factory import build_review_service
@@ -136,6 +137,37 @@ def test_release_gate_fails_when_required_config_is_missing(tmp_path: Path) -> N
     assert report.config_audit.status == "fail"
 
 
+def test_release_gate_fails_with_pending_source_reviews(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    _write_source_review(
+        settings.artifact_root / "20260605-release-source-review-run123",
+        decision="needs_review",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="source-review-sha",
+        require_approval=False,
+    )
+
+    source_review_check = next(
+        check for check in report.checks if check.name == "source_review_governance"
+    )
+    assert report.status == "fail"
+    assert report.can_deploy is False
+    assert source_review_check.status == "fail"
+    assert source_review_check.evidence["needs_review_count"] == 1
+    assert report.release_evidence.can_release is False
+
+
 def test_release_gate_reports_can_be_persisted_and_listed(tmp_path: Path) -> None:
     settings = Settings(
         artifact_root=tmp_path / "artifacts",
@@ -156,3 +188,22 @@ def test_release_gate_reports_can_be_persisted_and_listed(tmp_path: Path) -> Non
     assert path.exists()
     assert reports.total == 1
     assert reports.items[0].git_sha == "history-sha"
+
+
+def _write_source_review(run_dir: Path, decision: str) -> None:
+    run_dir.mkdir(parents=True)
+    (run_dir / "source-review.json").write_text(
+        json.dumps(
+            [
+                {
+                    "source_key": "https://example.com/source",
+                    "source_title": "Example source",
+                    "decision": decision,
+                    "reviewer": "zack",
+                    "notes": "Release gate test.",
+                    "decided_at": "2026-06-05T00:00:00Z",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
