@@ -174,6 +174,9 @@ To remove a drifted publish through the governed recovery path, run
 `contentops run-publish-recovery <run_id> --action rollback --actor <name>` or call
 `POST /runs/{id}/publish-recovery` with `{"action":"rollback"}`. This writes
 `publish-recovery-execution.json` and uses the existing rollback audit and notification path.
+The next release evidence bundle will include `publish_recovery_executions.json`; review it to
+confirm the recovery action completed and did not leave rollback errors before approving another
+deployment.
 When preparing a deployment handoff, run
 `contentops release-gate --git-sha <sha> --json --record --checklist-output release-gate-checklist.md`
 and review the Markdown checklist with the JSON report. The checklist translates failed or warning

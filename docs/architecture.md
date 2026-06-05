@@ -136,7 +136,9 @@ When drift appears, `contentops publish-recovery-plan <run_id>` and
 restore, republish, or rollback guidance before any destructive recovery action is taken.
 Rollback execution is explicit through `contentops run-publish-recovery` or
 `POST /runs/{id}/publish-recovery`, and writes `publish-recovery-execution.json` alongside the
-normal rollback audit event.
+normal rollback audit event. Release evidence indexes recent recovery executions in
+`publish_recovery_executions.json`, giving deployment reviewers a compact view of restored,
+deleted, skipped, and failed recovery actions.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,
 budget warnings, publish drift, and notification delivery failures into a single severity and
 action-required flag. They are exposed through the dashboard, CLI, and API so operational triage

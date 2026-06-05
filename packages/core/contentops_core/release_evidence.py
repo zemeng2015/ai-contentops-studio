@@ -34,6 +34,8 @@ from contentops_core.models import (
     ContentDistributionEvidenceItem,
     HomepageHandoffEvidence,
     HomepageHandoffEvidenceItem,
+    PublishRecoveryExecutionEvidence,
+    PublishRecoveryExecutionEvidenceItem,
     PublishVerificationEvidence,
     PublishVerificationEvidenceItem,
     ReleaseEvidenceBundle,
@@ -69,6 +71,7 @@ def build_release_evidence(
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
     content_distribution = _content_distribution_evidence(settings)
     publish_verifications = _publish_verification_evidence(repository, review_service)
+    publish_recovery_executions = _publish_recovery_execution_evidence(settings.artifact_root)
     worker_delivery_summaries = _worker_delivery_summary_evidence(
         settings.artifact_root,
         extra_paths=worker_delivery_summary_paths,
@@ -110,6 +113,7 @@ def build_release_evidence(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "publish_recovery_executions.json",
         "publish_verifications.json",
         "release_readiness.json",
         "source_reviews.json",
@@ -139,6 +143,7 @@ def build_release_evidence(
         homepage_handoffs=homepage_handoffs,
         content_distribution=content_distribution,
         publish_verifications=publish_verifications,
+        publish_recovery_executions=publish_recovery_executions,
         source_reviews=source_reviews,
         worker_delivery_summaries=worker_delivery_summaries,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
@@ -166,6 +171,9 @@ def write_release_evidence(
         "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
+        "publish_recovery_executions": bundle.publish_recovery_executions.model_dump(
+            mode="json"
+        ),
         "publish_verifications": bundle.publish_verifications.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "source_reviews": bundle.source_reviews.model_dump(mode="json"),
@@ -371,6 +379,68 @@ def _publish_verification_evidence(
         missing_receipt_count=missing_receipt_count,
         items=items,
     )
+
+
+def _publish_recovery_execution_evidence(
+    artifact_root: Path,
+    limit: int = 50,
+) -> PublishRecoveryExecutionEvidence:
+    if not artifact_root.exists():
+        return PublishRecoveryExecutionEvidence(total=0)
+    paths = sorted(
+        artifact_root.rglob("publish-recovery-execution.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    items = [
+        item
+        for path in paths[:limit]
+        if (item := _publish_recovery_execution_item(artifact_root, path)) is not None
+    ]
+    return PublishRecoveryExecutionEvidence(
+        total=len(paths),
+        completed_count=sum(1 for item in items if item.status == "completed"),
+        failed_count=sum(1 for item in items if item.status != "completed"),
+        error_count=sum(item.error_count for item in items),
+        items=items,
+    )
+
+
+def _publish_recovery_execution_item(
+    artifact_root: Path,
+    path: Path,
+) -> PublishRecoveryExecutionEvidenceItem | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    rollback_payload = payload.get("rollback")
+    rollback = rollback_payload if isinstance(rollback_payload, dict) else {}
+    executed_at = _parse_datetime_field(payload.get("executed_at"), path)
+    return PublishRecoveryExecutionEvidenceItem(
+        run_id=str(payload.get("run_id", "unknown")),
+        action=str(payload.get("action", "unknown")),
+        actor=str(payload.get("actor", "unknown")),
+        status=str(payload.get("status", "unknown")),
+        message=str(payload.get("message", "")),
+        restored_files=len(rollback.get("restored_files", [])),
+        deleted_files=len(rollback.get("deleted_files", [])),
+        skipped_files=len(rollback.get("skipped_files", [])),
+        error_count=len(rollback.get("errors", [])),
+        artifact_path=_best_relative_path_to_root(artifact_root, path),
+        executed_at=executed_at,
+    )
+
+
+def _parse_datetime_field(value: object, fallback_path: Path) -> datetime:
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+        except ValueError:
+            pass
+    return datetime.fromtimestamp(fallback_path.stat().st_mtime, UTC)
 
 
 def _worker_delivery_summary_evidence(

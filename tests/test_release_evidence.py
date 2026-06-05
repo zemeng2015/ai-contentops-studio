@@ -45,6 +45,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "publish_recovery_executions.json",
         "publish_verifications.json",
         "release_readiness.json",
         "source_reviews.json",
@@ -87,6 +88,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     publish_verifications = json.loads(
         (output_dir / "publish_verifications.json").read_text(encoding="utf-8")
     )
+    publish_recovery_executions = json.loads(
+        (output_dir / "publish_recovery_executions.json").read_text(encoding="utf-8")
+    )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
     assert deployment_check["profile"] == "production"
     assert "environment_template" in {check["name"] for check in deployment_check["checks"]}
@@ -105,9 +109,11 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert source_reviews["total_decisions"] == 0
     assert publish_verifications["total"] == 0
     assert publish_verifications["drift_count"] == 0
+    assert publish_recovery_executions["total"] == 0
     assert bundle.worker_execution_alerts["severity"] == "info"
     assert bundle.source_reviews.total_decisions == 0
     assert bundle.publish_verifications.total == 0
+    assert bundle.publish_recovery_executions.total == 0
     assert bundle.worker_execution_alert_deliveries == []
     assert bundle.worker_delivery_summary_deliveries == []
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
@@ -149,6 +155,51 @@ def test_release_evidence_indexes_publish_verification(
     assert evidence_manifest["artifacts"]["publish_verifications.json"]["media_type"] == (
         "application/json"
     )
+
+
+def test_release_evidence_indexes_publish_recovery_executions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    settings = Settings()
+    pipeline = build_pipeline(settings)
+    service = build_review_service(settings)
+    result = pipeline.run(RunRequest(topic="Release evidence publish recovery"))
+    service.approve(result.run.id, reviewer="zack")
+    service.publish(result.run.id)
+    receipt = service.publish_receipt(result.run.id)
+    assert receipt is not None
+    Path(receipt.file_changes[0].path).write_text("manual drift", encoding="utf-8")
+    service.execute_publish_recovery(
+        result.run.id,
+        action="rollback",
+        actor="zack",
+        notes="Evidence recovery.",
+    )
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    payload = json.loads(
+        (output_dir / "publish_recovery_executions.json").read_text(encoding="utf-8")
+    )
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    assert bundle.publish_recovery_executions.total == 1
+    assert bundle.publish_recovery_executions.completed_count == 1
+    assert bundle.publish_recovery_executions.error_count == 0
+    assert bundle.publish_recovery_executions.items[0].run_id == result.run.id
+    assert payload["items"][0]["action"] == "rollback"
+    assert payload["items"][0]["actor"] == "zack"
+    assert payload["items"][0]["artifact_path"].endswith("publish-recovery-execution.json")
+    assert "publish_recovery_executions.json" in bundle.summary.artifact_files
+    assert evidence_manifest["artifacts"]["publish_recovery_executions.json"][
+        "media_type"
+    ] == "application/json"
 
 
 def test_release_evidence_indexes_content_distribution_manifests(

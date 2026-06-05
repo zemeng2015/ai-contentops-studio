@@ -1555,6 +1555,28 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </td>
         </tr>
         """
+    publish_recovery_rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td>{escape(item.action)}</td>
+          <td><span class="pill">{escape(item.status)}</span></td>
+          <td>{escape(item.actor)}</td>
+          <td>{item.restored_files}</td>
+          <td>{item.deleted_files}</td>
+          <td>{item.error_count}</td>
+          <td>{escape(item.artifact_path)}</td>
+          <td>{escape(item.executed_at.isoformat())}</td>
+        </tr>
+        """
+        for item in bundle.publish_recovery_executions.items
+    )
+    if not publish_recovery_rows:
+        publish_recovery_rows = """
+        <tr>
+          <td colspan="9"><span class="muted">No publish recovery executions recorded.</span></td>
+        </tr>
+        """
     worker_trend_rows = "".join(
         f"""
         <tr>
@@ -1657,6 +1679,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <span>Publish drifts</span>
         </div>
         <div>
+          <strong>{bundle.publish_recovery_executions.completed_count}</strong>
+          <span>Recovery runs</span>
+        </div>
+        <div>
           <strong>{bundle.source_reviews.total_decisions}</strong>
           <span>Source reviews</span>
         </div>
@@ -1724,6 +1750,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </tr>
         </thead>
         <tbody>{publish_verification_rows}</tbody>
+      </table>
+      <h2>Publish Recovery Executions</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Action</th><th>Status</th><th>Actor</th>
+            <th>Restored</th><th>Deleted</th><th>Errors</th><th>Artifact</th><th>Executed</th>
+          </tr>
+        </thead>
+        <tbody>{publish_recovery_rows}</tbody>
       </table>
       <h2>Source Review Evidence</h2>
       <table>

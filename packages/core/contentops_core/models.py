@@ -650,6 +650,29 @@ class PublishVerificationEvidence(BaseModel):
     items: list[PublishVerificationEvidenceItem] = Field(default_factory=list)
 
 
+class PublishRecoveryExecutionEvidenceItem(BaseModel):
+    run_id: str
+    action: str
+    actor: str
+    status: str
+    message: str
+    restored_files: int = Field(ge=0)
+    deleted_files: int = Field(ge=0)
+    skipped_files: int = Field(ge=0)
+    error_count: int = Field(ge=0)
+    artifact_path: str
+    executed_at: datetime
+
+
+class PublishRecoveryExecutionEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    completed_count: int = Field(ge=0, default=0)
+    failed_count: int = Field(ge=0, default=0)
+    error_count: int = Field(ge=0, default=0)
+    items: list[PublishRecoveryExecutionEvidenceItem] = Field(default_factory=list)
+
+
 class WorkerDeliverySummaryEvidenceItem(BaseModel):
     execution_id: str
     name: str
@@ -680,6 +703,7 @@ class ReleaseEvidenceBundle(BaseModel):
     homepage_handoffs: HomepageHandoffEvidence
     content_distribution: ContentDistributionEvidence
     publish_verifications: PublishVerificationEvidence
+    publish_recovery_executions: PublishRecoveryExecutionEvidence
     source_reviews: SourceReviewEvidence
     worker_delivery_summaries: WorkerDeliverySummaryEvidence
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)

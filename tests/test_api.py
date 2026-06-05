@@ -214,6 +214,7 @@ def test_release_approval_api_and_dashboard(
     assert "Release Approval" in dashboard_response.text
     assert "Deployment Checklist" in dashboard_response.text
     assert "Publish Verification Evidence" in dashboard_response.text
+    assert "Publish Recovery Executions" in dashboard_response.text
     assert "Remediation" in dashboard_response.text
     assert "Recent Release Gates" in dashboard_response.text
     assert "Pass rate:" in dashboard_response.text
@@ -487,6 +488,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "worker_execution_trends" in release_evidence_payload
     assert "worker_execution_alerts" in release_evidence_payload
     assert "worker_execution_alert_deliveries" in release_evidence_payload
+    assert "publish_recovery_executions" in release_evidence_payload
     assert "source_reviews" in release_evidence_payload
     assert release_evidence_payload["source_reviews"]["total_decisions"] >= 1
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
