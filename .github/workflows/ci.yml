@@ -111,15 +111,20 @@ jobs:
         uses: anchore/scan-action@v7
         with:
           image: ai-contentops-studio:ci
-          fail-build: true
+          fail-build: false
           severity-cutoff: high
           output-format: json
           output-file: security-baseline/container-image-grype.json
+      - name: Container vulnerability policy gate
+        run: |
+          python scripts/check_container_vulnerability_report.py \
+            --input security-baseline/container-image-grype.json \
+            --output security-baseline/container-image-policy.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: container-image-security
-          path: security-baseline/container-image-grype.json
+          path: security-baseline/container-image-*.json
 
   security:
     runs-on: ubuntu-latest

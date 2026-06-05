@@ -117,6 +117,8 @@ def test_ci_validates_terraform() -> None:
     assert "anchore/scan-action@v7" in workflow
     assert "severity-cutoff: high" in workflow
     assert "container-image-grype.json" in workflow
+    assert "Container vulnerability policy gate" in workflow
+    assert "scripts/check_container_vulnerability_report.py" in workflow
     assert "security-baseline" in workflow
 
 
@@ -167,6 +169,7 @@ def test_phase_three_security_baseline_exists() -> None:
     assert "terraform:no-wildcard-iam" in security_script
     assert "docker:non-root-user" in security_script
     assert "ci:container-image-vulnerability-scan" in security_script
+    assert "ci:container-vulnerability-policy-gate" in security_script
     assert "ci:container-scan-artifact" in security_script
     assert "USER contentops" in dockerfile
     assert "PYTHONDONTWRITEBYTECODE=1" in dockerfile

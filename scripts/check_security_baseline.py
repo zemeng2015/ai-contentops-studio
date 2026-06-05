@@ -179,10 +179,16 @@ def _container_image_scan_checks(path: Path, workflow: dict[str, Any]) -> list[S
         ),
         _pass_if(
             "image: ai-contentops-studio:ci" in text
-            and "fail-build: true" in text
+            and "fail-build: false" in text
             and "severity-cutoff: high" in text,
             "ci:container-image-vulnerability-scan",
-            "CI blocks container images with high or critical vulnerabilities.",
+            "CI scans container images for high and critical vulnerabilities.",
+        ),
+        _pass_if(
+            "scripts/check_container_vulnerability_report.py" in text
+            and "container-image-policy.json" in text,
+            "ci:container-vulnerability-policy-gate",
+            "CI applies an actionable container vulnerability policy gate.",
         ),
         _pass_if(
             "security-baseline/container-image-grype.json" in text

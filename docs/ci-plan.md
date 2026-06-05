@@ -71,7 +71,10 @@ Status: complete.
 Status: complete.
 
 - Scan the built API image for high and critical vulnerabilities on every push and pull request.
-- Publish the Grype JSON scan result as CI evidence for release reviewers.
+- Publish the Grype JSON scan result and actionable vulnerability policy report as CI evidence for
+  release reviewers.
+- Fail CI only when a high or critical finding has a stable fix version available, so unrepaired
+  upstream base-image findings remain visible without permanently blocking development.
 - Keep the image runtime constrained with a slim Python base, no pip cache, non-root execution, and
   a healthcheck.
 
