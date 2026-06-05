@@ -18,7 +18,7 @@ readiness stay reviewable as the project grows.
 
 ## Phase 1: Compatibility And Evidence Baseline
 
-Status: active.
+Status: complete.
 
 - Run the main Python suite across Python 3.11, 3.12, and 3.13.
 - Keep release evidence, deployment preflight, and release gate artifacts for every Python version.
@@ -28,6 +28,8 @@ Status: active.
   gate checklist.
 
 ## Phase 2: Quality And Regression Signals
+
+Status: active.
 
 - Add coverage reporting for core packages and API routes.
 - Split slow API/dashboard tests from fast provider/unit tests while keeping a single required
@@ -57,4 +59,3 @@ Status: active.
 - Mirror release evidence and scheduled review packages to S3 in production.
 - Compare release evidence from the candidate commit against the latest successful release to detect
   missing checks or artifact regressions.
-

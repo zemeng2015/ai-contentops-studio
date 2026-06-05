@@ -47,6 +47,15 @@ jobs:
         run: |
           export CONTENTOPS_DATABASE_URL=sqlite:///release-evidence.db
           python scripts/generate_release_evidence.py --output-dir release-evidence
+      - name: Release evidence regression
+        run: |
+          python scripts/check_release_evidence_regression.py \
+            --evidence-dir release-evidence \
+            --output release-evidence-regression/release-evidence-regression.json
+      - name: Dashboard smoke
+        run: |
+          export CONTENTOPS_DATABASE_URL=sqlite:///dashboard-smoke.db
+          python scripts/dashboard_smoke.py --output dashboard-smoke/dashboard-smoke.json
       - name: Release gate report
         run: |
           export CONTENTOPS_DATABASE_URL=sqlite:///release-gate.db
@@ -65,12 +74,30 @@ jobs:
           path: release-evidence/*.json
       - uses: actions/upload-artifact@v7
         with:
+          name: release-evidence-regression-py${{ matrix.python-version }}
+          path: release-evidence-regression/release-evidence-regression.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-smoke-py${{ matrix.python-version }}
+          path: dashboard-smoke/dashboard-smoke.json
+      - uses: actions/upload-artifact@v7
+        with:
           name: release-gate-py${{ matrix.python-version }}
           path: |
             release-gate/release-gate.json
             release-gate/deployment-checklist.md
       - name: Test
-        run: pytest
+        run: |
+          pytest \
+            --cov=apps \
+            --cov=packages \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-fail-under=75
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: coverage.xml
 
   docker:
     runs-on: ubuntu-latest

@@ -88,15 +88,24 @@ def test_ci_validates_terraform() -> None:
     assert "terraform validate" in workflow
     assert "pipelines/project_repository_updates.yaml" in workflow
     assert "scripts/generate_release_evidence.py" in workflow
+    assert "scripts/check_release_evidence_regression.py" in workflow
+    assert "scripts/dashboard_smoke.py" in workflow
     assert "scripts/generate_deployment_check.py" in workflow
     assert "scripts/generate_release_gate.py" in workflow
     assert "deployment-check/deployment-check.json" in workflow
     assert "deployment-check-py${{ matrix.python-version }}" in workflow
     assert "release-evidence-py${{ matrix.python-version }}" in workflow
+    assert "release-evidence-regression-py${{ matrix.python-version }}" in workflow
+    assert "dashboard-smoke-py${{ matrix.python-version }}" in workflow
     assert "release-gate-py${{ matrix.python-version }}" in workflow
     assert "release-gate/release-gate.json" in workflow
     assert "--checklist-output release-gate/deployment-checklist.md" in workflow
     assert "release-gate/deployment-checklist.md" in workflow
+    assert "--cov=apps" in workflow
+    assert "--cov=packages" in workflow
+    assert "--cov-report=xml:coverage.xml" in workflow
+    assert "--cov-fail-under=75" in workflow
+    assert "coverage-py${{ matrix.python-version }}" in workflow
 
 
 def test_long_term_ci_plan_documents_quality_roadmap() -> None:
@@ -107,9 +116,26 @@ def test_long_term_ci_plan_documents_quality_roadmap() -> None:
     assert "Python 3.11, 3.12, and 3.13" in plan
     assert "deployment preflight" in plan
     assert "release evidence" in plan
+    assert "Status: active" in plan
+    assert "coverage reporting" in plan
+    assert "rendered dashboard smoke check" in plan
     assert "container image vulnerability scanning" in plan
     assert "Terraform security checks" in plan
     assert "docs/ci-plan.md" in readme
+
+
+def test_phase_two_ci_scripts_exist() -> None:
+    evidence_regression = Path("scripts/check_release_evidence_regression.py").read_text(
+        encoding="utf-8"
+    )
+    dashboard_smoke = Path("scripts/dashboard_smoke.py").read_text(encoding="utf-8")
+
+    assert "DEFAULT_REQUIRED_FILES" in evidence_regression
+    assert "release-evidence-regression.json" in evidence_regression
+    assert "missing_required_files" in evidence_regression
+    assert "DashboardSmokeReport" in dashboard_smoke
+    assert "/dashboard/release-evidence" in dashboard_smoke
+    assert "/dashboard/system-status" in dashboard_smoke
 
 
 def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
