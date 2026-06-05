@@ -128,6 +128,10 @@ Use `contentops job-execution-delivery-notify <execution_id>`, the dashboard exe
 button, or `POST /job-executions/{execution_id}/delivery-summary/notify` when a stakeholder needs
 the latest summary resent. Use `GET /job-executions/delivery-summaries/notifications` to audit the
 delivery history without opening artifact files.
+Check `ops-brief-notification-log.json` under the artifact root after non-dry-run worker
+executions. The worker sends the operations brief before writing final release evidence, and
+`ops_brief_deliveries.json` confirms whether the brief notification was skipped locally, delivered,
+or failed for the same evidence window.
 When a scheduled execution publishes content, check `content_assets_status` in the same receipt.
 `generated` means the worker refreshed `feed.xml`, `promotion-brief.md`, and
 `content-distribution-manifest.json` before release evidence was built; `failed` means the publish

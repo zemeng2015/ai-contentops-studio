@@ -84,6 +84,12 @@ jobs:
       - name: Notify worker alerts
         if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
         run: contentops job-execution-alert-notify --days 7 | tee scheduled-worker/daily-alert.json
+      - name: Archive ops brief notifications
+        if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
+        run: |
+          if [ -f artifacts/ops-brief-notification-log.json ]; then
+            cp artifacts/ops-brief-notification-log.json scheduled-worker/daily-ops-brief-notifications.json
+          fi
       - name: Write workflow review summary
         if: always()
         run: |
@@ -179,6 +185,12 @@ jobs:
       - name: Notify worker alerts
         if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
         run: contentops job-execution-alert-notify --days 7 | tee scheduled-worker/project-updates-alert.json
+      - name: Archive ops brief notifications
+        if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
+        run: |
+          if [ -f artifacts/ops-brief-notification-log.json ]; then
+            cp artifacts/ops-brief-notification-log.json scheduled-worker/project-updates-ops-brief-notifications.json
+          fi
       - name: Write workflow review summary
         if: always()
         run: |

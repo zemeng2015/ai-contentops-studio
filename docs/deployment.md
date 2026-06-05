@@ -261,7 +261,8 @@ terraform apply \
 
 For repository-hosted automation before a full AWS rollout, enable the `Scheduled ContentOps`
 GitHub Actions workflow. It runs `contentops worker-job-readiness --json`, worker dry-runs, live
-worker executions, alert notification, and artifact upload for the daily and weekly YAML calendars.
+worker executions, alert notification, ops brief receipt archival, and artifact upload for the
+daily and weekly YAML calendars.
 Use `workflow_dispatch` with `dry_run_only=true` for the first runs, then add repository secrets
 for live providers and notifications before relying on scheduled executions.
 When a reviewer should explicitly triage a run, dispatch the workflow with
@@ -305,6 +306,10 @@ evidence to verify recent scheduled publishing outcomes during deployment review
 When `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, the worker posts that delivery summary to
 the webhook and records the result in `worker-delivery-summary-notification-log.json`; release
 evidence mirrors the log as `worker_delivery_summary_deliveries.json`.
+The worker also sends the operations brief before the final release evidence bundle is written.
+That delivery receipt is stored in `ops-brief-notification-log.json`, copied into scheduled
+workflow artifacts, and mirrored into release evidence as `ops_brief_deliveries.json`. Use
+`--skip-ops-brief-notification` for local runs that should keep the brief notification disabled.
 When a worker execution publishes content, it also regenerates the content distribution assets in
 the configured publishing target before release evidence is generated. The same receipt records the
 asset path, status, generated filenames, and errors, and release evidence includes the resulting

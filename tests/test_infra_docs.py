@@ -88,6 +88,9 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "--dry-run" in workflow
     assert "--release-evidence-dir artifacts/release-evidence/daily-ai-roundup" in workflow
     assert "contentops job-execution-alert-notify --days 7" in workflow
+    assert "artifacts/ops-brief-notification-log.json" in workflow
+    assert "daily-ops-brief-notifications.json" in workflow
+    assert "project-updates-ops-brief-notifications.json" in workflow
     assert "contentops scheduled-workflow-summary" in workflow
     assert "--pr-metadata-output scheduled-worker/daily-pr-metadata.json" in workflow
     assert "--pr-metadata-output scheduled-worker/project-updates-pr-metadata.json" in workflow

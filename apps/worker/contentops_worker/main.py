@@ -20,6 +20,7 @@ from contentops_core.jobs import (
     write_job_execution_report,
 )
 from contentops_core.models import ArtifactMirrorRecord
+from contentops_core.ops_brief import notify_ops_brief
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
@@ -75,6 +76,10 @@ def run_pipeline(
         bool,
         typer.Option(help="Skip post-run worker delivery summary notification."),
     ] = False,
+    skip_ops_brief_notification: Annotated[
+        bool,
+        typer.Option(help="Skip post-run operations brief notification."),
+    ] = False,
 ) -> None:
     job_file = load_job_file(path)
     settings = Settings()
@@ -115,6 +120,7 @@ def run_pipeline(
                 release_evidence_dir,
                 write_delivery_summary=not skip_delivery_summary,
                 notify_delivery_summary=not skip_delivery_notification,
+                notify_operations_brief=not skip_ops_brief_notification,
             )
         except Exception as exc:
             report.release_evidence_status = "failed"
@@ -203,6 +209,7 @@ def _attach_release_evidence(
     *,
     write_delivery_summary: bool,
     notify_delivery_summary: bool,
+    notify_operations_brief: bool,
 ) -> None:
     target_dir = (
         release_evidence_dir
@@ -225,6 +232,11 @@ def _attach_release_evidence(
         delivery_summary_paths = (
             [Path(report.delivery_summary_path)] if report.delivery_summary_path else None
         )
+    else:
+        delivery_summary_paths = None
+    if notify_operations_brief:
+        _notify_operations_brief(settings)
+    if write_delivery_summary or notify_operations_brief:
         bundle = build_release_evidence(
             settings=settings,
             repository=RunRepository(settings.database_url),
@@ -248,6 +260,15 @@ def _attach_delivery_summary(report: JobExecutionReport) -> None:
 def _notify_delivery_summary(settings: Settings, report: JobExecutionReport) -> None:
     notify_worker_delivery_summary(
         report,
+        endpoint=settings.notification_webhook_url,
+        timeout_seconds=settings.notification_timeout_seconds,
+    )
+
+
+def _notify_operations_brief(settings: Settings) -> None:
+    notify_ops_brief(
+        settings=settings,
+        review_service=build_review_service(settings),
         endpoint=settings.notification_webhook_url,
         timeout_seconds=settings.notification_timeout_seconds,
     )

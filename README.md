@@ -308,8 +308,9 @@ automation. It checks schedule presence, cron shape, timezone, timeout, retry po
 policy, and whether publishing jobs create homepage handoff evidence. Use it as the preflight gate
 before connecting the same YAML to GitHub Actions schedules, EventBridge, cron, or another runner.
 This repository also includes `.github/workflows/scheduled-contentops.yml`, which runs the same
-readiness gate, worker dry-run, scheduled execution, worker alert notification, and artifact upload
-for the daily AI roundup and weekly project repository update pipelines. Trigger it manually with
+readiness gate, worker dry-run, scheduled execution, worker alert notification, ops brief receipt
+archival, and artifact upload for the daily AI roundup and weekly project repository update
+pipelines. Trigger it manually with
 `workflow_dispatch` for a dry-run, then set repository secrets such as
 `CONTENTOPS_RESEARCH_SEARCH_API_KEY`, `CONTENTOPS_RESEARCH_GITHUB_TOKEN`,
 `CONTENTOPS_OPENAI_API_KEY`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` before relying on scheduled
@@ -349,6 +350,10 @@ release evidence records recent summaries in `worker_delivery_summaries.json`. T
 auditable `worker-delivery-summary-notification-log.json` after each summary; when
 `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` is configured, the JSON summary plus Markdown body are posted
 to the webhook. Use `--skip-delivery-notification` for local runs that should not notify.
+Worker executions also notify the operations brief before the final release evidence bundle is
+written, so `ops_brief_deliveries.json` captures the actual post-run delivery attempt. Use
+`--skip-ops-brief-notification` when a local run should generate evidence without sending or
+recording the brief notification.
 Operators can resend a delivery summary with `contentops job-execution-delivery-notify` or
 `POST /job-executions/{execution_id}/delivery-summary/notify`, and review delivery history through
 `contentops job-execution-delivery-notifications` or

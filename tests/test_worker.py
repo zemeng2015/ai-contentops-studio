@@ -167,6 +167,14 @@ jobs:
             encoding="utf-8"
         )
     )
+    ops_brief_notification_log = json.loads(
+        (tmp_path / "artifacts" / "ops-brief-notification-log.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    ops_brief_deliveries = json.loads(
+        (evidence_dir / "ops_brief_deliveries.json").read_text(encoding="utf-8")
+    )
     assert delivery_summary_path.exists()
     assert delivery_summary_markdown_path.exists()
     assert delivery_summary["published_items"][0]["published_url"].startswith(
@@ -176,6 +184,8 @@ jobs:
     assert worker_delivery_summaries["items"][0]["execution_id"] == payload["execution_id"]
     assert notification_log[0]["execution_id"] == payload["execution_id"]
     assert notification_log[0]["status"] == "skipped"
+    assert ops_brief_notification_log[0]["status"] == "skipped"
+    assert ops_brief_deliveries[0]["delivery_id"] == ops_brief_notification_log[0]["delivery_id"]
 
 
 def test_worker_run_can_prepare_requested_homepage_handoff(
@@ -263,6 +273,41 @@ def test_worker_run_can_skip_release_evidence(
     assert payload["release_evidence_path"] is None
     assert payload["release_evidence_files"] == []
     assert not (tmp_path / "artifacts" / "release-evidence").exists()
+
+
+def test_worker_run_can_skip_ops_brief_notification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    path = tmp_path / "jobs.yaml"
+    path.write_text("name: skip-ops-brief\ntopic: Skip ops brief notification\n", encoding="utf-8")
+    receipt_dir = tmp_path / "receipts"
+    evidence_dir = tmp_path / "release-evidence"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-pipeline",
+            str(path),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--release-evidence-dir",
+            str(evidence_dir),
+            "--skip-ops-brief-notification",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert not (tmp_path / "artifacts" / "ops-brief-notification-log.json").exists()
+    ops_brief_deliveries = json.loads(
+        (evidence_dir / "ops_brief_deliveries.json").read_text(encoding="utf-8")
+    )
+    assert ops_brief_deliveries == []
 
 
 def test_worker_dry_run_mirrors_receipt_to_s3(
