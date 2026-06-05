@@ -29,6 +29,7 @@ from contentops_core.jobs import (
     worker_job_readiness,
     write_job_execution_delivery_summary,
     write_job_execution_report,
+    write_scheduled_workflow_pr_metadata,
     write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import RunStatus
@@ -311,8 +312,13 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
         review,
         tmp_path / "scheduled-review.md",
     )
+    metadata_path = write_scheduled_workflow_pr_metadata(
+        review,
+        tmp_path / "scheduled-pr-metadata.json",
+    )
 
     markdown = markdown_path.read_text(encoding="utf-8")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert review.total == 1
     assert review.published_count == 1
     assert review.handoff_count == 1
@@ -325,6 +331,10 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert "PR Handoff" in markdown
     assert "Suggested PR title" in markdown
     assert "Apply homepage handoff zip files" in markdown
+    assert metadata["title"].startswith("Review scheduled ContentOps output")
+    assert metadata["source_execution_ids"] == [report.execution_id]
+    assert "Scheduled ContentOps Publish Review" in metadata["body"]
+    assert metadata["checklist"]
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

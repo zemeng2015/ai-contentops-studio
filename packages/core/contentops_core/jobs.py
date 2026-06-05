@@ -260,6 +260,15 @@ class ScheduledWorkflowReviewReport(BaseModel):
     items: list[ScheduledWorkflowReviewItem] = Field(default_factory=list)
 
 
+class ScheduledWorkflowPrMetadata(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    title: str
+    body: str
+    source_execution_ids: list[str] = Field(default_factory=list)
+    action_required: bool = False
+    checklist: list[str] = Field(default_factory=list)
+
+
 class JobExecutionListResponse(BaseModel):
     items: list[JobExecutionReport]
     total: int
@@ -882,6 +891,29 @@ def write_scheduled_workflow_review_markdown(
     return output_path
 
 
+def scheduled_workflow_pr_metadata(
+    report: ScheduledWorkflowReviewReport,
+) -> ScheduledWorkflowPrMetadata:
+    checklist = _scheduled_workflow_pr_checklist(report)
+    return ScheduledWorkflowPrMetadata(
+        title=_scheduled_workflow_pr_title(report),
+        body=_scheduled_workflow_pr_body(report, checklist),
+        source_execution_ids=[item.execution_id for item in report.items],
+        action_required=report.action_required_count > 0,
+        checklist=checklist,
+    )
+
+
+def write_scheduled_workflow_pr_metadata(
+    report: ScheduledWorkflowReviewReport,
+    output_path: Path,
+) -> Path:
+    metadata = scheduled_workflow_pr_metadata(report)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(metadata.model_dump_json(indent=2), encoding="utf-8")
+    return output_path
+
+
 def job_execution_trends(receipt_dir: Path, days: int = 14) -> JobExecutionTrendReport:
     if days < 1:
         raise ValueError("days must be at least 1.")
@@ -1254,6 +1286,64 @@ def _scheduled_pr_checklist(
         checklist.append("Rerun without dry-run before opening a publishing PR.")
     checklist.append("Link this scheduled review issue or Actions run from the PR description.")
     return checklist
+
+
+def _scheduled_workflow_pr_title(report: ScheduledWorkflowReviewReport) -> str:
+    if not report.items:
+        return "Review scheduled ContentOps output"
+    latest = report.items[0]
+    return f"Review scheduled ContentOps output: {latest.name} {latest.execution_id}"
+
+
+def _scheduled_workflow_pr_checklist(report: ScheduledWorkflowReviewReport) -> list[str]:
+    checklist = [
+        "Review the scheduled workflow summary and linked Actions run.",
+        "Confirm release evidence and delivery summary artifacts are attached.",
+    ]
+    if report.published_count:
+        checklist.append("Verify published URLs and generated content assets.")
+    if report.handoff_count:
+        checklist.append("Apply homepage handoff artifacts in the target homepage repository.")
+    if report.action_required_count:
+        checklist.append("Resolve action-required executions before merge.")
+    for item in report.items:
+        checklist.extend(f"{item.execution_id}: {entry}" for entry in item.pr_checklist)
+    return _dedupe_preserve_order(checklist)
+
+
+def _scheduled_workflow_pr_body(
+    report: ScheduledWorkflowReviewReport,
+    checklist: list[str],
+) -> str:
+    lines = [
+        "# Scheduled ContentOps Publish Review",
+        "",
+        "This PR was prepared from scheduled worker execution evidence.",
+        "",
+        "## Summary",
+        "",
+        f"- Executions reviewed: `{report.total}`",
+        f"- Action required: `{report.action_required_count}`",
+        f"- Published URLs: `{report.published_count}`",
+        f"- Homepage handoffs: `{report.handoff_count}`",
+        "",
+        "## Checklist",
+        "",
+    ]
+    lines.extend(f"- [ ] {item}" for item in checklist)
+    lines.extend(["", "## Evidence", "", _scheduled_workflow_review_markdown(report)])
+    return "\n".join(lines)
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
 
 
 def _job_execution_delivery_summary_payload(report: JobExecutionReport) -> dict[str, Any]:

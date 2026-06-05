@@ -31,6 +31,7 @@ from contentops_core.jobs import (
     scheduled_workflow_review_report,
     worker_delivery_summary_notification_log,
     worker_job_readiness,
+    write_scheduled_workflow_pr_metadata,
     write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import (
@@ -605,6 +606,10 @@ def scheduled_workflow_summary_command(
         Path | None,
         typer.Option("--output", "-o", help="Optional Markdown summary path to write."),
     ] = None,
+    pr_metadata_output: Annotated[
+        Path | None,
+        typer.Option(help="Optional JSON file with draft PR title, body, and checklist."),
+    ] = None,
     json_output: Annotated[
         bool,
         typer.Option("--json", help="Print structured JSON instead of Markdown."),
@@ -615,6 +620,8 @@ def scheduled_workflow_summary_command(
         job_execution_dir(settings.artifact_root),
         limit=limit,
     )
+    if pr_metadata_output is not None:
+        write_scheduled_workflow_pr_metadata(report, pr_metadata_output)
     if output is not None:
         write_scheduled_workflow_review_markdown(report, output)
         typer.echo(str(output))

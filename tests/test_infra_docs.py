@@ -84,6 +84,8 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "--release-evidence-dir artifacts/release-evidence/daily-ai-roundup" in workflow
     assert "contentops job-execution-alert-notify --days 7" in workflow
     assert "contentops scheduled-workflow-summary" in workflow
+    assert "--pr-metadata-output scheduled-worker/daily-pr-metadata.json" in workflow
+    assert "--pr-metadata-output scheduled-worker/project-updates-pr-metadata.json" in workflow
     assert "GITHUB_STEP_SUMMARY" in workflow
     assert "scheduled-worker/daily-review.md" in workflow
     assert "gh issue create" in workflow

@@ -83,7 +83,8 @@ jobs:
         run: |
           contentops scheduled-workflow-summary \
             --limit 5 \
-            --output scheduled-worker/daily-review.md
+            --output scheduled-worker/daily-review.md \
+            --pr-metadata-output scheduled-worker/daily-pr-metadata.json
           cat scheduled-worker/daily-review.md >> "$GITHUB_STEP_SUMMARY"
       - name: Create review issue
         if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true
@@ -149,7 +150,8 @@ jobs:
         run: |
           contentops scheduled-workflow-summary \
             --limit 5 \
-            --output scheduled-worker/project-updates-review.md
+            --output scheduled-worker/project-updates-review.md \
+            --pr-metadata-output scheduled-worker/project-updates-pr-metadata.json
           cat scheduled-worker/project-updates-review.md >> "$GITHUB_STEP_SUMMARY"
       - name: Create review issue
         if: always() && github.event_name == 'workflow_dispatch' && inputs.create_review_issue == true

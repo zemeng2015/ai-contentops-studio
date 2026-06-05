@@ -543,9 +543,16 @@ def test_cli_job_execution_commands(
     )
     scheduled_summary_result = runner.invoke(app, ["scheduled-workflow-summary", "--json"])
     scheduled_summary_markdown = tmp_path / "scheduled-review.md"
+    scheduled_pr_metadata = tmp_path / "scheduled-pr-metadata.json"
     scheduled_summary_output_result = runner.invoke(
         app,
-        ["scheduled-workflow-summary", "--output", str(scheduled_summary_markdown)],
+        [
+            "scheduled-workflow-summary",
+            "--output",
+            str(scheduled_summary_markdown),
+            "--pr-metadata-output",
+            str(scheduled_pr_metadata),
+        ],
     )
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
     recovery_run_result = runner.invoke(app, ["job-recovery-plan", report.execution_id, "--run"])
@@ -614,6 +621,9 @@ def test_cli_job_execution_commands(
         encoding="utf-8"
     )
     assert "PR Handoff" in scheduled_summary_markdown.read_text(encoding="utf-8")
+    pr_metadata_payload = json.loads(scheduled_pr_metadata.read_text(encoding="utf-8"))
+    assert pr_metadata_payload["title"].startswith("Review scheduled ContentOps output")
+    assert pr_metadata_payload["checklist"]
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

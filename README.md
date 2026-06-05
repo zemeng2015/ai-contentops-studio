@@ -267,7 +267,9 @@ contentops job-execution-alert-notify --days 14
 contentops job-execution-alert-notifications
 contentops job-execution-delivery-notify <execution_id>
 contentops job-execution-delivery-notifications
-contentops scheduled-workflow-summary --output artifacts/scheduled-workflow-review.md
+contentops scheduled-workflow-summary `
+  --output artifacts/scheduled-workflow-review.md `
+  --pr-metadata-output artifacts/scheduled-pr-metadata.json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
@@ -288,7 +290,8 @@ human-readable review packet with published URLs, homepage handoff artifacts, re
 failure reasons, and next actions. The scheduled workflow appends that Markdown to the GitHub
 Actions step summary and uploads it with the rest of the worker artifacts. The packet also includes
 a suggested PR title and checklist so homepage or publishing changes can move into a normal review
-PR without reconstructing the evidence by hand.
+PR without reconstructing the evidence by hand. Use `--pr-metadata-output` to write the same PR
+title, body, checklist, and source execution ids as JSON for GitHub Actions or release tooling.
 When manually starting `Scheduled ContentOps`, set `create_review_issue=true` to open a GitHub
 issue containing the same review packet and a link back to the Actions run. This gives reviewers a
 normal issue thread for follow-up before homepage or publishing changes are accepted.
