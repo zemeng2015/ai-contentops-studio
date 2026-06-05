@@ -276,6 +276,9 @@ fail review packages whose artifacts are missing or whose hashes have drifted.
 `contentops scheduled-workflow-archive` builds on that check by producing a ZIP with the manifest,
 verification report, package index, receipts, release evidence, content assets, and homepage
 handoff files, giving scheduled automation a portable review artifact.
+`GET /scheduled-reviews`, `GET /scheduled-reviews/{package_id}/archive`, and
+`/dashboard/scheduled-reviews` make those packages inspectable without opening raw Actions
+artifacts, including verification state, failed counts, ZIP size, and SHA-256.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
 dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
 handoff success rate, and action-required counts.

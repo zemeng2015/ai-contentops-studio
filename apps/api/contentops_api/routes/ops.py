@@ -21,10 +21,12 @@ from contentops_core.jobs import (
     JobExecutionTrendReport,
     JobRecoveryPlan,
     JobRunner,
+    ScheduledWorkflowReviewPackageListResponse,
     WorkerDeliverySummaryDelivery,
     WorkerJobCatalogResponse,
     WorkerJobReadinessResponse,
     get_job_execution_report,
+    get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
@@ -33,6 +35,7 @@ from contentops_core.jobs import (
     job_execution_trends,
     job_recovery_plan,
     list_job_execution_reports,
+    list_scheduled_workflow_review_packages,
     list_worker_job_catalog,
     notify_job_execution_alert,
     notify_worker_delivery_summary,
@@ -312,6 +315,42 @@ def build_ops_router(
             job_execution_dir(settings.artifact_root),
             limit=limit,
             offset=offset,
+        )
+
+    @router.get(
+        "/scheduled-reviews",
+        response_model=ScheduledWorkflowReviewPackageListResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def list_scheduled_reviews(
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> ScheduledWorkflowReviewPackageListResponse:
+        return list_scheduled_workflow_review_packages(
+            settings.artifact_root,
+            limit=limit,
+            offset=offset,
+        )
+
+    @router.get(
+        "/scheduled-reviews/{package_id}/archive",
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_scheduled_review_archive(package_id: str) -> FileResponse:
+        try:
+            item = get_scheduled_workflow_review_package(settings.artifact_root, package_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if not item.archive_path or not Path(item.archive_path).exists():
+            raise HTTPException(
+                status_code=404,
+                detail="Scheduled review archive is not available for this package.",
+            )
+        archive_path = Path(item.archive_path)
+        return FileResponse(
+            archive_path,
+            media_type="application/zip",
+            filename=archive_path.name,
         )
 
     @router.get(

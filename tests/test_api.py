@@ -13,9 +13,15 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobRunner,
     JobRunResult,
+    create_scheduled_workflow_review_archive,
     job_execution_dir,
     load_job_file,
+    scheduled_workflow_review_report,
+    verify_scheduled_workflow_review_manifest,
     write_job_execution_report,
+    write_scheduled_workflow_pr_metadata,
+    write_scheduled_workflow_review_manifest,
+    write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import RunStatus
 from contentops_core.release_gate import release_gate, write_release_gate_report
@@ -826,6 +832,81 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert "Run recovery jobs" in dashboard_detail_response.text
     assert "Notify delivery summary" in dashboard_detail_response.text
     assert dashboard_delivery_notify_response.status_code == 303
+
+
+def test_scheduled_review_package_endpoints_and_dashboard(tmp_path: Path) -> None:
+    client = TestClient(app)
+    original_artifact_root = settings.artifact_root
+    try:
+        settings.artifact_root = tmp_path / "artifacts"
+        path = tmp_path / "job.yaml"
+        path.write_text("name: scheduled-api\ntopic: Scheduled API package\n", encoding="utf-8")
+        report = JobRunner.dry_run_report(load_job_file(path))
+        write_job_execution_report(report, job_execution_dir(settings.artifact_root))
+        scheduled_dir = settings.artifact_root / "scheduled"
+        scheduled_dir.mkdir(parents=True)
+        operations_console_path = scheduled_dir / "daily-operations-console.json"
+        operations_console_path.write_text(
+            json.dumps({"summary": {"status": "pass"}}),
+            encoding="utf-8",
+        )
+        review = scheduled_workflow_review_report(
+            job_execution_dir(settings.artifact_root),
+            limit=5,
+            operations_console={"status": "pass"},
+        )
+        markdown_path = write_scheduled_workflow_review_markdown(
+            review,
+            scheduled_dir / "daily-review.md",
+        )
+        metadata_path = write_scheduled_workflow_pr_metadata(
+            review,
+            scheduled_dir / "daily-pr-metadata.json",
+        )
+        manifest_path = write_scheduled_workflow_review_manifest(
+            review,
+            scheduled_dir / "daily-review-manifest.json",
+            review_markdown_path=markdown_path,
+            pr_metadata_path=metadata_path,
+            operations_console_path=operations_console_path,
+        )
+        verification_path = scheduled_dir / "daily-review-manifest-verification.json"
+        verification_path.write_text(
+            verify_scheduled_workflow_review_manifest(manifest_path).model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+        archive_report = create_scheduled_workflow_review_archive(
+            manifest_path,
+            scheduled_dir / "daily-review-package.zip",
+        )
+        (scheduled_dir / "daily-review-package.json").write_text(
+            archive_report.model_dump_json(indent=2),
+            encoding="utf-8",
+        )
+
+        list_response = client.get("/scheduled-reviews")
+        dashboard_response = client.get("/dashboard")
+        dashboard_packages_response = client.get("/dashboard/scheduled-reviews")
+
+        assert list_response.status_code == 200
+        payload = list_response.json()
+        assert payload["total"] == 1
+        item = payload["items"][0]
+        assert item["status"] == "archived"
+        assert item["verification_status"] == "pass"
+        assert item["archive_exists"] is True
+        assert item["archive_sha256"] == archive_report.archive_sha256
+        archive_response = client.get(f"/scheduled-reviews/{item['id']}/archive")
+        assert archive_response.status_code == 200
+        assert archive_response.headers["content-type"] == "application/zip"
+        assert dashboard_response.status_code == 200
+        assert "Scheduled Review Packages" in dashboard_response.text
+        assert item["id"] in dashboard_response.text
+        assert dashboard_packages_response.status_code == 200
+        assert "Archives ready" in dashboard_packages_response.text
+        assert "daily-review-package.zip" in dashboard_packages_response.text
+    finally:
+        settings.artifact_root = original_artifact_root
 
 
 def test_job_execution_recovery_can_be_run_from_api_and_dashboard(

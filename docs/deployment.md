@@ -291,6 +291,9 @@ It then runs `contentops scheduled-workflow-archive` to upload a ZIP package con
 manifest, verification report, package index, receipts, release evidence, content assets, and
 homepage handoff files. Treat this ZIP as the portable review artifact for release notes or audit
 handoff.
+When those scheduled artifacts are retained under the configured artifact root, operators can use
+`GET /scheduled-reviews` or `/dashboard/scheduled-reviews` to inspect verification status and
+download the archive ZIP without opening the raw Actions artifact browser.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes

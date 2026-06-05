@@ -105,6 +105,9 @@ homepage changes. The `--pr-metadata-output` JSON file is the machine-readable v
 draft PR creation step and includes the same Operations Console summary plus content asset fields.
 The scheduled GitHub workflow also uploads `daily-operations-console.json` or
 `project-updates-operations-console.json` as structured artifact data.
+Use `GET /scheduled-reviews` or `/dashboard/scheduled-reviews` to review the persisted scheduled
+package inventory from the artifact root. The dashboard shows manifest status, verification
+failures, action-required state, ZIP size, ZIP hash, and archive download links for release review.
 Use `contentops job-execution-trends --days 14`, `GET /job-executions/trends?days=14`, or
 `/dashboard/job-execution-trends` to check recurring automation success, publish, handoff, and
 action-required rates before changing the EventBridge schedule. The trend view also lists the

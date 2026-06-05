@@ -187,6 +187,7 @@ GET  /dashboard/ops-brief
 GET  /dashboard/ops-trends
 GET  /dashboard/system-status
 GET  /dashboard/release-evidence
+GET  /dashboard/scheduled-reviews
 GET  /review-queue
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/scorecard
@@ -232,6 +233,8 @@ GET  /job-executions/trends
 GET  /job-executions/{execution_id}/summary
 POST /job-executions/{execution_id}/approve-runs
 POST /job-executions/{execution_id}/publish-runs
+GET  /scheduled-reviews
+GET  /scheduled-reviews/{package_id}/archive
 ```
 
 The system status dashboard turns `/ready` and deployment manifest checks into operator-facing
@@ -357,6 +360,9 @@ automation.
 contains the manifest, verification report, package index, worker receipts, release evidence,
 content assets, and homepage handoff files. The scheduled workflow uploads this ZIP beside the
 normal Actions artifacts so reviewers can download one complete evidence package.
+`GET /scheduled-reviews` and `/dashboard/scheduled-reviews` expose recent review packages from the
+artifact root, including verification status, failed counts, ZIP size, ZIP hash, and archive
+download links.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,

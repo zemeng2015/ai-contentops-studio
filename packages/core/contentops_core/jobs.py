@@ -351,6 +351,36 @@ class ScheduledWorkflowReviewArchiveReport(BaseModel):
     items: list[ScheduledWorkflowReviewArchiveItem] = Field(default_factory=list)
 
 
+class ScheduledWorkflowReviewPackageItem(BaseModel):
+    id: str
+    manifest_path: str
+    status: str = "unknown"
+    action_required: bool = False
+    artifact_count: int = Field(ge=0, default=0)
+    source_execution_ids: list[str] = Field(default_factory=list)
+    published_urls: list[str] = Field(default_factory=list)
+    review_markdown_path: str | None = None
+    operations_console_path: str | None = None
+    verification_path: str | None = None
+    verification_status: str = "missing"
+    verification_failed_count: int = Field(ge=0, default=0)
+    package_metadata_path: str | None = None
+    package_metadata_exists: bool = False
+    archive_path: str | None = None
+    archive_exists: bool = False
+    archive_size_bytes: int = Field(ge=0, default=0)
+    archive_sha256: str | None = None
+    updated_at: datetime | None = None
+    error: str | None = None
+
+
+class ScheduledWorkflowReviewPackageListResponse(BaseModel):
+    items: list[ScheduledWorkflowReviewPackageItem]
+    total: int
+    limit: int
+    offset: int
+
+
 class JobExecutionListResponse(BaseModel):
     items: list[JobExecutionReport]
     total: int
@@ -1168,6 +1198,159 @@ def create_scheduled_workflow_review_archive(
     report.archive_size_bytes = stat.st_size
     report.archive_sha256 = hashlib.sha256(output_path.read_bytes()).hexdigest()
     return report
+
+
+def list_scheduled_workflow_review_packages(
+    artifact_root: Path,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> ScheduledWorkflowReviewPackageListResponse:
+    manifest_paths = _scheduled_review_manifest_paths(artifact_root)
+    items = [
+        _scheduled_review_package_item(path)
+        for path in manifest_paths[offset : offset + limit]
+    ]
+    return ScheduledWorkflowReviewPackageListResponse(
+        items=items,
+        total=len(manifest_paths),
+        limit=limit,
+        offset=offset,
+    )
+
+
+def get_scheduled_workflow_review_package(
+    artifact_root: Path,
+    package_id: str,
+) -> ScheduledWorkflowReviewPackageItem:
+    for path in _scheduled_review_manifest_paths(artifact_root):
+        item = _scheduled_review_package_item(path)
+        if item.id == package_id:
+            return item
+    raise FileNotFoundError(f"Scheduled review package not found: {package_id}")
+
+
+def _scheduled_review_manifest_paths(artifact_root: Path) -> list[Path]:
+    if not artifact_root.exists():
+        return []
+    return sorted(
+        (
+            path
+            for path in artifact_root.rglob("*review-manifest.json")
+            if path.is_file()
+        ),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+
+
+def _scheduled_review_package_item(
+    manifest_path: Path,
+) -> ScheduledWorkflowReviewPackageItem:
+    updated_at = datetime.fromtimestamp(manifest_path.stat().st_mtime, UTC)
+    package_id = _scheduled_review_package_id(manifest_path)
+    paths = _scheduled_review_package_paths(manifest_path)
+    try:
+        manifest = ScheduledWorkflowReviewManifest.model_validate_json(
+            manifest_path.read_text(encoding="utf-8")
+        )
+    except Exception as exc:
+        return ScheduledWorkflowReviewPackageItem(
+            id=package_id,
+            manifest_path=str(manifest_path),
+            status="invalid",
+            updated_at=updated_at,
+            error=str(exc),
+        )
+    verification = _read_scheduled_review_verification(paths["verification"])
+    package_metadata = _read_scheduled_review_archive_report(paths["package"])
+    archive_path = paths["archive"]
+    archive_exists = archive_path.exists()
+    archive_size = archive_path.stat().st_size if archive_exists else 0
+    archive_sha = hashlib.sha256(archive_path.read_bytes()).hexdigest() if archive_exists else None
+    verification_status = verification.status if verification is not None else "missing"
+    status = verification_status
+    if verification_status == "pass" and archive_exists:
+        status = "archived"
+    elif verification_status == "missing" and not archive_exists:
+        status = "manifest_only"
+    return ScheduledWorkflowReviewPackageItem(
+        id=package_id,
+        manifest_path=str(manifest_path),
+        status=status,
+        action_required=manifest.action_required,
+        artifact_count=int(manifest.metadata.get("artifact_count") or len(manifest.artifacts)),
+        source_execution_ids=manifest.source_execution_ids,
+        published_urls=manifest.published_urls,
+        review_markdown_path=manifest.review_markdown_path,
+        operations_console_path=manifest.operations_console_path,
+        verification_path=str(paths["verification"]) if paths["verification"].exists() else None,
+        verification_status=verification_status,
+        verification_failed_count=verification.failed_count if verification is not None else 0,
+        package_metadata_path=str(paths["package"]) if paths["package"].exists() else None,
+        package_metadata_exists=paths["package"].exists(),
+        archive_path=str(archive_path) if archive_exists else None,
+        archive_exists=archive_exists,
+        archive_size_bytes=(
+            package_metadata.archive_size_bytes
+            if package_metadata is not None and package_metadata.archive_size_bytes
+            else archive_size
+        ),
+        archive_sha256=(
+            package_metadata.archive_sha256
+            if package_metadata is not None and package_metadata.archive_sha256
+            else archive_sha
+        ),
+        updated_at=updated_at,
+    )
+
+
+def _scheduled_review_package_paths(manifest_path: Path) -> dict[str, Path]:
+    name = manifest_path.name
+    if name.endswith("-manifest.json"):
+        prefix = name.removesuffix("-manifest.json")
+        return {
+            "verification": manifest_path.with_name(f"{prefix}-manifest-verification.json"),
+            "package": manifest_path.with_name(f"{prefix}-package.json"),
+            "archive": manifest_path.with_name(f"{prefix}-package.zip"),
+        }
+    if name.endswith("manifest.json"):
+        prefix = name.removesuffix("manifest.json").rstrip("-")
+        stem = f"{prefix}-" if prefix else ""
+        return {
+            "verification": manifest_path.with_name(f"{stem}manifest-verification.json"),
+            "package": manifest_path.with_name(f"{stem}package.json"),
+            "archive": manifest_path.with_name(f"{stem}package.zip"),
+        }
+    return {
+        "verification": manifest_path.with_suffix(".verification.json"),
+        "package": manifest_path.with_suffix(".package.json"),
+        "archive": manifest_path.with_suffix(".zip"),
+    }
+
+
+def _read_scheduled_review_verification(
+    path: Path,
+) -> ScheduledWorkflowReviewVerificationReport | None:
+    if not path.exists():
+        return None
+    return ScheduledWorkflowReviewVerificationReport.model_validate_json(
+        path.read_text(encoding="utf-8")
+    )
+
+
+def _read_scheduled_review_archive_report(
+    path: Path,
+) -> ScheduledWorkflowReviewArchiveReport | None:
+    if not path.exists():
+        return None
+    return ScheduledWorkflowReviewArchiveReport.model_validate_json(
+        path.read_text(encoding="utf-8")
+    )
+
+
+def _scheduled_review_package_id(manifest_path: Path) -> str:
+    return hashlib.sha256(str(manifest_path.resolve()).encode("utf-8")).hexdigest()[:16]
 
 
 def _scheduled_review_archive_items(

@@ -11,6 +11,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobExecutionTrendReport,
     JobRecoveryPlan,
+    ScheduledWorkflowReviewPackageItem,
     WorkerDeliverySummaryDelivery,
     WorkerJobCatalogItem,
     WorkerJobReadinessResponse,
@@ -429,6 +430,51 @@ def _job_executions_html(reports: list[JobExecutionReport]) -> str:
       </table>
       <p>Failed executions expose <code>/job-executions/&lt;id&gt;/recovery-plan</code>.</p>
     """
+
+
+def _scheduled_review_packages_html(
+    items: list[ScheduledWorkflowReviewPackageItem],
+) -> str:
+    if not items:
+        return "<p>No scheduled review packages recorded.</p>"
+    rows = "".join(
+        f"""
+        <tr>
+          <td><code>{escape(item.id)}</code></td>
+          <td>{escape(item.status)}</td>
+          <td>{escape(item.verification_status)}</td>
+          <td>{item.verification_failed_count}</td>
+          <td>{item.artifact_count}</td>
+          <td>{str(item.action_required).lower()}</td>
+          <td>{escape(str(item.archive_size_bytes))}</td>
+          <td>{_scheduled_review_archive_link(item)}</td>
+          <td>{escape(item.updated_at.isoformat() if item.updated_at else "n/a")}</td>
+        </tr>
+        """
+        for item in items
+    )
+    return f"""
+      <p><a href="/scheduled-reviews">Scheduled review package JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Package</th><th>Status</th><th>Verification</th><th>Failed</th>
+            <th>Artifacts</th><th>Action required</th><th>Zip bytes</th>
+            <th>Archive</th><th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _scheduled_review_archive_link(item: ScheduledWorkflowReviewPackageItem) -> str:
+    if not item.archive_exists:
+        return "not available"
+    return (
+        f'<a href="/scheduled-reviews/{escape(item.id)}/archive">'
+        f"{escape(item.archive_path or 'download zip')}</a>"
+    )
 
 
 def _job_execution_detail_html(

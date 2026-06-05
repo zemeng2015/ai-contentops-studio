@@ -23,6 +23,7 @@ from contentops_core.jobs import (
     job_execution_trends,
     job_recovery_plan,
     list_job_execution_reports,
+    list_scheduled_workflow_review_packages,
     list_worker_job_catalog,
     load_job_file,
     notify_job_execution_alert,
@@ -435,8 +436,16 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     verification = verify_scheduled_workflow_review_manifest(manifest_path)
     assert verification.status == "pass"
     assert verification.checked_count == manifest["metadata"]["artifact_count"]
+    (tmp_path / "scheduled-review-manifest-verification.json").write_text(
+        verification.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
     archive_path = tmp_path / "scheduled-review-package.zip"
     archive_report = create_scheduled_workflow_review_archive(manifest_path, archive_path)
+    (tmp_path / "scheduled-review-package.json").write_text(
+        archive_report.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
     assert archive_report.status == "pass"
     assert archive_report.artifact_count == manifest["metadata"]["artifact_count"]
     assert archive_report.archive_size_bytes == archive_path.stat().st_size
@@ -450,6 +459,11 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert "scheduled-review-package.json" in names
     assert any(name.endswith("/feed.xml") for name in names)
     assert any(name.endswith("/run-scheduled-homepage-handoff.zip") for name in names)
+    packages = list_scheduled_workflow_review_packages(tmp_path)
+    assert packages.total == 1
+    assert packages.items[0].status == "archived"
+    assert packages.items[0].archive_sha256 == archive_report.archive_sha256
+    assert packages.items[0].verification_status == "pass"
     markdown_path.write_text("drift", encoding="utf-8")
     drift_verification = verify_scheduled_workflow_review_manifest(manifest_path)
     assert drift_verification.status == "fail"
