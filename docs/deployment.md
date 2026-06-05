@@ -245,6 +245,12 @@ terraform apply \
   -var='worker_schedule_expression=cron(0 13 * * ? *)'
 ```
 
+For repository-hosted automation before a full AWS rollout, enable the `Scheduled ContentOps`
+GitHub Actions workflow. It runs `contentops worker-job-readiness --json`, worker dry-runs, live
+worker executions, alert notification, and artifact upload for the daily and weekly YAML calendars.
+Use `workflow_dispatch` with `dry_run_only=true` for the first runs, then add repository secrets
+for live providers and notifications before relying on scheduled executions.
+
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes
 require `X-ContentOps-Api-Key` or an `api_key` query parameter.

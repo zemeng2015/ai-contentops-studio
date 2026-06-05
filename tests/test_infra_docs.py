@@ -68,6 +68,23 @@ def test_ci_validates_terraform() -> None:
     assert "release-gate/release-gate.json" in workflow
 
 
+def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
+    workflow = Path(".github/workflows/scheduled-contentops.yml").read_text(encoding="utf-8")
+
+    assert "name: Scheduled ContentOps" in workflow
+    assert "workflow_dispatch:" in workflow
+    assert 'cron: "0 0 * * *"' in workflow
+    assert 'cron: "30 0 * * 1"' in workflow
+    assert "contentops worker-job-readiness --json" in workflow
+    assert "pipelines/daily_ai_roundup.yaml" in workflow
+    assert "pipelines/project_repository_updates.yaml" in workflow
+    assert "--dry-run" in workflow
+    assert "--release-evidence-dir artifacts/release-evidence/daily-ai-roundup" in workflow
+    assert "contentops job-execution-alert-notify --days 7" in workflow
+    assert "actions/upload-artifact@v7" in workflow
+    assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in workflow
+
+
 def test_docker_image_contains_release_profile() -> None:
     dockerfile = Path("infra/docker/Dockerfile").read_text(encoding="utf-8")
     entrypoint = Path("infra/docker/entrypoint.py").read_text(encoding="utf-8")

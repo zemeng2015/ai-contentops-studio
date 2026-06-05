@@ -1,0 +1,129 @@
+name: Scheduled ContentOps
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+    - cron: "30 0 * * 1"
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: "Pipeline to run"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - project-updates
+          - all
+      dry_run_only:
+        description: "Validate and dry-run without executing the worker"
+        required: true
+        default: true
+        type: boolean
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  CONTENTOPS_ARTIFACT_ROOT: artifacts
+  CONTENTOPS_DATABASE_URL: sqlite:///scheduled-contentops.db
+  CONTENTOPS_SITE_OUTPUT_DIR: site
+  CONTENTOPS_PUBLIC_BASE_URL: https://zemeng2015.github.io/ai-contentops-studio
+  CONTENTOPS_RESEARCH_SEARCH_API_KEY: ${{ secrets.CONTENTOPS_RESEARCH_SEARCH_API_KEY }}
+  CONTENTOPS_RESEARCH_GITHUB_TOKEN: ${{ secrets.CONTENTOPS_RESEARCH_GITHUB_TOKEN }}
+  CONTENTOPS_OPENAI_API_KEY: ${{ secrets.CONTENTOPS_OPENAI_API_KEY }}
+  CONTENTOPS_NOTIFICATION_WEBHOOK_URL: ${{ secrets.CONTENTOPS_NOTIFICATION_WEBHOOK_URL }}
+
+permissions:
+  contents: read
+
+jobs:
+  daily-ai-roundup:
+    name: Daily AI roundup
+    if: >-
+      github.event_name == 'schedule' && github.event.schedule == '0 0 * * *' ||
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.pipeline == 'daily' || inputs.pipeline == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/job-executions artifacts/release-evidence scheduled-worker
+      - name: Worker readiness gate
+        run: contentops worker-job-readiness --json | tee scheduled-worker/readiness.json
+      - name: Worker dry run
+        run: |
+          contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml \
+            --dry-run \
+            --json \
+            --receipt-dir artifacts/job-executions \
+            | tee scheduled-worker/daily-dry-run.json
+      - name: Execute worker
+        if: github.event_name == 'schedule' || inputs.dry_run_only == false
+        run: |
+          contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml \
+            --receipt-dir artifacts/job-executions \
+            --release-evidence-dir artifacts/release-evidence/daily-ai-roundup \
+            | tee scheduled-worker/daily-execution.txt
+      - name: Notify worker alerts
+        if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
+        run: contentops job-execution-alert-notify --days 7 | tee scheduled-worker/daily-alert.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: scheduled-contentops-daily
+          path: |
+            scheduled-worker/**
+            artifacts/job-executions/**
+            artifacts/release-evidence/**
+            site/**
+
+  project-repository-updates:
+    name: Project repository updates
+    if: >-
+      github.event_name == 'schedule' && github.event.schedule == '30 0 * * 1' ||
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.pipeline == 'project-updates' || inputs.pipeline == 'all')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Prepare artifact directories
+        run: mkdir -p artifacts/job-executions artifacts/release-evidence scheduled-worker
+      - name: Worker readiness gate
+        run: contentops worker-job-readiness --json | tee scheduled-worker/readiness.json
+      - name: Worker dry run
+        run: |
+          contentops-worker run-pipeline pipelines/project_repository_updates.yaml \
+            --dry-run \
+            --json \
+            --receipt-dir artifacts/job-executions \
+            | tee scheduled-worker/project-updates-dry-run.json
+      - name: Execute worker
+        if: github.event_name == 'schedule' || inputs.dry_run_only == false
+        run: |
+          contentops-worker run-pipeline pipelines/project_repository_updates.yaml \
+            --receipt-dir artifacts/job-executions \
+            --release-evidence-dir artifacts/release-evidence/project-repository-updates \
+            | tee scheduled-worker/project-updates-execution.txt
+      - name: Notify worker alerts
+        if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
+        run: contentops job-execution-alert-notify --days 7 | tee scheduled-worker/project-updates-alert.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: scheduled-contentops-project-updates
+          path: |
+            scheduled-worker/**
+            artifacts/job-executions/**
+            artifacts/release-evidence/**
+            site/**

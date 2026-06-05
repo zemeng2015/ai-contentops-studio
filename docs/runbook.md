@@ -13,6 +13,7 @@ contentops ops-summary --json
 contentops deployment-manifest
 contentops release-readiness --json
 contentops worker-jobs --json
+contentops worker-job-readiness --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
 ```
@@ -26,6 +27,8 @@ Expected result:
 - `scheduled_research_ready` is `ok` for production worker calendars that depend on live sources.
 - `publishing_recovery` is `ok`, proving the configured publishing target can be planned safely.
 - `worker-jobs` finds the expected calendars and reports `invalid_count=0`.
+- `worker-job-readiness` reports `can_schedule=true` before a cron, EventBridge, or GitHub Actions
+  schedule is enabled.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 
@@ -44,6 +47,12 @@ $env:CONTENTOPS_RESEARCH_PROVIDER="github"
 $env:CONTENTOPS_RESEARCH_GITHUB_TOKEN="..."
 contentops-worker run-pipeline pipelines/project_repository_updates.yaml --receipt-dir artifacts/job-executions
 ```
+
+For GitHub-hosted automation, use the `Scheduled ContentOps` workflow. It runs daily for
+`pipelines/daily_ai_roundup.yaml`, weekly for `pipelines/project_repository_updates.yaml`, and can
+be started manually with `workflow_dispatch`. Keep `dry_run_only=true` until repository secrets are
+configured and the uploaded `scheduled-contentops-*` artifacts show the expected receipts, release
+evidence, and alert notification log.
 
 For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
 durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs

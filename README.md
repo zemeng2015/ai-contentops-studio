@@ -275,6 +275,13 @@ contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir art
 automation. It checks schedule presence, cron shape, timezone, timeout, retry policy, concurrency
 policy, and whether publishing jobs create homepage handoff evidence. Use it as the preflight gate
 before connecting the same YAML to GitHub Actions schedules, EventBridge, cron, or another runner.
+This repository also includes `.github/workflows/scheduled-contentops.yml`, which runs the same
+readiness gate, worker dry-run, scheduled execution, worker alert notification, and artifact upload
+for the daily AI roundup and weekly project repository update pipelines. Trigger it manually with
+`workflow_dispatch` for a dry-run, then set repository secrets such as
+`CONTENTOPS_RESEARCH_SEARCH_API_KEY`, `CONTENTOPS_RESEARCH_GITHUB_TOKEN`,
+`CONTENTOPS_OPENAI_API_KEY`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` before relying on scheduled
+live runs.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
