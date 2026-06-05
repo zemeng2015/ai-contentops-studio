@@ -554,6 +554,26 @@ class HomepageHandoffEvidence(BaseModel):
     items: list[HomepageHandoffEvidenceItem] = Field(default_factory=list)
 
 
+class SourceReviewEvidenceItem(BaseModel):
+    run_id: str
+    artifact_path: str
+    total: int = Field(ge=0)
+    include_count: int = Field(ge=0)
+    exclude_count: int = Field(ge=0)
+    needs_review_count: int = Field(ge=0)
+    latest_reviewed_at: datetime | None = None
+
+
+class SourceReviewEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total_runs: int = Field(ge=0)
+    total_decisions: int = Field(ge=0)
+    include_count: int = Field(ge=0, default=0)
+    exclude_count: int = Field(ge=0, default=0)
+    needs_review_count: int = Field(ge=0, default=0)
+    items: list[SourceReviewEvidenceItem] = Field(default_factory=list)
+
+
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
@@ -562,6 +582,7 @@ class ReleaseEvidenceBundle(BaseModel):
     release_readiness: ReleaseReadinessReport
     deployment_check: DeploymentCheckReport
     homepage_handoffs: HomepageHandoffEvidence
+    source_reviews: SourceReviewEvidence
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alert_deliveries: list[dict[str, Any]] = Field(default_factory=list)

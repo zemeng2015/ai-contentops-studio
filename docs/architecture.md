@@ -287,3 +287,6 @@ Publishing providers:
   into a reviewable zip before the homepage repository is committed. Release evidence indexes
   generated homepage handoff zips in `homepage_handoffs.json` with path, size, digest, and update
   time, keeping personal-site publish packages tied to the deployment evidence trail.
+  Release evidence also indexes source review decisions in `source_reviews.json`, summarizing
+  include, exclude, and pending-review decisions by run so source curation is part of the final
+  deployment evidence bundle.

@@ -201,6 +201,8 @@ def test_release_approval_api_and_dashboard(
     evidence_payload = evidence_response.json()
     assert evidence_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
     assert "release_approval.json" in evidence_payload["summary"]["artifact_files"]
+    assert "source_reviews.json" in evidence_payload["summary"]["artifact_files"]
+    assert evidence_payload["source_reviews"]["total_decisions"] >= 0
     assert evidence_bundle_response.status_code == 200
     assert b"release_approval.json" in evidence_bundle_response.content
     assert dashboard_response.status_code == 200
@@ -423,6 +425,8 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert "worker_execution_trends" in release_evidence_payload
     assert "worker_execution_alerts" in release_evidence_payload
     assert "worker_execution_alert_deliveries" in release_evidence_payload
+    assert "source_reviews" in release_evidence_payload
+    assert release_evidence_payload["source_reviews"]["total_decisions"] >= 1
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
     assert retention_response.status_code == 200
     assert retention_response.json()["total_runs_scanned"] >= 1
@@ -961,6 +965,7 @@ def test_dashboard_release_evidence_renders() -> None:
     assert "Deployment Capabilities" in response.text
     assert "Evidence Files" in response.text
     assert "Homepage Handoffs" in response.text
+    assert "Source Review Evidence" in response.text
     assert "Worker Execution Trends" in response.text
     assert "Worker alert" in response.text
     assert "Worker Alert Notifications" in response.text

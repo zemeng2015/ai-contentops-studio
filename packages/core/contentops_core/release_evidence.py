@@ -33,6 +33,10 @@ from contentops_core.models import (
     HomepageHandoffEvidenceItem,
     ReleaseEvidenceBundle,
     ReleaseEvidenceSummary,
+    SourceReviewDecision,
+    SourceReviewEvidence,
+    SourceReviewEvidenceItem,
+    SourceReviewRecord,
 )
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
@@ -54,6 +58,7 @@ def build_release_evidence(
     preflight = deployment_check(settings, repository, operations)
     approval = _latest_release_approval(settings.artifact_root)
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
+    source_reviews = _source_review_evidence(settings.artifact_root)
     worker_execution_trends = job_execution_trends(
         job_execution_dir(settings.artifact_root),
         days=14,
@@ -73,6 +78,7 @@ def build_release_evidence(
         "homepage_handoffs.json",
         "operations_summary.json",
         "release_readiness.json",
+        "source_reviews.json",
         "summary.json",
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
@@ -95,6 +101,7 @@ def build_release_evidence(
         release_readiness=readiness,
         deployment_check=preflight,
         homepage_handoffs=homepage_handoffs,
+        source_reviews=source_reviews,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
         worker_execution_alert_deliveries=[
             delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
@@ -117,6 +124,7 @@ def write_release_evidence(
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
+        "source_reviews": bundle.source_reviews.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
         "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
         "worker_execution_alerts": bundle.worker_execution_alerts,
@@ -223,6 +231,65 @@ def _homepage_handoff_item(
         sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
         updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
     )
+
+
+def _source_review_evidence(artifact_root: Path, limit: int = 100) -> SourceReviewEvidence:
+    if not artifact_root.exists():
+        return SourceReviewEvidence(total_runs=0, total_decisions=0)
+    paths = sorted(
+        artifact_root.rglob("source-review.json"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    items = [
+        item
+        for path in paths[:limit]
+        if (item := _source_review_item(artifact_root, path)) is not None
+    ]
+    return SourceReviewEvidence(
+        total_runs=len(paths),
+        total_decisions=sum(item.total for item in items),
+        include_count=sum(item.include_count for item in items),
+        exclude_count=sum(item.exclude_count for item in items),
+        needs_review_count=sum(item.needs_review_count for item in items),
+        items=items,
+    )
+
+
+def _source_review_item(
+    artifact_root: Path,
+    path: Path,
+) -> SourceReviewEvidenceItem | None:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        return None
+    records = [SourceReviewRecord.model_validate(item) for item in data if isinstance(item, dict)]
+    try:
+        artifact_path = path.relative_to(artifact_root).as_posix()
+    except ValueError:
+        artifact_path = path.as_posix()
+    return SourceReviewEvidenceItem(
+        run_id=_run_id_from_artifact_dir(path.parent),
+        artifact_path=artifact_path,
+        total=len(records),
+        include_count=sum(
+            1 for record in records if record.decision == SourceReviewDecision.INCLUDE
+        ),
+        exclude_count=sum(
+            1 for record in records if record.decision == SourceReviewDecision.EXCLUDE
+        ),
+        needs_review_count=sum(
+            1 for record in records if record.decision == SourceReviewDecision.NEEDS_REVIEW
+        ),
+        latest_reviewed_at=max((record.decided_at for record in records), default=None),
+    )
+
+
+def _run_id_from_artifact_dir(path: Path) -> str:
+    name = path.name
+    if "-" not in name:
+        return name
+    return name.rsplit("-", 1)[-1]
 
 
 def _evidence_manifest(output_dir: Path, artifact_files: list[str]) -> ArtifactManifest:

@@ -1218,6 +1218,30 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     worker_trends_summary = bundle.worker_execution_trends.get("summary", {})
     worker_buckets = bundle.worker_execution_trends.get("buckets", [])
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
+    source_review_latest = {
+        item.run_id: item.latest_reviewed_at.isoformat() if item.latest_reviewed_at else "n/a"
+        for item in bundle.source_reviews.items
+    }
+    source_review_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(item.run_id)}</td>
+          <td>{escape(item.artifact_path)}</td>
+          <td>{item.total}</td>
+          <td>{item.include_count}</td>
+          <td>{item.exclude_count}</td>
+          <td>{item.needs_review_count}</td>
+          <td>{escape(source_review_latest[item.run_id])}</td>
+        </tr>
+        """
+        for item in bundle.source_reviews.items
+    )
+    if not source_review_rows:
+        source_review_rows = """
+        <tr>
+          <td colspan="7"><span class="muted">No source review decisions recorded.</span></td>
+        </tr>
+        """
     gate_rows = "".join(
         f"""
         <tr>
@@ -1369,6 +1393,14 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         <div><strong>{len(summary.artifact_files)}</strong><span>Evidence files</span></div>
         <div><strong>{bundle.homepage_handoffs.total}</strong><span>Homepage handoffs</span></div>
         <div>
+          <strong>{bundle.source_reviews.total_decisions}</strong>
+          <span>Source reviews</span>
+        </div>
+        <div>
+          <strong>{bundle.source_reviews.needs_review_count}</strong>
+          <span>Pending sources</span>
+        </div>
+        <div>
           <strong>{escape(str(worker_trends_summary.get("execution_count", 0)))}</strong>
           <span>Worker executions</span>
         </div>
@@ -1408,6 +1440,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <tr><th>Run</th><th>Artifact</th><th>Size</th><th>SHA256</th><th>Updated</th></tr>
         </thead>
         <tbody>{handoff_rows}</tbody>
+      </table>
+      <h2>Source Review Evidence</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Artifact</th><th>Total</th><th>Include</th>
+            <th>Exclude</th><th>Needs review</th><th>Latest</th>
+          </tr>
+        </thead>
+        <tbody>{source_review_rows}</tbody>
       </table>
       <h2>Worker Execution Trends</h2>
       <div class="metrics">

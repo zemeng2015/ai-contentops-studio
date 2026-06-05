@@ -43,6 +43,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "homepage_handoffs.json",
         "operations_summary.json",
         "release_readiness.json",
+        "source_reviews.json",
         "summary.json",
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
@@ -68,6 +69,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     worker_alert_deliveries = json.loads(
         (output_dir / "worker_execution_alert_deliveries.json").read_text(encoding="utf-8")
     )
+    source_reviews = json.loads(
+        (output_dir / "source_reviews.json").read_text(encoding="utf-8")
+    )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
     assert deployment_check["profile"] == "production"
     assert "environment_template" in {check["name"] for check in deployment_check["checks"]}
@@ -80,7 +84,10 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert worker_trends["summary"]["top_failure_reasons"] == []
     assert worker_alerts["severity"] == "info"
     assert worker_alert_deliveries == []
+    assert source_reviews["total_runs"] == 0
+    assert source_reviews["total_decisions"] == 0
     assert bundle.worker_execution_alerts["severity"] == "info"
+    assert bundle.source_reviews.total_decisions == 0
     assert bundle.worker_execution_alert_deliveries == []
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
@@ -117,6 +124,70 @@ def test_release_evidence_indexes_homepage_handoff_bundles(
     assert handoffs["items"][0]["sha256"] == expected_sha
     assert "homepage_handoffs.json" in bundle.summary.artifact_files
     assert evidence_manifest["artifacts"]["homepage_handoffs.json"]["media_type"] == (
+        "application/json"
+    )
+
+
+def test_release_evidence_indexes_source_review_decisions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(artifact_root))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    run_artifact_dir = artifact_root / "20260605-source-review-run-abc123"
+    run_artifact_dir.mkdir(parents=True)
+    (run_artifact_dir / "source-review.json").write_text(
+        json.dumps(
+            [
+                {
+                    "source_key": "https://example.com/keep",
+                    "source_title": "Keep",
+                    "decision": "include",
+                    "reviewer": "zack",
+                    "notes": "Good evidence.",
+                    "decided_at": "2026-06-05T00:00:00Z",
+                },
+                {
+                    "source_key": "https://example.com/drop",
+                    "source_title": "Drop",
+                    "decision": "exclude",
+                    "reviewer": "zack",
+                    "notes": "Too generic.",
+                    "decided_at": "2026-06-05T00:01:00Z",
+                },
+                {
+                    "source_key": "https://example.com/check",
+                    "source_title": "Check",
+                    "decision": "needs_review",
+                    "reviewer": "zack",
+                    "notes": "Needs owner confirmation.",
+                    "decided_at": "2026-06-05T00:02:00Z",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    payload = json.loads((output_dir / "source_reviews.json").read_text(encoding="utf-8"))
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    assert bundle.source_reviews.total_runs == 1
+    assert bundle.source_reviews.total_decisions == 3
+    assert bundle.source_reviews.include_count == 1
+    assert bundle.source_reviews.exclude_count == 1
+    assert bundle.source_reviews.needs_review_count == 1
+    assert bundle.source_reviews.items[0].run_id == "abc123"
+    assert payload["items"][0]["artifact_path"] == (
+        "20260605-source-review-run-abc123/source-review.json"
+    )
+    assert "source_reviews.json" in bundle.summary.artifact_files
+    assert evidence_manifest["artifacts"]["source_reviews.json"]["media_type"] == (
         "application/json"
     )
 
