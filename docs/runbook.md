@@ -47,6 +47,8 @@ Expected result:
   reviewer opens the detailed evidence tables.
 - Use each risk row's evidence link to jump directly to the detailed table or operations dashboard
   behind the signal, then return to the summary before recording a release approval.
+- Use the risk row's operation button when it is present. These buttons reuse protected dashboard
+  actions, such as worker alert notification and scheduled review package archive rebuilds.
 - If `contentops release-gate` reports `content_calendar_lineage=warn`, finish the campaign review
   items that are in scope for the release. If it reports `fail`, recover or rerun failed calendar
   items before deploying.

@@ -272,6 +272,8 @@ It also includes a Release Risk Summary that rolls up gate failures, preflight w
 lineage actions, worker recovery backlog, publish drift, and source review backlog for sign-off.
 Each risk links back to the relevant evidence section or operations dashboard so reviewers can move
 from summary to investigation without searching the bundle by hand.
+When a safe dashboard action already exists, the summary renders the protected operation directly,
+such as notifying worker alerts or rebuilding scheduled review packages.
 `config-audit` exposes a redacted runtime and secret posture report, so production operators can
 verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or

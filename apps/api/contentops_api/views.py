@@ -1062,7 +1062,7 @@ def _release_calendar_published_url(item: dict[object, object]) -> str:
     return f'<a href="{escaped}">{escaped}</a>'
 
 
-def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
+def _release_risk_summary_html(bundle: ReleaseEvidenceBundle, api_key: str = "") -> str:
     items = _release_risk_summary_items(bundle)
     fail_count = sum(1 for item in items if item["severity"] == "fail")
     warn_count = sum(1 for item in items if item["severity"] == "warn")
@@ -1079,6 +1079,7 @@ def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
           <td>{escape(item["signal"])}</td>
           <td>{escape(item["action"])}</td>
           <td>{_release_risk_target_link(item)}</td>
+          <td>{_release_risk_operation_cell(item, api_key)}</td>
         </tr>
         """
         for item in items
@@ -1086,7 +1087,7 @@ def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
     if not rows:
         rows = """
         <tr>
-          <td colspan="5"><span class="muted">No release risks detected.</span></td>
+          <td colspan="6"><span class="muted">No release risks detected.</span></td>
         </tr>
         """
     return f"""
@@ -1100,7 +1101,7 @@ def _release_risk_summary_html(bundle: ReleaseEvidenceBundle) -> str:
         <thead>
           <tr>
             <th>Area</th><th>Severity</th><th>Signal</th><th>Recommended action</th>
-            <th>Open</th>
+            <th>Open</th><th>Operate</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>
@@ -1194,19 +1195,38 @@ def _release_risk_summary_items(bundle: ReleaseEvidenceBundle) -> list[dict[str,
             )
         )
     if bundle.scheduled_review_packages.action_required_count:
-        items.append(
-            _release_risk_item(
-                "Scheduled review",
-                "warn",
-                (
-                    f"{bundle.scheduled_review_packages.action_required_count} "
-                    "packages need action"
-                ),
-                "Archive or verify scheduled review packages before release approval.",
-                "/dashboard/scheduled-reviews",
-                "Open packages",
+        scheduled_actions = [
+            package
+            for package in bundle.scheduled_review_packages.items
+            if package.action_required
+        ]
+        for package in scheduled_actions[:5]:
+            items.append(
+                _release_risk_item(
+                    "Scheduled review",
+                    "warn",
+                    f"{package.id} needs package action",
+                    "Archive or verify this scheduled review package before release approval.",
+                    "/dashboard/scheduled-reviews",
+                    "Open packages",
+                    f"/dashboard/scheduled-reviews/{escape(package.id)}/archive",
+                    "Rebuild package",
+                )
             )
+        remaining = bundle.scheduled_review_packages.action_required_count - len(
+            scheduled_actions[:5]
         )
+        if remaining > 0:
+            items.append(
+                _release_risk_item(
+                    "Scheduled review",
+                    "warn",
+                    f"{remaining} additional scheduled review packages need action",
+                    "Archive or verify scheduled review packages before release approval.",
+                    "/dashboard/scheduled-reviews",
+                    "Open packages",
+                )
+            )
     _append_worker_risks(items, bundle.worker_execution_alerts, bundle.worker_recovery_lineage)
     return items
 
@@ -1218,6 +1238,28 @@ def _release_risk_target_link(item: dict[str, str]) -> str:
     )
 
 
+def _release_risk_operation_cell(item: dict[str, str], api_key: str) -> str:
+    operation_url = item.get("operation_url")
+    operation_label = item.get("operation_label")
+    if not operation_url or not operation_label:
+        return '<span class="muted">Use evidence link</span>'
+    return f"""
+      <form method="post" action="{escape(operation_url)}{_api_key_query(api_key)}">
+        {_api_key_hidden(api_key)}
+        {_release_risk_operation_hidden_inputs(item)}
+        <button type="submit">{escape(operation_label)}</button>
+      </form>
+    """
+
+
+def _release_risk_operation_hidden_inputs(item: dict[str, str]) -> str:
+    name = item.get("operation_hidden_name")
+    value = item.get("operation_hidden_value")
+    if not name:
+        return ""
+    return f'<input type="hidden" name="{escape(name)}" value="{escape(value or "")}">'
+
+
 def _release_risk_item(
     area: str,
     severity: str,
@@ -1225,6 +1267,10 @@ def _release_risk_item(
     action: str,
     target: str,
     target_label: str,
+    operation_url: str = "",
+    operation_label: str = "",
+    operation_hidden_name: str = "",
+    operation_hidden_value: str = "",
 ) -> dict[str, str]:
     return {
         "area": area,
@@ -1233,6 +1279,10 @@ def _release_risk_item(
         "action": action,
         "target": target,
         "target_label": target_label,
+        "operation_url": operation_url,
+        "operation_label": operation_label,
+        "operation_hidden_name": operation_hidden_name,
+        "operation_hidden_value": operation_hidden_value,
     }
 
 
@@ -1301,6 +1351,10 @@ def _append_worker_risks(
                 "Inspect worker alert signals and fix the latest automation failure.",
                 "/dashboard/job-execution-trends",
                 "Open worker trends",
+                "/dashboard/job-execution-alerts/notify",
+                "Notify worker alert",
+                "days",
+                "14",
             )
         )
     unrecovered = _release_payload_int(worker_recovery, "unrecovered_execution_count")
@@ -2181,7 +2235,7 @@ def _unique_recommendations(items: list[dict[str, str]]) -> list[dict[str, str]]
     return unique
 
 
-def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
+def _release_evidence_html(bundle: ReleaseEvidenceBundle, api_key: str = "") -> str:
     summary = bundle.summary
     deploy_status = escape(bundle.deployment_check.status)
     can_deploy = str(bundle.deployment_check.can_deploy).lower()
@@ -2193,7 +2247,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     worker_failure_reasons = worker_trends_summary.get("top_failure_reasons", [])
     calendar_lineage = bundle.content_calendar_lineage
     calendar_lineage_html = _release_calendar_lineage_html(calendar_lineage)
-    release_risk_summary_html = _release_risk_summary_html(bundle)
+    release_risk_summary_html = _release_risk_summary_html(bundle, api_key)
     source_review_latest = {
         item.run_id: item.latest_reviewed_at.isoformat() if item.latest_reviewed_at else "n/a"
         for item in bundle.source_reviews.items

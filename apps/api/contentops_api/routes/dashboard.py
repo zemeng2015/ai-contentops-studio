@@ -950,7 +950,7 @@ def build_dashboard_router(
                   </p>
                   {_release_gate_html(gate)}
                   {_release_gate_history_html(gate_history)}
-                  {_release_evidence_html(bundle)}
+                  {_release_evidence_html(bundle, api_key)}
                   {_release_approvals_html(approvals, api_key)}
                 </section>
                 """,
