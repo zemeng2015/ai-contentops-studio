@@ -4,8 +4,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from contentops_core.factory import build_review_service
-from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest
+from contentops_core.factory import build_pipeline, build_review_service
+from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest, RunRequest
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_gate import (
     list_release_gate_reports,
@@ -116,6 +116,48 @@ def test_release_gate_warns_for_dirty_distribution_assets(tmp_path: Path) -> Non
         "content-distribution-manifest.json"
     ]
     assert "content-assets" in distribution_check.remediation_steps[0]
+
+
+def test_release_gate_fails_when_published_content_drifts(tmp_path: Path) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    pipeline = build_pipeline(settings)
+    result = pipeline.run(RunRequest(topic="Release gate publish drift"))
+    service.approve(result.run.id, reviewer="zack")
+    service.publish(result.run.id)
+    approve_release(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        request=ReleaseApprovalRequest(
+            decision=ReleaseApprovalDecision.APPROVED,
+            approver="zack",
+            notes="Approved before drift.",
+        ),
+        git_sha="release-sha",
+    )
+    target_file = next(settings.site_output_dir.glob("*.html"))
+    target_file.write_text("manual edit after publish", encoding="utf-8")
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="release-sha",
+    )
+
+    publish_check = next(check for check in report.checks if check.name == "publish_verification")
+    assert report.status == "fail"
+    assert report.can_deploy is False
+    assert publish_check.status == "fail"
+    assert publish_check.evidence["drift_count"] == 1
+    assert publish_check.evidence["drifting_run_ids"] == [result.run.id]
+    assert "verify-publish" in publish_check.remediation_steps[0]
 
 
 def test_release_gate_fails_when_approval_git_sha_does_not_match(tmp_path: Path) -> None:

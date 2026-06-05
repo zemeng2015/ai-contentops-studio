@@ -163,6 +163,9 @@ expected manifest hash and git status before shipping a site update.
 If `contentops release-gate` reports `content_distribution=warn`, commit or intentionally stage the
 generated feed, promotion brief, and manifest before deployment. If it reports `fail`, regenerate
 distribution assets because the manifest is incomplete.
+If the gate reports `publish_verification=fail`, run `contentops verify-publish <run_id>` for each
+drifting run in `publish_verifications.json`, then restore the expected target files, republish the
+approved content, or roll the run back before regenerating release evidence.
 When preparing a deployment handoff, run
 `contentops release-gate --git-sha <sha> --json --record --checklist-output release-gate-checklist.md`
 and review the Markdown checklist with the JSON report. The checklist translates failed or warning

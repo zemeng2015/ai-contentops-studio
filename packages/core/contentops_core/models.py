@@ -590,6 +590,27 @@ class ContentDistributionEvidence(BaseModel):
     items: list[ContentDistributionEvidenceItem] = Field(default_factory=list)
 
 
+class PublishVerificationEvidenceItem(BaseModel):
+    run_id: str
+    url: str
+    provider: str
+    verified: bool
+    item_count: int = Field(ge=0)
+    mismatch_count: int = Field(ge=0)
+    missing_count: int = Field(ge=0)
+    artifact_path: str
+    verified_at: datetime
+
+
+class PublishVerificationEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    verified_count: int = Field(ge=0)
+    drift_count: int = Field(ge=0)
+    missing_receipt_count: int = Field(ge=0)
+    items: list[PublishVerificationEvidenceItem] = Field(default_factory=list)
+
+
 class WorkerDeliverySummaryEvidenceItem(BaseModel):
     execution_id: str
     name: str
@@ -619,6 +640,7 @@ class ReleaseEvidenceBundle(BaseModel):
     deployment_check: DeploymentCheckReport
     homepage_handoffs: HomepageHandoffEvidence
     content_distribution: ContentDistributionEvidence
+    publish_verifications: PublishVerificationEvidence
     source_reviews: SourceReviewEvidence
     worker_delivery_summaries: WorkerDeliverySummaryEvidence
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)

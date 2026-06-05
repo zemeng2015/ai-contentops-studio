@@ -219,13 +219,16 @@ Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 ```
 
 The gate fails when release readiness fails, deployment preflight fails, required configuration
-audit items are missing, distribution manifests are incomplete, no approval exists, the latest
-approval rejects deployment, or the approval git SHA does not match the commit being released.
+audit items are missing, published files drift from their receipts, distribution manifests are
+incomplete, no approval exists, the latest approval rejects deployment, or the approval git SHA does
+not match the commit being released.
 It warns when published content has no distribution evidence or when generated distribution files
 are still dirty in git.
 Every release gate check also includes `remediation_steps`, so failed API, CLI, and dashboard
 reports can point operators to the next command or review action instead of only exposing raw
 status.
+Release evidence also writes `publish_verifications.json`, which summarizes recent published run
+verification status and links back to each run's `publish-verification.json` artifact.
 CI also uploads a non-blocking `release-gate/release-gate.json` report with
 `--no-require-approval`, plus `release-gate/deployment-checklist.md` with the human deployment
 steps derived from the same gate checks. Review the checklist before promoting a build, then use

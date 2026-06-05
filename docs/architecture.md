@@ -128,7 +128,9 @@ published content lacks distribution evidence or distribution files are still di
 fails when recorded manifests do not include the expected feed, promotion brief, and manifest
 assets.
 Publish verification reads the current target files and compares their hashes against the publish
-receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
+receipt, producing per-run `publish-verification.json` files for drift detection after deploys or
+manual edits. Release evidence now rolls those run-level reports into `publish_verifications.json`,
+and the release gate fails when published content no longer matches its recorded receipt.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,
 budget warnings, publish drift, and notification delivery failures into a single severity and
 action-required flag. They are exposed through the dashboard, CLI, and API so operational triage

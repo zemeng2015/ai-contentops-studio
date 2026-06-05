@@ -42,6 +42,7 @@ def release_gate(
     checks = [
         _release_readiness_check(bundle),
         _source_review_governance_check(bundle),
+        _publish_verification_check(bundle),
         _content_distribution_check(bundle),
         _deployment_preflight_check(bundle),
         _configuration_audit_check(audit),
@@ -257,6 +258,57 @@ def _content_distribution_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
                 "Commit or intentionally stage distribution asset changes before deployment.",
             ]
         ),
+    )
+
+
+def _publish_verification_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    verifications = bundle.publish_verifications
+    if verifications.missing_receipt_count:
+        return ReleaseGateItem(
+            name="publish_verification",
+            status="fail",
+            message="Published runs are missing publish receipts.",
+            evidence={
+                "published_count": verifications.total,
+                "verified_count": verifications.verified_count,
+                "drift_count": verifications.drift_count,
+                "missing_receipt_count": verifications.missing_receipt_count,
+            },
+            remediation_steps=[
+                "Inspect published runs without `publish-receipt.json`.",
+                "Republish through ContentOps or roll back orphaned published records.",
+                "Regenerate release evidence after receipts are restored.",
+            ],
+        )
+    if verifications.drift_count:
+        return ReleaseGateItem(
+            name="publish_verification",
+            status="fail",
+            message="Published content drift detected against publish receipts.",
+            evidence={
+                "published_count": verifications.total,
+                "verified_count": verifications.verified_count,
+                "drift_count": verifications.drift_count,
+                "drifting_run_ids": [
+                    item.run_id for item in verifications.items if not item.verified
+                ],
+            },
+            remediation_steps=[
+                "Run `contentops verify-publish <run_id>` for each drifting run.",
+                "Restore expected files, republish approved content, or roll back the run.",
+                "Regenerate release evidence once `publish-verification.json` is verified.",
+            ],
+        )
+    return ReleaseGateItem(
+        name="publish_verification",
+        status="pass",
+        message="Published content matches publish receipts.",
+        evidence={
+            "published_count": verifications.total,
+            "verified_count": verifications.verified_count,
+            "drift_count": verifications.drift_count,
+            "missing_receipt_count": verifications.missing_receipt_count,
+        },
     )
 
 

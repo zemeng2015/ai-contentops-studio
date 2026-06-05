@@ -141,9 +141,10 @@ contentops ops-trends --days 14 --json
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, homepage handoff
-inventory, content distribution manifests, source review summaries, worker execution trends, and
-`evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence artifact, so CI
-output can be archived and compared during deployment reviews.
+inventory, content distribution manifests, publish verification summaries, source review
+summaries, worker execution trends, and `evidence_manifest.json` with SHA-256 hashes and file
+metadata for every evidence artifact, so CI output can be archived and compared during deployment
+reviews.
 When a release approval exists, the evidence bundle also includes `release_approval.json` and the
 API response includes `latest_release_approval`, closing the audit loop between review and deploy.
 Source review decisions are operational gates, not just notes: excluded sources are removed from
@@ -217,9 +218,11 @@ deployment is approved.
 Release approval records capture the approver, decision, notes, force flag, release/deployment
 status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 `release-gate` combines readiness, deployment preflight, redacted configuration audit, approval
-state, content distribution readiness, and git SHA matching into a single CI/CD pass/fail report.
+state, publish drift detection, content distribution readiness, and git SHA matching into a single
+CI/CD pass/fail report.
 Each check includes `remediation_steps`, giving operators concrete next actions when approval,
-configuration, source governance, content distribution, or deployment preflight blocks a release.
+configuration, source governance, publish verification, content distribution, or deployment
+preflight blocks a release.
 The report also includes a human deployment checklist, and the CLI can write it with
 `--checklist-output` for release review packets.
 CI uploads `release-gate/release-gate.json` and `release-gate/deployment-checklist.md` as a

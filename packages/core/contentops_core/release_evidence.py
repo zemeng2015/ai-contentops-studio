@@ -34,8 +34,11 @@ from contentops_core.models import (
     ContentDistributionEvidenceItem,
     HomepageHandoffEvidence,
     HomepageHandoffEvidenceItem,
+    PublishVerificationEvidence,
+    PublishVerificationEvidenceItem,
     ReleaseEvidenceBundle,
     ReleaseEvidenceSummary,
+    RunStatus,
     SourceReviewDecision,
     SourceReviewEvidence,
     SourceReviewEvidenceItem,
@@ -65,13 +68,26 @@ def build_release_evidence(
     approval = _latest_release_approval(settings.artifact_root)
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
     content_distribution = _content_distribution_evidence(settings)
+    publish_verifications = _publish_verification_evidence(repository, review_service)
     worker_delivery_summaries = _worker_delivery_summary_evidence(
         settings.artifact_root,
         extra_paths=worker_delivery_summary_paths,
     )
     source_reviews = _source_review_evidence(settings.artifact_root)
-    release_status = "fail" if source_reviews.needs_review_count else readiness.status
-    can_release = readiness.can_release and source_reviews.needs_review_count == 0
+    has_publish_drift = (
+        publish_verifications.drift_count > 0
+        or publish_verifications.missing_receipt_count > 0
+    )
+    release_status = (
+        "fail"
+        if source_reviews.needs_review_count or has_publish_drift
+        else readiness.status
+    )
+    can_release = (
+        readiness.can_release
+        and source_reviews.needs_review_count == 0
+        and not has_publish_drift
+    )
     worker_execution_trends = job_execution_trends(
         job_execution_dir(settings.artifact_root),
         days=14,
@@ -94,6 +110,7 @@ def build_release_evidence(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "publish_verifications.json",
         "release_readiness.json",
         "source_reviews.json",
         "summary.json",
@@ -121,6 +138,7 @@ def build_release_evidence(
         deployment_check=preflight,
         homepage_handoffs=homepage_handoffs,
         content_distribution=content_distribution,
+        publish_verifications=publish_verifications,
         source_reviews=source_reviews,
         worker_delivery_summaries=worker_delivery_summaries,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
@@ -148,6 +166,7 @@ def write_release_evidence(
         "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
+        "publish_verifications": bundle.publish_verifications.model_dump(mode="json"),
         "release_readiness": bundle.release_readiness.model_dump(mode="json"),
         "source_reviews": bundle.source_reviews.model_dump(mode="json"),
         "summary": bundle.summary.model_dump(mode="json"),
@@ -308,6 +327,49 @@ def _content_distribution_item(
         sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
         git=git if isinstance(git, dict) else {},
         updated_at=datetime.fromtimestamp(stat.st_mtime, UTC),
+    )
+
+
+def _publish_verification_evidence(
+    repository: RunRepository,
+    review_service: ReviewService,
+    limit: int = 100,
+) -> PublishVerificationEvidence:
+    total_published = repository.count(status=RunStatus.PUBLISHED)
+    runs = repository.list(limit=limit, status=RunStatus.PUBLISHED)
+    items: list[PublishVerificationEvidenceItem] = []
+    missing_receipt_count = 0
+    for run in runs:
+        try:
+            report = review_service.verify_publish(run.id)
+        except ValueError:
+            missing_receipt_count += 1
+            continue
+        mismatch_count = sum(1 for item in report.items if not item.matches_receipt)
+        missing_count = sum(1 for item in report.items if not item.exists)
+        verification_path = run.artifact_dir / "publish-verification.json"
+        items.append(
+            PublishVerificationEvidenceItem(
+                run_id=run.id,
+                url=report.url,
+                provider=report.provider,
+                verified=report.verified,
+                item_count=len(report.items),
+                mismatch_count=mismatch_count,
+                missing_count=missing_count,
+                artifact_path=_best_relative_path_to_root(
+                    run.artifact_dir.parent,
+                    verification_path,
+                ),
+                verified_at=report.verified_at,
+            )
+        )
+    return PublishVerificationEvidence(
+        total=total_published,
+        verified_count=sum(1 for item in items if item.verified),
+        drift_count=sum(1 for item in items if not item.verified),
+        missing_receipt_count=missing_receipt_count,
+        items=items,
     )
 
 

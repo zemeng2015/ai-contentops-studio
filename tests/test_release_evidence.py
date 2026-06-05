@@ -6,7 +6,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
-from contentops_core.factory import build_review_service
+from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
@@ -15,7 +15,7 @@ from contentops_core.jobs import (
     write_job_execution_delivery_summary,
     write_job_execution_report,
 )
-from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest
+from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest, RunRequest
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_evidence import create_release_evidence_archive
 from contentops_core.repository import RunRepository
@@ -45,6 +45,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "publish_verifications.json",
         "release_readiness.json",
         "source_reviews.json",
         "summary.json",
@@ -83,6 +84,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     source_reviews = json.loads(
         (output_dir / "source_reviews.json").read_text(encoding="utf-8")
     )
+    publish_verifications = json.loads(
+        (output_dir / "publish_verifications.json").read_text(encoding="utf-8")
+    )
     assert readiness["deployment"]["runtime"]["database_engine"] == "sqlite"
     assert deployment_check["profile"] == "production"
     assert "environment_template" in {check["name"] for check in deployment_check["checks"]}
@@ -99,14 +103,52 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert worker_delivery_summaries["total"] == 0
     assert source_reviews["total_runs"] == 0
     assert source_reviews["total_decisions"] == 0
+    assert publish_verifications["total"] == 0
+    assert publish_verifications["drift_count"] == 0
     assert bundle.worker_execution_alerts["severity"] == "info"
     assert bundle.source_reviews.total_decisions == 0
+    assert bundle.publish_verifications.total == 0
     assert bundle.worker_execution_alert_deliveries == []
     assert bundle.worker_delivery_summary_deliveries == []
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
     assert bundle.worker_delivery_summaries.total == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
+
+
+def test_release_evidence_indexes_publish_verification(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    settings = Settings()
+    pipeline = build_pipeline(settings)
+    service = build_review_service(settings)
+    result = pipeline.run(RunRequest(topic="Release evidence publish verification"))
+    service.approve(result.run.id, reviewer="zack")
+    service.publish(result.run.id)
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    payload = json.loads(
+        (output_dir / "publish_verifications.json").read_text(encoding="utf-8")
+    )
+    evidence_manifest = json.loads(
+        (output_dir / "evidence_manifest.json").read_text(encoding="utf-8")
+    )
+    assert bundle.publish_verifications.total == 1
+    assert bundle.publish_verifications.verified_count == 1
+    assert bundle.publish_verifications.drift_count == 0
+    assert bundle.publish_verifications.items[0].run_id == result.run.id
+    assert payload["items"][0]["verified"] is True
+    assert payload["items"][0]["artifact_path"].endswith("publish-verification.json")
+    assert "publish_verifications.json" in bundle.summary.artifact_files
+    assert evidence_manifest["artifacts"]["publish_verifications.json"]["media_type"] == (
+        "application/json"
+    )
 
 
 def test_release_evidence_indexes_content_distribution_manifests(

@@ -207,11 +207,13 @@ def test_release_approval_api_and_dashboard(
     assert "release_approval.json" in evidence_payload["summary"]["artifact_files"]
     assert "source_reviews.json" in evidence_payload["summary"]["artifact_files"]
     assert evidence_payload["source_reviews"]["total_decisions"] >= 0
+    assert evidence_payload["publish_verifications"]["total"] >= 0
     assert evidence_bundle_response.status_code == 200
     assert b"release_approval.json" in evidence_bundle_response.content
     assert dashboard_response.status_code == 200
     assert "Release Approval" in dashboard_response.text
     assert "Deployment Checklist" in dashboard_response.text
+    assert "Publish Verification Evidence" in dashboard_response.text
     assert "Remediation" in dashboard_response.text
     assert "Recent Release Gates" in dashboard_response.text
     assert "Pass rate:" in dashboard_response.text

@@ -1524,6 +1524,30 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </td>
         </tr>
         """
+    publish_verification_rows = "".join(
+        f"""
+        <tr>
+          <td><a href="/dashboard/runs/{escape(item.run_id)}">{escape(item.run_id)}</a></td>
+          <td><span class="pill">{escape(str(item.verified).lower())}</span></td>
+          <td>{escape(item.provider)}</td>
+          <td><a href="{escape(item.url)}">{escape(item.url)}</a></td>
+          <td>{item.item_count}</td>
+          <td>{item.mismatch_count}</td>
+          <td>{item.missing_count}</td>
+          <td>{escape(item.artifact_path)}</td>
+          <td>{escape(item.verified_at.isoformat())}</td>
+        </tr>
+        """
+        for item in bundle.publish_verifications.items
+    )
+    if not publish_verification_rows:
+        publish_verification_rows = """
+        <tr>
+          <td colspan="9">
+            <span class="muted">No published content verification recorded.</span>
+          </td>
+        </tr>
+        """
     worker_trend_rows = "".join(
         f"""
         <tr>
@@ -1622,6 +1646,10 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <span>Distribution manifests</span>
         </div>
         <div>
+          <strong>{bundle.publish_verifications.drift_count}</strong>
+          <span>Publish drifts</span>
+        </div>
+        <div>
           <strong>{bundle.source_reviews.total_decisions}</strong>
           <span>Source reviews</span>
         </div>
@@ -1679,6 +1707,16 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           </tr>
         </thead>
         <tbody>{distribution_rows}</tbody>
+      </table>
+      <h2>Publish Verification Evidence</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Run</th><th>Verified</th><th>Provider</th><th>URL</th><th>Files</th>
+            <th>Mismatches</th><th>Missing</th><th>Artifact</th><th>Verified at</th>
+          </tr>
+        </thead>
+        <tbody>{publish_verification_rows}</tbody>
       </table>
       <h2>Source Review Evidence</h2>
       <table>
