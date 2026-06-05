@@ -233,6 +233,31 @@ class WorkerDeliverySummaryDelivery(BaseModel):
     delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class ScheduledWorkflowReviewItem(BaseModel):
+    execution_id: str
+    name: str
+    dry_run: bool
+    completed_at: datetime
+    action_required: bool
+    succeeded: int = Field(ge=0)
+    total: int = Field(ge=0)
+    published_urls: list[str] = Field(default_factory=list)
+    homepage_handoff_paths: list[str] = Field(default_factory=list)
+    release_evidence_path: str | None = None
+    delivery_summary_markdown_path: str | None = None
+    failure_reasons: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+
+
+class ScheduledWorkflowReviewReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    action_required_count: int = Field(ge=0)
+    published_count: int = Field(ge=0)
+    handoff_count: int = Field(ge=0)
+    items: list[ScheduledWorkflowReviewItem] = Field(default_factory=list)
+
+
 class JobExecutionListResponse(BaseModel):
     items: list[JobExecutionReport]
     total: int
@@ -830,6 +855,31 @@ def list_job_execution_reports(
     )
 
 
+def scheduled_workflow_review_report(
+    receipt_dir: Path,
+    *,
+    limit: int = 5,
+) -> ScheduledWorkflowReviewReport:
+    reports = list_job_execution_reports(receipt_dir, limit=limit).items
+    items = [_scheduled_workflow_review_item(report) for report in reports]
+    return ScheduledWorkflowReviewReport(
+        total=len(items),
+        action_required_count=sum(1 for item in items if item.action_required),
+        published_count=sum(len(item.published_urls) for item in items),
+        handoff_count=sum(len(item.homepage_handoff_paths) for item in items),
+        items=items,
+    )
+
+
+def write_scheduled_workflow_review_markdown(
+    report: ScheduledWorkflowReviewReport,
+    output_path: Path,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(_scheduled_workflow_review_markdown(report), encoding="utf-8")
+    return output_path
+
+
 def job_execution_trends(receipt_dir: Path, days: int = 14) -> JobExecutionTrendReport:
     if days < 1:
         raise ValueError("days must be at least 1.")
@@ -1074,6 +1124,91 @@ def job_execution_summary(report: JobExecutionReport) -> JobExecutionSummary:
         and report.release_evidence_error is None,
         action_required=action_required,
     )
+
+
+def _scheduled_workflow_review_item(report: JobExecutionReport) -> ScheduledWorkflowReviewItem:
+    summary = job_execution_summary(report)
+    failure_reasons = [reason for _, reason in _job_execution_failure_reasons(report)]
+    return ScheduledWorkflowReviewItem(
+        execution_id=report.execution_id,
+        name=report.name,
+        dry_run=report.dry_run,
+        completed_at=report.completed_at,
+        action_required=summary.action_required,
+        succeeded=report.succeeded,
+        total=report.total,
+        published_urls=[
+            result.published_url for result in report.results if result.published_url is not None
+        ],
+        homepage_handoff_paths=[
+            result.homepage_handoff_path
+            for result in report.results
+            if result.homepage_handoff_path is not None
+        ],
+        release_evidence_path=report.release_evidence_path,
+        delivery_summary_markdown_path=report.delivery_summary_markdown_path,
+        failure_reasons=failure_reasons,
+        recommended_actions=_job_execution_delivery_actions(report, summary),
+    )
+
+
+def _scheduled_workflow_review_markdown(report: ScheduledWorkflowReviewReport) -> str:
+    lines = [
+        "# Scheduled ContentOps Review",
+        "",
+        f"- Generated at: `{report.generated_at.isoformat()}`",
+        f"- Executions reviewed: `{report.total}`",
+        f"- Action required: `{report.action_required_count}`",
+        f"- Published URLs: `{report.published_count}`",
+        f"- Homepage handoffs: `{report.handoff_count}`",
+        "",
+    ]
+    if not report.items:
+        lines.extend(
+            [
+                "No worker execution receipts were found.",
+                "",
+                (
+                    "Run `contentops-worker run-pipeline <pipeline.yaml> "
+                    "--receipt-dir artifacts/job-executions`."
+                ),
+            ]
+        )
+        return "\n".join(lines) + "\n"
+    for item in report.items:
+        lines.extend(
+            [
+                f"## {item.name} `{item.execution_id}`",
+                "",
+                f"- Completed: `{item.completed_at.isoformat()}`",
+                f"- Mode: `{'dry-run' if item.dry_run else 'executed'}`",
+                f"- Jobs: `{item.succeeded}/{item.total}`",
+                f"- Action required: `{str(item.action_required).lower()}`",
+                f"- Release evidence: `{item.release_evidence_path or 'not recorded'}`",
+                f"- Delivery summary: `{item.delivery_summary_markdown_path or 'not recorded'}`",
+                "",
+                "### Published URLs",
+                "",
+            ]
+        )
+        if item.published_urls:
+            lines.extend(f"- {url}" for url in item.published_urls)
+        else:
+            lines.append("- None")
+        lines.extend(["", "### Homepage Handoffs", ""])
+        if item.homepage_handoff_paths:
+            lines.extend(f"- `{path}`" for path in item.homepage_handoff_paths)
+        else:
+            lines.append("- None")
+        lines.extend(["", "### Failures", ""])
+        if item.failure_reasons:
+            lines.extend(f"- {reason}" for reason in item.failure_reasons)
+        else:
+            lines.append("- None")
+        lines.extend(["", "### Next Actions", ""])
+        lines.extend(f"- {action}" for action in item.recommended_actions)
+        lines.append("")
+    return "\n".join(lines)
 
 
 def _job_execution_delivery_summary_payload(report: JobExecutionReport) -> dict[str, Any]:

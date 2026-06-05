@@ -66,6 +66,7 @@ contentops job-executions --json
 contentops job-execution <execution_id>
 contentops job-execution-summary <execution_id>
 contentops job-execution-trends --days 14
+contentops scheduled-workflow-summary --output artifacts/scheduled-workflow-review.md
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 
@@ -74,6 +75,10 @@ run ids, artifact directories, publish URLs, duration, and the post-run release 
 Use `contentops job-execution-summary <execution_id>` or
 `GET /job-executions/{execution_id}/summary` to scan generated runs, published runs, handoff
 readiness, release evidence readiness, and whether operator action is required.
+Use `contentops scheduled-workflow-summary` after a GitHub Actions or cron run to generate the
+same review packet shown in the Actions step summary. It lists published URLs, homepage handoff
+zip files, delivery summaries, release evidence paths, failure reasons, and next actions for the
+latest worker receipts.
 Use `contentops job-execution-trends --days 14`, `GET /job-executions/trends?days=14`, or
 `/dashboard/job-execution-trends` to check recurring automation success, publish, handoff, and
 action-required rates before changing the EventBridge schedule. The trend view also lists the

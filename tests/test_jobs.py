@@ -24,11 +24,14 @@ from contentops_core.jobs import (
     load_job_file,
     notify_job_execution_alert,
     notify_worker_delivery_summary,
+    scheduled_workflow_review_report,
     worker_delivery_summary_notification_log,
     worker_job_readiness,
     write_job_execution_delivery_summary,
     write_job_execution_report,
+    write_scheduled_workflow_review_markdown,
 )
+from contentops_core.models import RunStatus
 from contentops_core.settings import Settings
 
 
@@ -277,6 +280,46 @@ def test_job_execution_delivery_summary_writes_json_and_markdown(tmp_path: Path)
     assert "Published AI content" in markdown
     assert report.delivery_summary_path == str(json_path)
     assert report.delivery_summary_markdown_path == str(markdown_path)
+
+
+def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> None:
+    receipt_dir = tmp_path / "receipts"
+    report = JobExecutionReport(
+        name="scheduled-calendar",
+        total=1,
+        succeeded=1,
+        failed=0,
+        release_evidence_path=str(tmp_path / "release-evidence"),
+        delivery_summary_markdown_path=str(tmp_path / "summary.md"),
+        results=[
+            JobRunResult(
+                job_name="published",
+                topic="Published content",
+                publish=True,
+                homepage_handoff=True,
+                run_id="run-scheduled",
+                status=RunStatus.PUBLISHED,
+                published_url="https://example.com/posts/scheduled.html",
+                homepage_handoff_path=str(tmp_path / "run-scheduled-homepage-handoff.zip"),
+            )
+        ],
+    )
+    write_job_execution_report(report, receipt_dir)
+
+    review = scheduled_workflow_review_report(receipt_dir, limit=5)
+    markdown_path = write_scheduled_workflow_review_markdown(
+        review,
+        tmp_path / "scheduled-review.md",
+    )
+
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert review.total == 1
+    assert review.published_count == 1
+    assert review.handoff_count == 1
+    assert review.items[0].published_urls == ["https://example.com/posts/scheduled.html"]
+    assert "Scheduled ContentOps Review" in markdown
+    assert "https://example.com/posts/scheduled.html" in markdown
+    assert "run-scheduled-homepage-handoff.zip" in markdown
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

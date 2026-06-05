@@ -541,6 +541,12 @@ def test_cli_job_execution_commands(
         app,
         ["job-execution-delivery-notifications"],
     )
+    scheduled_summary_result = runner.invoke(app, ["scheduled-workflow-summary", "--json"])
+    scheduled_summary_markdown = tmp_path / "scheduled-review.md"
+    scheduled_summary_output_result = runner.invoke(
+        app,
+        ["scheduled-workflow-summary", "--output", str(scheduled_summary_markdown)],
+    )
     recovery_result = runner.invoke(app, ["job-recovery-plan", report.execution_id])
     recovery_run_result = runner.invoke(app, ["job-recovery-plan", report.execution_id, "--run"])
 
@@ -595,6 +601,13 @@ def test_cli_job_execution_commands(
     delivery_notifications_payload = json.loads(delivery_notifications_result.output)
     assert delivery_notifications_payload[0]["delivery_id"] == (
         delivery_notify_payload["delivery_id"]
+    )
+    assert scheduled_summary_result.exit_code == 0
+    scheduled_summary_payload = json.loads(scheduled_summary_result.output)
+    assert scheduled_summary_payload["items"][0]["execution_id"] == report.execution_id
+    assert scheduled_summary_output_result.exit_code == 0
+    assert "Scheduled ContentOps Review" in scheduled_summary_markdown.read_text(
+        encoding="utf-8"
     )
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)

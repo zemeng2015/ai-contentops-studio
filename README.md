@@ -267,6 +267,7 @@ contentops job-execution-alert-notify --days 14
 contentops job-execution-alert-notifications
 contentops job-execution-delivery-notify <execution_id>
 contentops job-execution-delivery-notifications
+contentops scheduled-workflow-summary --output artifacts/scheduled-workflow-review.md
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
@@ -282,6 +283,10 @@ for the daily AI roundup and weekly project repository update pipelines. Trigger
 `CONTENTOPS_RESEARCH_SEARCH_API_KEY`, `CONTENTOPS_RESEARCH_GITHUB_TOKEN`,
 `CONTENTOPS_OPENAI_API_KEY`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` before relying on scheduled
 live runs.
+After a scheduled run, `contentops scheduled-workflow-summary` turns recent worker receipts into a
+human-readable review packet with published URLs, homepage handoff artifacts, release evidence,
+failure reasons, and next actions. The scheduled workflow appends that Markdown to the GitHub
+Actions step summary and uploads it with the rest of the worker artifacts.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,

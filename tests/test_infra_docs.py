@@ -81,6 +81,9 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "--dry-run" in workflow
     assert "--release-evidence-dir artifacts/release-evidence/daily-ai-roundup" in workflow
     assert "contentops job-execution-alert-notify --days 7" in workflow
+    assert "contentops scheduled-workflow-summary" in workflow
+    assert "GITHUB_STEP_SUMMARY" in workflow
+    assert "scheduled-worker/daily-review.md" in workflow
     assert "actions/upload-artifact@v7" in workflow
     assert "CONTENTOPS_NOTIFICATION_WEBHOOK_URL" in workflow
 

@@ -28,8 +28,10 @@ from contentops_core.jobs import (
     list_worker_job_catalog,
     notify_job_execution_alert,
     notify_worker_delivery_summary,
+    scheduled_workflow_review_report,
     worker_delivery_summary_notification_log,
     worker_job_readiness,
+    write_scheduled_workflow_review_markdown,
 )
 from contentops_core.models import (
     ReleaseApprovalDecision,
@@ -594,6 +596,35 @@ def worker_job_readiness_command(
         for check in item.checks:
             typer.echo(f"  - {check.name}: {check.status} - {check.message}")
     raise typer.Exit(0 if report.can_schedule else 1)
+
+
+@app.command("scheduled-workflow-summary")
+def scheduled_workflow_summary_command(
+    limit: Annotated[int, typer.Option(help="Number of recent worker receipts to summarize.")] = 5,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", "-o", help="Optional Markdown summary path to write."),
+    ] = None,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON instead of Markdown."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report = scheduled_workflow_review_report(
+        job_execution_dir(settings.artifact_root),
+        limit=limit,
+    )
+    if output is not None:
+        write_scheduled_workflow_review_markdown(report, output)
+        typer.echo(str(output))
+        return
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    path = settings.artifact_root / "scheduled-workflow-review.md"
+    write_scheduled_workflow_review_markdown(report, path)
+    typer.echo(path.read_text(encoding="utf-8"))
 
 
 @app.command("job-execution")

@@ -72,6 +72,13 @@ jobs:
       - name: Notify worker alerts
         if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
         run: contentops job-execution-alert-notify --days 7 | tee scheduled-worker/daily-alert.json
+      - name: Write workflow review summary
+        if: always()
+        run: |
+          contentops scheduled-workflow-summary \
+            --limit 5 \
+            --output scheduled-worker/daily-review.md
+          cat scheduled-worker/daily-review.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -118,6 +125,13 @@ jobs:
       - name: Notify worker alerts
         if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
         run: contentops job-execution-alert-notify --days 7 | tee scheduled-worker/project-updates-alert.json
+      - name: Write workflow review summary
+        if: always()
+        run: |
+          contentops scheduled-workflow-summary \
+            --limit 5 \
+            --output scheduled-worker/project-updates-review.md
+          cat scheduled-worker/project-updates-review.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
