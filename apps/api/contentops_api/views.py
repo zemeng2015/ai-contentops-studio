@@ -424,6 +424,9 @@ def _job_execution_detail_html(
     release_evidence = report.release_evidence_path or "not recorded"
     release_evidence_status = report.release_evidence_status or "n/a"
     release_evidence_error = report.release_evidence_error or "none"
+    content_assets = report.content_assets_path or "not recorded"
+    content_assets_status = report.content_assets_status or "n/a"
+    content_assets_error = report.content_assets_error or "none"
     summary = job_execution_summary(report)
     rows = "".join(
         f"""
@@ -461,12 +464,17 @@ def _job_execution_detail_html(
         <div><strong>{escape(report.started_at.isoformat())}</strong><span>Started</span></div>
         <div><strong>{escape(release_evidence_status)}</strong><span>Evidence status</span></div>
         <div><strong>{len(report.release_evidence_files)}</strong><span>Evidence files</span></div>
+        <div><strong>{escape(content_assets_status)}</strong><span>Content assets</span></div>
+        <div><strong>{len(report.content_assets_files)}</strong><span>Asset files</span></div>
         <div>
           <strong>{str(summary.action_required).lower()}</strong>
           <span>Action required</span>
         </div>
       </div>
       <p>
+        Content assets: <code>{escape(content_assets)}</code><br>
+        Content asset files: {escape(", ".join(report.content_assets_files) or "none")}<br>
+        Content asset error: {escape(content_assets_error)}<br>
         Release evidence: <code>{escape(release_evidence)}</code><br>
         Evidence error: {escape(release_evidence_error)}
       </p>

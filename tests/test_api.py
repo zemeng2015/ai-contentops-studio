@@ -640,6 +640,9 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     report.release_evidence_path = str(tmp_path / "release-evidence")
     report.release_evidence_status = "warn"
     report.release_evidence_files = ["summary.json", "homepage_handoffs.json"]
+    report.content_assets_path = str(tmp_path / "site")
+    report.content_assets_status = "generated"
+    report.content_assets_files = ["feed.xml", "promotion-brief.md"]
     write_job_execution_report(report, job_execution_dir(settings.artifact_root))
     assert report.receipt_path is not None
     receipt_path = Path(report.receipt_path)
@@ -695,6 +698,8 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert "Source dry run" in dashboard_detail_response.text
     assert "Dry-run worker receipts are schedule previews" in dashboard_detail_response.text
     assert "Evidence status" in dashboard_detail_response.text
+    assert "Content assets" in dashboard_detail_response.text
+    assert "feed.xml" in dashboard_detail_response.text
     assert "Generated runs" in dashboard_detail_response.text
     assert "Action required" in dashboard_detail_response.text
     assert "homepage_handoffs.json" in detail_response.text

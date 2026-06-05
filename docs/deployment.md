@@ -270,6 +270,10 @@ Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-execut
 `--release-evidence-dir` or `--skip-release-evidence` is provided. The worker receipt records the
 evidence path, release status, evidence files, and any evidence generation error so scheduled
 automation can be audited from a single JSON record.
+When a worker execution publishes content, it also regenerates the content distribution assets in
+the configured publishing target before release evidence is generated. The same receipt records the
+asset path, status, generated filenames, and errors, and release evidence includes the resulting
+content distribution manifest for CI/CD review.
 In ECS/EventBridge deployments, keep artifact mirroring enabled so these receipts are copied to S3
 with the rest of the run artifacts and release evidence.
 Terraform also defines a disabled-by-default worker alert notifier task. Enable

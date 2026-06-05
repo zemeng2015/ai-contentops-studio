@@ -211,6 +211,10 @@ Every worker invocation writes a job execution receipt under `artifact_root/job-
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,
 artifact directories, publish URLs, and per-job errors, giving EventBridge/ECS-triggered runs an
 auditable artifact even when stdout logs are rotated.
+For executions that publish content, the worker refreshes distribution assets from the publish
+index before generating release evidence. The receipt records `content_assets_path`,
+`content_assets_status`, `content_assets_files`, and `content_assets_error`, while the evidence
+bundle indexes the generated `content-distribution-manifest.json`.
 When a worker job creates a run, its workflow name, job name, tags, publish intent, and custom
 metadata are copied into `request.json` and `workflow-context.json` inside the run artifact
 directory. This lets reviewers open a run and understand which scheduled workflow produced it

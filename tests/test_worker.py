@@ -96,6 +96,68 @@ def test_worker_run_attaches_release_evidence_to_receipt(
     assert (evidence_dir / "evidence_manifest.json").exists()
 
 
+def test_worker_run_generates_content_distribution_assets_before_release_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    site_dir = tmp_path / "site"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(site_dir))
+    monkeypatch.setenv("CONTENTOPS_PUBLIC_BASE_URL", "https://example.com")
+    monkeypatch.setenv("CONTENTOPS_MIN_PUBLISH_SCORE", "0.1")
+    path = tmp_path / "jobs.yaml"
+    path.write_text(
+        """
+name: distribution-job
+jobs:
+  - name: daily-ai-note
+    topic: Worker generated AI distribution assets
+    publish: true
+""",
+        encoding="utf-8",
+    )
+    receipt_dir = tmp_path / "receipts"
+    evidence_dir = tmp_path / "release-evidence"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-pipeline",
+            str(path),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--release-evidence-dir",
+            str(evidence_dir),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    receipt = next(receipt_dir.glob("*.json"))
+    receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+    assert payload["content_assets_path"] == str(site_dir)
+    assert receipt_payload["content_assets_status"] == "generated"
+    assert payload["content_assets_files"] == [
+        "feed.xml",
+        "promotion-brief.md",
+        "content-distribution-manifest.json",
+    ]
+    assert (site_dir / "feed.xml").exists()
+    assert (site_dir / "promotion-brief.md").exists()
+    assert (site_dir / "content-distribution-manifest.json").exists()
+    content_distribution = json.loads(
+        (evidence_dir / "content_distribution.json").read_text(encoding="utf-8")
+    )
+    assert content_distribution["total"] == 1
+    assert content_distribution["items"][0]["manifest_path"] == (
+        "content-distribution-manifest.json"
+    )
+    assert content_distribution["items"][0]["sha256"]
+
+
 def test_worker_run_can_prepare_requested_homepage_handoff(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

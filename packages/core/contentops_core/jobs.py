@@ -84,6 +84,10 @@ class JobExecutionReport(BaseModel):
     completed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     duration_ms: int = 0
     receipt_path: str | None = None
+    content_assets_path: str | None = None
+    content_assets_status: str | None = None
+    content_assets_files: list[str] = Field(default_factory=list)
+    content_assets_error: str | None = None
     release_evidence_path: str | None = None
     release_evidence_status: str | None = None
     release_evidence_files: list[str] = Field(default_factory=list)
@@ -657,6 +661,7 @@ def job_execution_summary(report: JobExecutionReport) -> JobExecutionSummary:
     action_required = (
         report.failed > 0
         or handoff_failed > 0
+        or report.content_assets_error is not None
         or report.release_evidence_error is not None
         or generated_runs < report.total
     )

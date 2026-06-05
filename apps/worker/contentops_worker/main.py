@@ -21,6 +21,7 @@ from contentops_core.models import ArtifactMirrorRecord
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
+from contentops_publishing.publish_index import write_distribution_assets
 
 app = typer.Typer(help="Run scheduled or YAML-defined ContentOps jobs.")
 
@@ -58,6 +59,12 @@ def run_pipeline(
         bool,
         typer.Option(help="Skip homepage handoff generation for jobs that request it."),
     ] = False,
+    skip_content_assets: Annotated[
+        bool,
+        typer.Option(
+            help="Skip post-publish RSS, promotion brief, and distribution manifest output."
+        ),
+    ] = False,
 ) -> None:
     job_file = load_job_file(path)
     settings = Settings()
@@ -80,6 +87,16 @@ def run_pipeline(
     handoff_errors: list[str] = []
     if not skip_homepage_handoff:
         handoff_errors = _attach_homepage_handoffs(settings, report)
+    if not skip_content_assets:
+        try:
+            _attach_content_assets(settings, report)
+        except Exception as exc:
+            report.content_assets_status = "failed"
+            report.content_assets_error = str(exc)
+            rewrite_job_execution_report(report)
+            raise typer.BadParameter(
+                f"Failed to generate content distribution assets: {exc}"
+            ) from exc
     if not skip_release_evidence:
         try:
             _attach_release_evidence(settings, report, release_evidence_dir)
@@ -96,6 +113,8 @@ def run_pipeline(
         return
     typer.echo(f"Job file {report.name}: {report.succeeded}/{report.total} succeeded")
     typer.echo(f"Receipt: {report.receipt_path}")
+    if report.content_assets_path is not None:
+        typer.echo(f"Content assets: {report.content_assets_path}")
     if report.release_evidence_path is not None:
         typer.echo(f"Release evidence: {report.release_evidence_path}")
     for result in report.results:
@@ -131,6 +150,30 @@ def _attach_homepage_handoffs(settings: Settings, report: JobExecutionReport) ->
     return errors
 
 
+def _attach_content_assets(settings: Settings, report: JobExecutionReport) -> None:
+    if not any(result.published_url for result in report.results):
+        report.content_assets_status = "skipped"
+        report.content_assets_error = None
+        rewrite_job_execution_report(report)
+        return
+    target_dir = _publisher_target_dir(settings)
+    index_path = target_dir / "contentops-publish-index.json"
+    if not index_path.exists():
+        raise FileNotFoundError(f"Publish index not found: {index_path}")
+    assets = write_distribution_assets(
+        index_path,
+        target_dir,
+        channel_title="AI ContentOps Studio",
+        channel_description="Reviewed AI and technical content.",
+        channel_url=_publisher_public_url(settings),
+    )
+    report.content_assets_path = str(target_dir)
+    report.content_assets_status = "generated"
+    report.content_assets_files = [path.name for path in assets.values()]
+    report.content_assets_error = None
+    rewrite_job_execution_report(report)
+
+
 def _attach_release_evidence(
     settings: Settings,
     report: JobExecutionReport,
@@ -151,6 +194,22 @@ def _attach_release_evidence(
     report.release_evidence_files = bundle.summary.artifact_files
     report.release_evidence_error = None
     rewrite_job_execution_report(report)
+
+
+def _publisher_target_dir(settings: Settings) -> Path:
+    if settings.publisher_provider == "homepage":
+        if settings.homepage_repo_path is None:
+            raise typer.BadParameter(
+                "CONTENTOPS_HOMEPAGE_REPO_PATH is required for homepage content assets."
+            )
+        return settings.homepage_repo_path
+    return settings.site_output_dir
+
+
+def _publisher_public_url(settings: Settings) -> str:
+    if settings.publisher_provider == "homepage":
+        return settings.homepage_public_base_url
+    return settings.public_base_url
 
 
 def _mirror_receipt_if_configured(settings: Settings, receipt_path: str | None) -> None:

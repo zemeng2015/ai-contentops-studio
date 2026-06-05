@@ -85,6 +85,10 @@ In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tr
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced
 for CI/CD release reviews.
+When a scheduled execution publishes content, check `content_assets_status` in the same receipt.
+`generated` means the worker refreshed `feed.xml`, `promotion-brief.md`, and
+`content-distribution-manifest.json` before release evidence was built; `failed` means the publish
+index or publishing target needs repair before deployment.
 If a scheduled job declares `homepage_handoff: true`, inspect `homepage_handoff_path` on that job
 result before committing the personal homepage repository. A populated `homepage_handoff_error`
 usually means the homepage publisher is not configured or the target path is not a git repository.
@@ -98,7 +102,7 @@ After a publish, confirm `contentops-publish-index.json` changed with the genera
 report. Commit or deploy that JSON catalog with the site output because homepage aggregation,
 search indexing, RSS generation, and promotion scripts can use it as the authoritative published
 content feed.
-Then generate distribution assets:
+For manual publishing outside the worker, generate distribution assets:
 
 ```powershell
 contentops content-assets --output-dir site
