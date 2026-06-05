@@ -142,6 +142,7 @@ contentops provider-health --json
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
+contentops release-gate --no-fail-on-block --json --record
 contentops release-gates --json
 contentops ops-brief --days 14 --json
 contentops ops-brief-notify --days 14
@@ -350,8 +351,8 @@ policy, and whether publishing jobs create homepage handoff evidence. Use it as 
 before connecting the same YAML to GitHub Actions schedules, EventBridge, cron, or another runner.
 This repository also includes `.github/workflows/scheduled-contentops.yml`, which runs the same
 readiness gate, worker dry-run, scheduled execution, worker alert notification, ops brief receipt
-archival, and artifact upload for the daily AI roundup and weekly project repository update
-pipelines. Trigger it manually with
+archival, release gate snapshot, review package generation, and artifact upload for the daily AI
+roundup and weekly project repository update pipelines. Trigger it manually with
 `workflow_dispatch` for a dry-run, then set repository secrets such as
 `CONTENTOPS_RESEARCH_SEARCH_API_KEY`, `CONTENTOPS_RESEARCH_GITHUB_TOKEN`,
 `CONTENTOPS_OPENAI_API_KEY`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL` before relying on scheduled

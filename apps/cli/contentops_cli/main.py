@@ -509,6 +509,16 @@ def show_release_gate(
         Path | None,
         typer.Option(help="Optional Markdown file where the deployment checklist is written."),
     ] = None,
+    fail_on_block: Annotated[
+        bool,
+        typer.Option(
+            "--fail-on-block/--no-fail-on-block",
+            help=(
+                "Exit non-zero when the release gate blocks deployment. Disable for scheduled "
+                "evidence capture that should continue packaging artifacts."
+            ),
+        ),
+    ] = True,
 ) -> None:
     settings = Settings()
     report = release_gate(
@@ -523,9 +533,10 @@ def show_release_gate(
         write_release_gate_report(report, settings.artifact_root)
     if checklist_output is not None:
         write_release_gate_checklist(report, checklist_output)
+    exit_code = 0 if report.can_deploy or not fail_on_block else 1
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
-        raise typer.Exit(0 if report.can_deploy else 1)
+        raise typer.Exit(exit_code)
     typer.echo(f"Status: {report.status}")
     typer.echo(f"Can deploy: {str(report.can_deploy).lower()}")
     typer.echo("Deployment checklist:")
@@ -535,7 +546,7 @@ def show_release_gate(
         typer.echo(f"- {check.name}: {check.status} - {check.message}")
         for step in check.remediation_steps:
             typer.echo(f"  fix: {step}")
-    raise typer.Exit(0 if report.can_deploy else 1)
+    raise typer.Exit(exit_code)
 
 
 @app.command("release-gates")

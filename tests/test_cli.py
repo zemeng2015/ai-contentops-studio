@@ -270,6 +270,38 @@ def test_cli_release_gate_prints_remediation_steps(
     assert "Traceback" not in result.output
 
 
+def test_cli_release_gate_can_record_blocking_snapshot_without_failing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    checklist = tmp_path / "blocked-checklist.md"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "release-gate",
+            "--git-sha",
+            "missing-approval-sha",
+            "--record",
+            "--no-fail-on-block",
+            "--json",
+            "--checklist-output",
+            str(checklist),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["can_deploy"] is False
+    assert payload["status"] == "fail"
+    assert checklist.exists()
+    assert list((tmp_path / "artifacts" / "release-gates").glob("*.json"))
+
+
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:
     runner = CliRunner()
     path = tmp_path / ".env.production"

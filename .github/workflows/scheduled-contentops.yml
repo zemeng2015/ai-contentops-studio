@@ -93,6 +93,16 @@ jobs:
       - name: Write operations console snapshot
         if: always()
         run: contentops operations-console --days 14 --json | tee scheduled-worker/daily-operations-console.json
+      - name: Write release gate snapshot
+        if: always()
+        run: |
+          contentops release-gate \
+            --require-approval=false \
+            --record \
+            --no-fail-on-block \
+            --json \
+            --checklist-output scheduled-worker/daily-release-gate-checklist.md \
+            | tee scheduled-worker/daily-release-gate.json
       - name: Write workflow review summary
         if: always()
         run: |
@@ -214,6 +224,16 @@ jobs:
       - name: Write operations console snapshot
         if: always()
         run: contentops operations-console --days 14 --json | tee scheduled-worker/project-updates-operations-console.json
+      - name: Write release gate snapshot
+        if: always()
+        run: |
+          contentops release-gate \
+            --require-approval=false \
+            --record \
+            --no-fail-on-block \
+            --json \
+            --checklist-output scheduled-worker/project-updates-release-gate-checklist.md \
+            | tee scheduled-worker/project-updates-release-gate.json
       - name: Write workflow review summary
         if: always()
         run: |

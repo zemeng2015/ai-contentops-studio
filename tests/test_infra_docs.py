@@ -114,6 +114,12 @@ def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
     assert "artifacts/ops-brief-notification-log.json" in workflow
     assert "daily-ops-brief-notifications.json" in workflow
     assert "project-updates-ops-brief-notifications.json" in workflow
+    assert "contentops release-gate" in workflow
+    assert "--no-fail-on-block" in workflow
+    assert "daily-release-gate.json" in workflow
+    assert "daily-release-gate-checklist.md" in workflow
+    assert "project-updates-release-gate.json" in workflow
+    assert "project-updates-release-gate-checklist.md" in workflow
     assert "contentops scheduled-workflow-summary" in workflow
     assert "--pr-metadata-output scheduled-worker/daily-pr-metadata.json" in workflow
     assert "--pr-metadata-output scheduled-worker/project-updates-pr-metadata.json" in workflow

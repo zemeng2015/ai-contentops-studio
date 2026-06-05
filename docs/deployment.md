@@ -239,6 +239,7 @@ Use the release gate in deployment automation after the approval is recorded:
 
 ```powershell
 contentops release-gate --git-sha $env:GITHUB_SHA --json --record --checklist-output release-gate-checklist.md
+contentops release-gate --no-fail-on-block --json --record --checklist-output release-gate-checklist.md
 Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 ```
 
@@ -261,7 +262,9 @@ verification status and links back to each run's `publish-verification.json` art
 CI also uploads a non-blocking `release-gate/release-gate.json` report with
 `--no-require-approval`, plus `release-gate/deployment-checklist.md` with the human deployment
 steps derived from the same gate checks. Review the checklist before promoting a build, then use
-`--strict` in an actual deployment job once approval is required.
+the default `--fail-on-block` behavior in an actual deployment job once approval is required.
+Scheduled ContentOps runs use `--no-fail-on-block` to archive a release gate snapshot and checklist
+even when the gate reports `fail`, so review packages still contain deployment posture evidence.
 Review `provider_health.json` in release evidence or run `contentops provider-health --json`
 before enabling scheduled jobs. Search research should show configured credentials, feed/discovery
 providers should show scheduled readiness, and GitHub research should record whether a token is
