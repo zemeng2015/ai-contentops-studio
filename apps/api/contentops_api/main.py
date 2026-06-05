@@ -118,6 +118,7 @@ def _parse_status_filter(status: str) -> RunStatus | None:
 app.include_router(
     build_ops_router(
         settings=settings,
+        pipeline=pipeline,
         repository=repository,
         review_service=review_service,
         require_read_access=require_read_access,

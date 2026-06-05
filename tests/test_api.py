@@ -674,6 +674,55 @@ def test_job_execution_endpoints_and_dashboard(tmp_path: Path) -> None:
     assert str(tmp_path / "release-evidence") in dashboard_detail_response.text
     assert "S3 Mirror Log" in dashboard_detail_response.text
     assert "job-bucket" in dashboard_detail_response.text
+    assert "Run recovery jobs" in dashboard_detail_response.text
+
+
+def test_job_execution_recovery_can_be_run_from_api_and_dashboard(
+    tmp_path: Path,
+) -> None:
+    client = TestClient(app)
+    original_artifact_root = settings.artifact_root
+    original_site_output_dir = settings.site_output_dir
+    settings.artifact_root = tmp_path / "artifacts"
+    settings.site_output_dir = tmp_path / "site"
+    failed = JobExecutionReport(
+        name="api-recovery",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="failed-roundup",
+                topic="API recovery rerun",
+                status="failed",
+                error="provider timeout",
+            )
+        ],
+    )
+    try:
+        write_job_execution_report(failed, job_execution_dir(settings.artifact_root))
+
+        recovery_response = client.post(
+            f"/job-executions/{failed.execution_id}/recovery-runs"
+        )
+        dashboard_response = client.post(
+            f"/dashboard/job-executions/{failed.execution_id}/recovery-runs",
+            follow_redirects=False,
+        )
+    finally:
+        settings.artifact_root = original_artifact_root
+        settings.site_output_dir = original_site_output_dir
+
+    assert recovery_response.status_code == 200
+    recovery_payload = recovery_response.json()
+    assert recovery_payload["name"] == "api-recovery-recovery"
+    assert recovery_payload["total"] == 1
+    assert recovery_payload["succeeded"] == 1
+    assert recovery_payload["results"][0]["metadata"]["recovery_source_execution_id"] == (
+        failed.execution_id
+    )
+    assert dashboard_response.status_code == 303
+    assert "/dashboard/job-executions/" in dashboard_response.headers["location"]
 
 
 def test_worker_job_catalog_endpoint(tmp_path: Path) -> None:

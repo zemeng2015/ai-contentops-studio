@@ -18,6 +18,7 @@ from contentops_core.jobs import (
     JobExecutionSummary,
     JobExecutionTrendReport,
     JobRecoveryPlan,
+    JobRunner,
     WorkerJobCatalogResponse,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -56,6 +57,7 @@ from contentops_core.models import (
     ScorecardListResponse,
     SystemStatus,
 )
+from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import (
     build_release_evidence,
@@ -76,6 +78,7 @@ StatusParser = Callable[[str], RunStatus | None]
 def build_ops_router(
     *,
     settings: Settings,
+    pipeline: ContentOpsPipeline,
     repository: RunRepository,
     review_service: ReviewService,
     require_read_access: ReadAccessDependency,
@@ -354,6 +357,29 @@ def build_ops_router(
             )
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @router.post(
+        "/job-executions/{execution_id}/recovery-runs",
+        response_model=JobExecutionReport,
+        dependencies=[Depends(require_operator)],
+    )
+    def run_job_recovery_plan(execution_id: str) -> JobExecutionReport:
+        try:
+            plan = job_recovery_plan(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if plan.failed_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="Recovery plan has no failed jobs to rerun.",
+            )
+        return JobRunner(pipeline).run(
+            plan.to_job_file(),
+            receipt_dir=job_execution_dir(settings.artifact_root),
+        )
 
     @router.post(
         "/job-executions/{execution_id}/approve-runs",

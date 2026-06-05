@@ -98,7 +98,10 @@ can be traced to exact S3 keys.
 Use `contentops s3-mirror-log <run_id>`, `GET /runs/{id}/s3-mirror-log`, or the dashboard run
 detail page to inspect run-level mirror records without opening the artifact directory manually.
 When failures occur, inspect the recovery plan before rerunning it with
-`contentops-worker run-pipeline recovery.yaml`.
+`contentops-worker run-pipeline recovery.yaml`. For an operator-driven recovery loop, use
+`contentops job-recovery-plan <execution_id> --run`,
+`POST /job-executions/{execution_id}/recovery-runs`, or the dashboard job execution detail page to
+run only failed jobs and write a new audited worker receipt.
 
 ## 3. CloudWatch Operations
 

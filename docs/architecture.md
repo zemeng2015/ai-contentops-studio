@@ -206,7 +206,10 @@ handoff success rate, and action-required counts.
 Failed executions also expose a recovery plan through
 `GET /job-executions/{id}/recovery-plan` and `contentops job-recovery-plan`. The plan rebuilds the
 failed jobs as a YAML-compatible content calendar while preserving topic, source URLs, publish
-intent, tags, and metadata for controlled reruns.
+intent, tags, and metadata for controlled reruns. Operators can execute the same plan immediately
+through `POST /job-executions/{id}/recovery-runs`, `contentops job-recovery-plan <id> --run`, or
+the dashboard detail page; the new recovery execution is recorded as a normal worker receipt with
+`recovery_source_execution_id` metadata for traceability.
 
 ## Production path
 

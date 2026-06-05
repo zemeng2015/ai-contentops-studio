@@ -10,12 +10,14 @@ from contentops_core.config_audit import config_audit
 from contentops_core.diagnostics import deployment_manifest, system_status
 from contentops_core.jobs import (
     JobExecutionReport,
+    JobRunner,
     get_job_execution_report,
     job_execution_alert_notification_log,
     job_execution_alert_report,
     job_execution_dir,
     job_execution_run_ids,
     job_execution_trends,
+    job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
     notify_job_execution_alert,
@@ -500,6 +502,17 @@ def build_dashboard_router(
                 <button type="submit">Publish approved runs</button>
               </form>
             """
+        recovery_action = (
+            f"/dashboard/job-executions/{escape(report.execution_id)}/recovery-runs"
+            f"{_api_key_query(api_key)}"
+        )
+        recovery_form = f"""
+          <h3>Recovery</h3>
+          <form method="post" action="{recovery_action}">
+            {_api_key_hidden(api_key)}
+            <button type="submit">Run recovery jobs</button>
+          </form>
+        """
         return HTMLResponse(
             _page(
                 f"Job Execution {report.execution_id}",
@@ -508,11 +521,42 @@ def build_dashboard_router(
                 <section class="hero">
                   {_job_execution_detail_html(report)}
                   {execution_review_forms}
+                  {recovery_form}
                   <h3>S3 Mirror Log</h3>
                   {_s3_mirror_log_html(_job_execution_s3_mirror_log(report))}
                 </section>
                 """,
             )
+        )
+
+
+    @router.post(
+        "/dashboard/job-executions/{execution_id}/recovery-runs",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_run_job_recovery(
+        execution_id: str,
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        try:
+            plan = job_recovery_plan(
+                job_execution_dir(settings.artifact_root),
+                execution_id,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if plan.failed_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="Recovery plan has no failed jobs to rerun.",
+            )
+        recovery_report = JobRunner(pipeline).run(
+            plan.to_job_file(),
+            receipt_dir=job_execution_dir(settings.artifact_root),
+        )
+        return RedirectResponse(
+            f"/dashboard/job-executions/{recovery_report.execution_id}{_api_key_query(api_key)}",
+            status_code=303,
         )
 
 

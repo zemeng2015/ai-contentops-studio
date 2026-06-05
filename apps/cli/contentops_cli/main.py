@@ -16,6 +16,7 @@ from contentops_core.diagnostics import (
 )
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
+    JobRunner,
     get_job_execution_report,
     job_execution_alert_notification_log,
     job_execution_alert_report,
@@ -636,6 +637,10 @@ def job_recovery_plan_command(
         Path | None,
         typer.Option("--output", "-o", help="Optional YAML file to write."),
     ] = None,
+    run_recovery: Annotated[
+        bool,
+        typer.Option("--run", help="Execute the generated recovery plan immediately."),
+    ] = False,
 ) -> None:
     settings = Settings()
     try:
@@ -645,6 +650,16 @@ def job_recovery_plan_command(
         )
     except FileNotFoundError as exc:
         raise typer.BadParameter(str(exc)) from exc
+    if run_recovery:
+        if plan.failed_count == 0:
+            typer.echo("Recovery plan has no failed jobs to rerun.", err=True)
+            raise typer.Exit(1)
+        report = JobRunner(build_pipeline(settings)).run(
+            plan.to_job_file(),
+            receipt_dir=job_execution_dir(settings.artifact_root),
+        )
+        typer.echo(report.model_dump_json(indent=2))
+        return
     if output is not None:
         content = yaml.safe_dump(
             plan.to_job_file().model_dump(mode="json"),

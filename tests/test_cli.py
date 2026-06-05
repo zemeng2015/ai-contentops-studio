@@ -8,7 +8,9 @@ from zipfile import ZipFile
 import pytest
 from contentops_cli.main import app
 from contentops_core.jobs import (
+    JobExecutionReport,
     JobRunner,
+    JobRunResult,
     job_execution_dir,
     load_job_file,
     write_job_execution_report,
@@ -553,6 +555,42 @@ def test_cli_job_execution_commands(
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0
+
+
+def test_cli_job_recovery_plan_can_run_failed_jobs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    failed = JobExecutionReport(
+        name="cli-recovery",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="failed-roundup",
+                topic="CLI recovery rerun",
+                status="failed",
+                error="provider timeout",
+            )
+        ],
+    )
+    write_job_execution_report(failed, job_execution_dir(Settings().artifact_root))
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["job-recovery-plan", failed.execution_id, "--run"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["name"] == "cli-recovery-recovery"
+    assert payload["total"] == 1
+    assert payload["succeeded"] == 1
+    assert payload["results"][0]["metadata"]["recovery_source_execution_id"] == (
+        failed.execution_id
+    )
 
 
 def test_cli_worker_jobs_command(
