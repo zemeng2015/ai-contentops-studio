@@ -48,6 +48,7 @@ def release_gate(
         _retention_archive_governance_check(bundle, review_service),
         _deployment_preflight_check(bundle),
         _integration_smoke_plan_check(bundle),
+        _integration_smoke_history_check(bundle),
         _configuration_audit_check(audit),
         _approval_check(bundle, require_approval),
         _approval_git_sha_check(bundle, resolved_git_sha, require_approval),
@@ -209,6 +210,92 @@ def _integration_smoke_plan_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateI
         name="integration_smoke_plan",
         status="pass",
         message="Live provider smoke tests are planned and ready.",
+        evidence=evidence,
+    )
+
+
+def _integration_smoke_history_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    smoke_runs = bundle.integration_smoke_runs
+    latest = smoke_runs.items[0] if smoke_runs.items else None
+    evidence: dict[str, object] = {
+        "total_reports": smoke_runs.summary.total_reports,
+        "latest_status": smoke_runs.summary.latest_status,
+        "latest_generated_at": (
+            smoke_runs.summary.latest_generated_at.isoformat()
+            if smoke_runs.summary.latest_generated_at
+            else None
+        ),
+        "pass_count": smoke_runs.summary.pass_count,
+        "warn_count": smoke_runs.summary.warn_count,
+        "fail_count": smoke_runs.summary.fail_count,
+    }
+    if latest is None:
+        return ReleaseGateItem(
+            name="integration_smoke_history",
+            status="warn",
+            message="No recorded integration smoke run is available for release review.",
+            evidence=evidence,
+            remediation_steps=[
+                (
+                    "Run `contentops integration-smoke-run --dry-run --record --json` "
+                    "to record a plan."
+                ),
+                (
+                    "After credentials are configured, run "
+                    "`contentops integration-smoke-run --record --json`."
+                ),
+                "Regenerate release evidence and rerun `contentops release-gate`.",
+            ],
+        )
+    latest_failures = [item.name for item in latest.items if item.status == "fail"]
+    latest_skips = [item.name for item in latest.items if item.status == "skip"]
+    latest_planned = [item.name for item in latest.items if item.status == "planned"]
+    evidence.update(
+        {
+            "latest_artifact_path": latest.artifact_path,
+            "latest_dry_run": latest.dry_run,
+            "latest_integration_enabled": latest.integration_enabled,
+            "latest_selected": latest.selected,
+            "latest_summary": latest.summary,
+            "latest_failures": latest_failures,
+            "latest_skips": latest_skips,
+            "latest_planned": latest_planned,
+        }
+    )
+    if latest.status == "fail" or latest_failures:
+        return ReleaseGateItem(
+            name="integration_smoke_history",
+            status="fail",
+            message="The latest recorded integration smoke run failed.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `integration_smoke_runs.json` in release evidence.",
+                (
+                    "Inspect the failed provider stdout/stderr tails and fix credentials "
+                    "or provider access."
+                ),
+                "Rerun `contentops integration-smoke-run --record --json` after the fix.",
+            ],
+        )
+    if latest.dry_run or latest.status == "warn" or latest_skips or latest_planned:
+        return ReleaseGateItem(
+            name="integration_smoke_history",
+            status="warn",
+            message="The latest integration smoke evidence is not a full live provider pass.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `integration_smoke_runs.json` in release evidence.",
+                (
+                    "Configure missing provider credentials or homepage path if providers "
+                    "were skipped."
+                ),
+                "Run `contentops integration-smoke-run --record --json` without `--dry-run`.",
+            ],
+        )
+    return ReleaseGateItem(
+        name="integration_smoke_history",
+        status="pass",
+        message="The latest recorded integration smoke run passed.",
         evidence=evidence,
     )
 

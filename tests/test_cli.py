@@ -8,6 +8,7 @@ from zipfile import ZipFile
 
 import pytest
 from contentops_cli.main import app
+from contentops_core.diagnostics import integration_smoke_dir, write_integration_smoke_report
 from contentops_core.jobs import (
     JobExecutionReport,
     JobRunner,
@@ -16,9 +17,35 @@ from contentops_core.jobs import (
     load_job_file,
     write_job_execution_report,
 )
-from contentops_core.models import ArtifactMirrorRecord
+from contentops_core.models import (
+    ArtifactMirrorRecord,
+    IntegrationSmokeRunItem,
+    IntegrationSmokeRunReport,
+)
 from contentops_core.settings import Settings
 from typer.testing import CliRunner
+
+
+def _write_cli_smoke_pass(artifact_root: Path) -> None:
+    report = IntegrationSmokeRunReport(
+        status="pass",
+        integration_enabled=True,
+        selected=["feed"],
+        items=[
+            IntegrationSmokeRunItem(
+                name="feed",
+                category="research",
+                status="pass",
+                command="pytest -m integration tests/test_integration_smoke.py -k feed",
+                exit_code=0,
+            )
+        ],
+        summary={"pass": 1, "fail": 0, "skip": 0, "planned": 0},
+    )
+    write_integration_smoke_report(
+        report,
+        integration_smoke_dir(artifact_root) / "cli-smoke-pass.json",
+    )
 
 
 def test_cli_publish_reports_approval_gate_without_traceback(
@@ -156,6 +183,7 @@ def test_cli_release_approval_records_decision(
     monkeypatch.setenv("CONTENTOPS_OPENAI_API_KEY", "test-openai")
     monkeypatch.setenv("CONTENTOPS_RESEARCH_SEARCH_API_KEY", "test-search")
     monkeypatch.setenv("CONTENTOPS_HOMEPAGE_REPO_PATH", str(homepage))
+    _write_cli_smoke_pass(tmp_path / "artifacts")
     runner = CliRunner()
 
     approval_result = runner.invoke(

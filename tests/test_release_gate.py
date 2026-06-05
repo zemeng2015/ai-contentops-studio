@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from contentops_core.diagnostics import integration_smoke_dir, write_integration_smoke_report
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
@@ -18,7 +19,13 @@ from contentops_core.jobs import (
     write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
-from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest, RunRequest
+from contentops_core.models import (
+    IntegrationSmokeRunItem,
+    IntegrationSmokeRunReport,
+    ReleaseApprovalDecision,
+    ReleaseApprovalRequest,
+    RunRequest,
+)
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_gate import (
     list_release_gate_reports,
@@ -27,6 +34,39 @@ from contentops_core.release_gate import (
 )
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
+
+
+def _write_smoke_report(settings: Settings, status: str, *, dry_run: bool = False) -> Path:
+    item_status = "planned" if dry_run else status
+    if status == "warn":
+        item_status = "skip"
+    report = IntegrationSmokeRunReport(
+        status=status,
+        integration_enabled=not dry_run,
+        dry_run=dry_run,
+        selected=["feed"],
+        items=[
+            IntegrationSmokeRunItem(
+                name="feed",
+                category="research",
+                status=item_status,
+                command="pytest -m integration tests/test_integration_smoke.py -k feed",
+                exit_code=0 if status == "pass" else 1 if status == "fail" else None,
+                missing_env=["CONTENTOPS_RUN_INTEGRATION"] if status == "warn" else [],
+                stderr_tail="simulated smoke failure" if status == "fail" else "",
+            )
+        ],
+        summary={
+            "pass": 1 if status == "pass" else 0,
+            "fail": 1 if status == "fail" else 0,
+            "skip": 1 if status == "warn" else 0,
+            "planned": 1 if dry_run else 0,
+        },
+    )
+    return write_integration_smoke_report(
+        report,
+        integration_smoke_dir(settings.artifact_root) / f"smoke-{status}.json",
+    )
 
 
 def test_release_gate_requires_approval_by_default(tmp_path: Path) -> None:
@@ -71,6 +111,7 @@ def test_release_gate_passes_with_matching_approval(
     )
     repository = RunRepository(settings.database_url)
     service = build_review_service(settings)
+    _write_smoke_report(settings, "pass")
     approval = approve_release(
         settings=settings,
         repository=repository,
@@ -98,6 +139,10 @@ def test_release_gate_passes_with_matching_approval(
     assert report.config_audit.redacted is True
     smoke_check = next(check for check in report.checks if check.name == "integration_smoke_plan")
     assert smoke_check.status == "pass"
+    smoke_history_check = next(
+        check for check in report.checks if check.name == "integration_smoke_history"
+    )
+    assert smoke_history_check.status == "pass"
 
 
 def test_release_gate_warns_when_live_smoke_plan_is_not_ready(
@@ -129,6 +174,63 @@ def test_release_gate_warns_when_live_smoke_plan_is_not_ready(
     assert "content_distribution" in check_names
     assert "retention_archive_governance" in check_names
     assert "scheduled_review_packages" in check_names
+    smoke_history_check = next(
+        check for check in report.checks if check.name == "integration_smoke_history"
+    )
+    assert smoke_history_check.status == "warn"
+    assert "No recorded integration smoke run" in smoke_history_check.message
+
+
+def test_release_gate_fails_when_latest_integration_smoke_run_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_RUN_INTEGRATION", "1")
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    _write_smoke_report(settings, "fail")
+
+    report = release_gate(
+        settings=settings,
+        repository=RunRepository(settings.database_url),
+        review_service=build_review_service(settings),
+        require_approval=False,
+    )
+
+    smoke_history_check = next(
+        check for check in report.checks if check.name == "integration_smoke_history"
+    )
+    assert smoke_history_check.status == "fail"
+    assert "integration_smoke_runs.json" in smoke_history_check.remediation_steps[0]
+    assert smoke_history_check.evidence["latest_failures"] == ["feed"]
+
+
+def test_release_gate_warns_when_latest_integration_smoke_run_is_dry_run(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    _write_smoke_report(settings, "pass", dry_run=True)
+
+    report = release_gate(
+        settings=settings,
+        repository=RunRepository(settings.database_url),
+        review_service=build_review_service(settings),
+        require_approval=False,
+    )
+
+    smoke_history_check = next(
+        check for check in report.checks if check.name == "integration_smoke_history"
+    )
+    assert smoke_history_check.status == "warn"
+    assert smoke_history_check.evidence["latest_dry_run"] is True
+    assert smoke_history_check.evidence["latest_planned"] == ["feed"]
 
 
 def test_release_gate_warns_for_dirty_distribution_assets(tmp_path: Path) -> None:

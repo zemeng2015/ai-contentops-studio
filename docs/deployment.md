@@ -244,9 +244,9 @@ incomplete, scheduled review package verification failed, scheduled review packa
 failed, retention archive S3 mirroring failed, no approval exists, the latest approval rejects
 deployment, or the approval git SHA does not match the commit being released.
 It warns when published content has no distribution evidence, generated distribution files are
-still dirty in git, live provider smoke tests are not fully ready, scheduled review manifests are
-verified but missing archive ZIPs, or old artifact candidates exist without a non-dry-run retention
-archive receipt.
+still dirty in git, live provider smoke tests are not fully ready, recent smoke evidence is only a
+dry-run or missing, scheduled review manifests are verified but missing archive ZIPs, or old
+artifact candidates exist without a non-dry-run retention archive receipt.
 Every release gate check also includes `remediation_steps`, so failed API, CLI, and dashboard
 reports can point operators to the next command or review action instead of only exposing raw
 status.
