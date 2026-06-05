@@ -13,8 +13,8 @@ readiness stay reviewable as the project grows.
 - Operations: release gates, scheduled review packages, worker alert notifications, operations
   console snapshots, S3 mirroring evidence, and AWS Terraform are present.
 - CI baseline: lint, type checking, migrations, worker dry-runs, deployment preflight, release
-  evidence, release gate reports, tests, Docker build, Terraform fmt, and Terraform validate run on
-  every push and pull request.
+  evidence, release gate reports, tests, Docker build, container image vulnerability scan,
+  Terraform fmt, and Terraform validate run on every push and pull request.
 
 ## Phase 1: Compatibility And Evidence Baseline
 
@@ -58,10 +58,27 @@ Status: complete.
 
 ## Phase 5: Release And Deployment Readiness
 
-Status: active.
+Status: complete.
 
 - Require a passing release gate report before production deployment.
 - Require a matching release approval record for protected deployment environments.
 - Mirror release evidence and scheduled review packages to S3 in production.
 - Compare release evidence from the candidate commit against the latest successful release to detect
   missing checks or artifact regressions.
+
+## Phase 6: Container Image Assurance
+
+Status: complete.
+
+- Scan the built API image for high and critical vulnerabilities on every push and pull request.
+- Publish the Grype JSON scan result as CI evidence for release reviewers.
+- Keep the image runtime constrained with a slim Python base, no pip cache, non-root execution, and
+  a healthcheck.
+
+## Phase 7: Release Provenance And Image Publishing
+
+Status: active.
+
+- Publish approved API images to GitHub Container Registry from protected release workflows.
+- Attach SBOM and provenance evidence to release artifacts.
+- Keep image tags tied to immutable commit SHAs and reviewed release gate reports.

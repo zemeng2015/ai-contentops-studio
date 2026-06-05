@@ -95,6 +95,8 @@ def _workflow_checks(workflow_dir: Path) -> list[SecurityCheck]:
         else:
             checks.extend(_scheduled_workflow_checks(path, workflow))
         checks.extend(_action_reference_checks(path, workflow))
+        if path.name == "ci.yml":
+            checks.extend(_container_image_scan_checks(path, workflow))
     return checks
 
 
@@ -153,6 +155,40 @@ def _action_reference_checks(path: Path, workflow: dict[str, Any]) -> list[Secur
                 )
             )
     return checks
+
+
+def _container_image_scan_checks(path: Path, workflow: dict[str, Any]) -> list[SecurityCheck]:
+    text = path.read_text(encoding="utf-8")
+    docker_job = workflow.get("jobs", {}).get("docker", {})
+    docker_steps = docker_job.get("steps", []) if isinstance(docker_job, dict) else []
+    grype_action_present = any(
+        step.get("uses") == "anchore/scan-action/download-grype@v5"
+        for step in docker_steps
+        if isinstance(step, dict)
+    )
+    return [
+        _pass_if(
+            "docker build -f infra/docker/Dockerfile -t ai-contentops-studio:ci ." in text,
+            "ci:docker-image-build",
+            "CI builds the API container image before scanning it.",
+        ),
+        _pass_if(
+            grype_action_present,
+            "ci:container-scanner-versioned",
+            "CI installs a versioned Grype scanner action.",
+        ),
+        _pass_if(
+            "grype ai-contentops-studio:ci" in text and "--fail-on high" in text,
+            "ci:container-image-vulnerability-scan",
+            "CI blocks container images with high or critical vulnerabilities.",
+        ),
+        _pass_if(
+            "security-baseline/container-image-grype.json" in text
+            and "container-image-security" in text,
+            "ci:container-scan-artifact",
+            "CI publishes the container vulnerability scan report as an artifact.",
+        ),
+    ]
 
 
 def _terraform_checks(main_tf: Path) -> list[SecurityCheck]:

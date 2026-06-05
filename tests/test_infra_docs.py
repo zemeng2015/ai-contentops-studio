@@ -113,6 +113,9 @@ def test_ci_validates_terraform() -> None:
     assert "Release evidence comparison smoke" in workflow
     assert "scripts/compare_release_evidence.py" in workflow
     assert "python -m pip_audit --skip-editable" in workflow
+    assert "Container image vulnerability scan" in workflow
+    assert "anchore/scan-action/download-grype@v5" in workflow
+    assert "--fail-on high" in workflow
     assert "security-baseline" in workflow
 
 
@@ -162,6 +165,8 @@ def test_phase_three_security_baseline_exists() -> None:
     assert "terraform:rds-encryption" in security_script
     assert "terraform:no-wildcard-iam" in security_script
     assert "docker:non-root-user" in security_script
+    assert "ci:container-image-vulnerability-scan" in security_script
+    assert "ci:container-scan-artifact" in security_script
     assert "USER contentops" in dockerfile
     assert "PYTHONDONTWRITEBYTECODE=1" in dockerfile
 
