@@ -211,6 +211,10 @@ Every worker invocation writes a job execution receipt under `artifact_root/job-
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,
 artifact directories, publish URLs, and per-job errors, giving EventBridge/ECS-triggered runs an
 auditable artifact even when stdout logs are rotated.
+Executed workers also write a JSON and Markdown delivery summary beside the receipt. The summary is
+designed for operator review: it captures published items, distribution asset status, release
+evidence status, failures, and recommended next actions, and release evidence indexes recent
+summaries in `worker_delivery_summaries.json`.
 For executions that publish content, the worker refreshes distribution assets from the publish
 index before generating release evidence. The receipt records `content_assets_path`,
 `content_assets_status`, `content_assets_files`, and `content_assets_error`, while the evidence

@@ -15,6 +15,7 @@ from contentops_core.jobs import (
     JobRunner,
     load_job_file,
     rewrite_job_execution_report,
+    write_job_execution_delivery_summary,
     write_job_execution_report,
 )
 from contentops_core.models import ArtifactMirrorRecord
@@ -65,6 +66,10 @@ def run_pipeline(
             help="Skip post-publish RSS, promotion brief, and distribution manifest output."
         ),
     ] = False,
+    skip_delivery_summary: Annotated[
+        bool,
+        typer.Option(help="Skip post-run worker delivery summary generation."),
+    ] = False,
 ) -> None:
     job_file = load_job_file(path)
     settings = Settings()
@@ -99,12 +104,19 @@ def run_pipeline(
             ) from exc
     if not skip_release_evidence:
         try:
-            _attach_release_evidence(settings, report, release_evidence_dir)
+            _attach_release_evidence(
+                settings,
+                report,
+                release_evidence_dir,
+                write_delivery_summary=not skip_delivery_summary,
+            )
         except Exception as exc:
             report.release_evidence_status = "failed"
             report.release_evidence_error = str(exc)
             rewrite_job_execution_report(report)
             raise typer.BadParameter(f"Failed to generate release evidence: {exc}") from exc
+    elif not skip_delivery_summary:
+        _attach_delivery_summary(report)
     _mirror_receipt_if_configured(settings, report.receipt_path)
     if json_output:
         typer.echo(report.model_dump_json(indent=2))
@@ -115,6 +127,8 @@ def run_pipeline(
     typer.echo(f"Receipt: {report.receipt_path}")
     if report.content_assets_path is not None:
         typer.echo(f"Content assets: {report.content_assets_path}")
+    if report.delivery_summary_markdown_path is not None:
+        typer.echo(f"Delivery summary: {report.delivery_summary_markdown_path}")
     if report.release_evidence_path is not None:
         typer.echo(f"Release evidence: {report.release_evidence_path}")
     for result in report.results:
@@ -178,6 +192,8 @@ def _attach_release_evidence(
     settings: Settings,
     report: JobExecutionReport,
     release_evidence_dir: Path | None,
+    *,
+    write_delivery_summary: bool,
 ) -> None:
     target_dir = (
         release_evidence_dir
@@ -188,12 +204,34 @@ def _attach_release_evidence(
         repository=RunRepository(settings.database_url),
         review_service=build_review_service(settings),
     )
-    write_release_evidence(bundle, target_dir, settings=settings)
     report.release_evidence_path = str(target_dir)
     report.release_evidence_status = bundle.release_readiness.status
     report.release_evidence_files = bundle.summary.artifact_files
     report.release_evidence_error = None
     rewrite_job_execution_report(report)
+    if write_delivery_summary:
+        _attach_delivery_summary(report)
+        delivery_summary_paths = (
+            [Path(report.delivery_summary_path)] if report.delivery_summary_path else None
+        )
+        bundle = build_release_evidence(
+            settings=settings,
+            repository=RunRepository(settings.database_url),
+            review_service=build_review_service(settings),
+            worker_delivery_summary_paths=delivery_summary_paths,
+        )
+        report.release_evidence_files = bundle.summary.artifact_files
+        rewrite_job_execution_report(report)
+    write_release_evidence(bundle, target_dir, settings=settings)
+
+
+def _attach_delivery_summary(report: JobExecutionReport) -> None:
+    try:
+        write_job_execution_delivery_summary(report)
+    except Exception as exc:
+        report.delivery_summary_error = str(exc)
+        rewrite_job_execution_report(report)
+        raise
 
 
 def _publisher_target_dir(settings: Settings) -> Path:

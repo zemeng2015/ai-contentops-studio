@@ -270,6 +270,9 @@ Worker executions write JSON receipts under `CONTENTOPS_ARTIFACT_ROOT/job-execut
 `--release-evidence-dir` or `--skip-release-evidence` is provided. The worker receipt records the
 evidence path, release status, evidence files, and any evidence generation error so scheduled
 automation can be audited from a single JSON record.
+The worker also writes a delivery summary in JSON and Markdown beside the receipt. Use the Markdown
+file for human review or notification handoff, and use `worker_delivery_summaries.json` in release
+evidence to verify recent scheduled publishing outcomes during deployment reviews.
 When a worker execution publishes content, it also regenerates the content distribution assets in
 the configured publishing target before release evidence is generated. The same receipt records the
 asset path, status, generated filenames, and errors, and release evidence includes the resulting

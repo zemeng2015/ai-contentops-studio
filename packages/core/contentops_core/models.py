@@ -590,6 +590,26 @@ class ContentDistributionEvidence(BaseModel):
     items: list[ContentDistributionEvidenceItem] = Field(default_factory=list)
 
 
+class WorkerDeliverySummaryEvidenceItem(BaseModel):
+    execution_id: str
+    name: str
+    artifact_path: str
+    markdown_path: str | None = None
+    published_runs: int = Field(ge=0)
+    content_assets_status: str | None = None
+    release_evidence_status: str | None = None
+    action_required: bool
+    size_bytes: int = Field(ge=0)
+    sha256: str
+    generated_at: datetime
+
+
+class WorkerDeliverySummaryEvidence(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    total: int = Field(ge=0)
+    items: list[WorkerDeliverySummaryEvidenceItem] = Field(default_factory=list)
+
+
 class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
@@ -600,6 +620,7 @@ class ReleaseEvidenceBundle(BaseModel):
     homepage_handoffs: HomepageHandoffEvidence
     content_distribution: ContentDistributionEvidence
     source_reviews: SourceReviewEvidence
+    worker_delivery_summaries: WorkerDeliverySummaryEvidence
     worker_execution_trends: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
     worker_execution_alert_deliveries: list[dict[str, Any]] = Field(default_factory=list)

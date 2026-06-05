@@ -39,6 +39,8 @@ from contentops_core.models import (
     SourceReviewEvidence,
     SourceReviewEvidenceItem,
     SourceReviewRecord,
+    WorkerDeliverySummaryEvidence,
+    WorkerDeliverySummaryEvidenceItem,
 )
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
@@ -52,6 +54,7 @@ def build_release_evidence(
     review_service: ReviewService,
     window_size: int = 100,
     git_sha: str | None = None,
+    worker_delivery_summary_paths: list[Path] | None = None,
 ) -> ReleaseEvidenceBundle:
     doctor = system_status(settings, repository)
     manifest = deployment_manifest(settings, repository)
@@ -61,6 +64,10 @@ def build_release_evidence(
     approval = _latest_release_approval(settings.artifact_root)
     homepage_handoffs = _homepage_handoff_evidence(settings.artifact_root)
     content_distribution = _content_distribution_evidence(settings)
+    worker_delivery_summaries = _worker_delivery_summary_evidence(
+        settings.artifact_root,
+        extra_paths=worker_delivery_summary_paths,
+    )
     source_reviews = _source_review_evidence(settings.artifact_root)
     release_status = "fail" if source_reviews.needs_review_count else readiness.status
     can_release = readiness.can_release and source_reviews.needs_review_count == 0
@@ -89,6 +96,7 @@ def build_release_evidence(
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
         "worker_execution_trends.json",
+        "worker_delivery_summaries.json",
     ]
     if approval is not None:
         artifact_files.append("release_approval.json")
@@ -109,6 +117,7 @@ def build_release_evidence(
         homepage_handoffs=homepage_handoffs,
         content_distribution=content_distribution,
         source_reviews=source_reviews,
+        worker_delivery_summaries=worker_delivery_summaries,
         worker_execution_alerts=worker_execution_alerts.model_dump(mode="json"),
         worker_execution_alert_deliveries=[
             delivery.model_dump(mode="json") for delivery in worker_alert_deliveries
@@ -137,6 +146,7 @@ def write_release_evidence(
         "worker_execution_alert_deliveries": bundle.worker_execution_alert_deliveries,
         "worker_execution_alerts": bundle.worker_execution_alerts,
         "worker_execution_trends": bundle.worker_execution_trends,
+        "worker_delivery_summaries": bundle.worker_delivery_summaries.model_dump(mode="json"),
     }
     if bundle.latest_release_approval is not None:
         payloads["release_approval"] = bundle.latest_release_approval.model_dump(mode="json")
@@ -292,6 +302,94 @@ def _content_distribution_item(
     )
 
 
+def _worker_delivery_summary_evidence(
+    artifact_root: Path,
+    limit: int = 50,
+    extra_paths: list[Path] | None = None,
+) -> WorkerDeliverySummaryEvidence:
+    receipt_dir = job_execution_dir(artifact_root)
+    paths: list[Path] = []
+    seen: set[Path] = set()
+    if receipt_dir.exists():
+        for path in receipt_dir.glob("*-delivery-summary.json"):
+            resolved = path.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                paths.append(path)
+    for path in extra_paths or []:
+        if not path.exists():
+            continue
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        paths.append(path)
+    paths.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    items = [
+        item
+        for path in paths[:limit]
+        if (item := _worker_delivery_summary_item(artifact_root, path)) is not None
+    ]
+    return WorkerDeliverySummaryEvidence(total=len(paths), items=items)
+
+
+def _worker_delivery_summary_item(
+    artifact_root: Path,
+    path: Path,
+) -> WorkerDeliverySummaryEvidenceItem | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    summary = payload.get("summary")
+    content_assets = payload.get("content_assets")
+    release_evidence = payload.get("release_evidence")
+    if not isinstance(summary, dict):
+        summary = {}
+    if not isinstance(content_assets, dict):
+        content_assets = {}
+    if not isinstance(release_evidence, dict):
+        release_evidence = {}
+    stat = path.stat()
+    return WorkerDeliverySummaryEvidenceItem(
+        execution_id=str(payload.get("execution_id") or path.stem),
+        name=str(payload.get("name") or "worker-execution"),
+        artifact_path=_best_relative_path_to_root(artifact_root, path),
+        markdown_path=_worker_delivery_markdown_path(artifact_root, path),
+        published_runs=int(summary.get("published_runs") or 0),
+        content_assets_status=_optional_str(content_assets.get("status")),
+        release_evidence_status=_optional_str(release_evidence.get("status")),
+        action_required=bool(summary.get("action_required")),
+        size_bytes=stat.st_size,
+        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        generated_at=_parse_delivery_generated_at(payload.get("generated_at"), stat),
+    )
+
+
+def _worker_delivery_markdown_path(artifact_root: Path, json_path: Path) -> str | None:
+    markdown_path = json_path.with_suffix(".md")
+    if not markdown_path.exists():
+        return None
+    return _best_relative_path_to_root(artifact_root, markdown_path)
+
+
+def _parse_delivery_generated_at(value: object, stat: os.stat_result) -> datetime:
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+        except ValueError:
+            pass
+    return datetime.fromtimestamp(stat.st_mtime, UTC)
+
+
+def _optional_str(value: object) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
 def _source_review_evidence(artifact_root: Path, limit: int = 100) -> SourceReviewEvidence:
     if not artifact_root.exists():
         return SourceReviewEvidence(total_runs=0, total_decisions=0)
@@ -364,6 +462,13 @@ def _best_relative_path(settings: Settings, path: Path) -> str:
         except ValueError:
             continue
     return path.as_posix()
+
+
+def _best_relative_path_to_root(root: Path, path: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def _evidence_manifest(output_dir: Path, artifact_files: list[str]) -> ArtifactManifest:

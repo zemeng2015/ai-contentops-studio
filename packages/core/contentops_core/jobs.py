@@ -88,6 +88,9 @@ class JobExecutionReport(BaseModel):
     content_assets_status: str | None = None
     content_assets_files: list[str] = Field(default_factory=list)
     content_assets_error: str | None = None
+    delivery_summary_path: str | None = None
+    delivery_summary_markdown_path: str | None = None
+    delivery_summary_error: str | None = None
     release_evidence_path: str | None = None
     release_evidence_status: str | None = None
     release_evidence_files: list[str] = Field(default_factory=list)
@@ -372,6 +375,26 @@ def rewrite_job_execution_report(report: JobExecutionReport) -> Path:
     path = Path(report.receipt_path)
     path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     return path
+
+
+def write_job_execution_delivery_summary(report: JobExecutionReport) -> tuple[Path, Path]:
+    if report.receipt_path is None:
+        raise ValueError("Job execution receipt path is missing.")
+    receipt_path = Path(report.receipt_path)
+    output_dir = receipt_path.parent
+    json_path = output_dir / f"{report.execution_id}-delivery-summary.json"
+    markdown_path = output_dir / f"{report.execution_id}-delivery-summary.md"
+    payload = _job_execution_delivery_summary_payload(report)
+    json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    markdown_path.write_text(
+        _job_execution_delivery_summary_markdown(payload),
+        encoding="utf-8",
+    )
+    report.delivery_summary_path = str(json_path)
+    report.delivery_summary_markdown_path = str(markdown_path)
+    report.delivery_summary_error = None
+    rewrite_job_execution_report(report)
+    return json_path, markdown_path
 
 
 def job_execution_dir(artifact_root: Path) -> Path:
@@ -682,6 +705,138 @@ def job_execution_summary(report: JobExecutionReport) -> JobExecutionSummary:
     )
 
 
+def _job_execution_delivery_summary_payload(report: JobExecutionReport) -> dict[str, Any]:
+    summary = job_execution_summary(report)
+    published_items = [
+        {
+            "job_name": result.job_name,
+            "topic": result.topic,
+            "run_id": result.run_id,
+            "published_url": result.published_url,
+            "artifact_dir": result.artifact_dir,
+            "tags": result.tags,
+        }
+        for result in report.results
+        if result.published_url
+    ]
+    failed_items = [
+        {
+            "job_name": result.job_name,
+            "topic": result.topic,
+            "run_id": result.run_id,
+            "status": str(result.status),
+            "error": result.error or result.homepage_handoff_error,
+        }
+        for result in report.results
+        if result.error or result.homepage_handoff_error
+    ]
+    return {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "execution_id": report.execution_id,
+        "name": report.name,
+        "dry_run": report.dry_run,
+        "started_at": report.started_at.isoformat(),
+        "completed_at": report.completed_at.isoformat(),
+        "duration_ms": report.duration_ms,
+        "summary": summary.model_dump(mode="json"),
+        "published_items": published_items,
+        "failed_items": failed_items,
+        "content_assets": {
+            "path": report.content_assets_path,
+            "status": report.content_assets_status,
+            "files": report.content_assets_files,
+            "error": report.content_assets_error,
+        },
+        "release_evidence": {
+            "path": report.release_evidence_path,
+            "status": report.release_evidence_status,
+            "files": report.release_evidence_files,
+            "error": report.release_evidence_error,
+        },
+        "recommended_actions": _job_execution_delivery_actions(report, summary),
+    }
+
+
+def _job_execution_delivery_summary_markdown(payload: dict[str, Any]) -> str:
+    summary = payload["summary"]
+    content_assets = payload["content_assets"]
+    release_evidence = payload["release_evidence"]
+    lines = [
+        f"# Worker Delivery Summary: {payload['name']}",
+        "",
+        f"- Execution ID: `{payload['execution_id']}`",
+        f"- Generated at: {payload['generated_at']}",
+        f"- Duration: {payload['duration_ms']} ms",
+        f"- Jobs: {summary['succeeded']}/{summary['total_jobs']} succeeded",
+        f"- Published runs: {summary['published_runs']}",
+        f"- Action required: {str(summary['action_required']).lower()}",
+        "",
+        "## Published Content",
+        "",
+    ]
+    published_items = payload["published_items"]
+    if published_items:
+        for item in published_items:
+            lines.append(
+                f"- {item['job_name']}: {item['topic']} "
+                f"({item['published_url'] or 'not published'})"
+            )
+    else:
+        lines.append("- No content was published in this execution.")
+    lines.extend(
+        [
+            "",
+            "## Distribution Assets",
+            "",
+            f"- Status: {content_assets['status'] or 'n/a'}",
+            f"- Path: `{content_assets['path'] or 'not recorded'}`",
+            f"- Files: {', '.join(content_assets['files']) or 'none'}",
+            f"- Error: {content_assets['error'] or 'none'}",
+            "",
+            "## Release Evidence",
+            "",
+            f"- Status: {release_evidence['status'] or 'n/a'}",
+            f"- Path: `{release_evidence['path'] or 'not recorded'}`",
+            f"- Files: {len(release_evidence['files'])}",
+            f"- Error: {release_evidence['error'] or 'none'}",
+            "",
+            "## Recommended Actions",
+            "",
+        ]
+    )
+    for action in payload["recommended_actions"]:
+        lines.append(f"- {action}")
+    return "\n".join(lines) + "\n"
+
+
+def _job_execution_delivery_actions(
+    report: JobExecutionReport,
+    summary: JobExecutionSummary,
+) -> list[str]:
+    if report.dry_run:
+        return [
+            "Rerun without `--dry-run` when this schedule is ready for production execution."
+        ]
+    actions: list[str] = []
+    if summary.published_runs:
+        actions.append(
+            "Review generated distribution assets before committing the publishing target."
+        )
+    if report.content_assets_error:
+        actions.append(
+            "Regenerate content assets after fixing the publish index or output directory."
+        )
+    if report.release_evidence_error:
+        actions.append("Regenerate release evidence after fixing the reported evidence error.")
+    if report.failed:
+        actions.append("Generate a recovery plan and rerun only failed worker jobs.")
+    if not actions:
+        actions.append(
+            "No operator action is required; archive this summary with release evidence."
+        )
+    return actions
+
+
 def _job_execution_trend_bucket(
     bucket_date: date,
     reports: list[JobExecutionReport],
@@ -990,7 +1145,12 @@ def _job_execution_receipt_paths(receipt_dir: Path) -> list[Path]:
         return []
     ignored_names = {"s3-mirror-log.json", "worker-alert-notification-log.json"}
     return sorted(
-        (path for path in receipt_dir.glob("*.json") if path.name not in ignored_names),
+        (
+            path
+            for path in receipt_dir.glob("*.json")
+            if path.name not in ignored_names
+            and not path.name.endswith("-delivery-summary.json")
+        ),
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )

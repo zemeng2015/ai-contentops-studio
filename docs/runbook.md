@@ -85,6 +85,10 @@ In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tr
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced
 for CI/CD release reviews.
+Open `delivery_summary_markdown_path` when an operator needs the short human-readable outcome of a
+scheduled run. The Markdown summary lists published URLs, content distribution status, release
+evidence status, failures, and recommended actions; release evidence stores recent summaries in
+`worker_delivery_summaries.json` for deployment review.
 When a scheduled execution publishes content, check `content_assets_status` in the same receipt.
 `generated` means the worker refreshed `feed.xml`, `promotion-brief.md`, and
 `content-distribution-manifest.json` before release evidence was built; `failed` means the publish

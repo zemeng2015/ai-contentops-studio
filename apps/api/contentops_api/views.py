@@ -427,6 +427,10 @@ def _job_execution_detail_html(
     content_assets = report.content_assets_path or "not recorded"
     content_assets_status = report.content_assets_status or "n/a"
     content_assets_error = report.content_assets_error or "none"
+    delivery_summary_status = "ready" if report.delivery_summary_path else "n/a"
+    delivery_summary = report.delivery_summary_path or "not recorded"
+    delivery_summary_markdown = report.delivery_summary_markdown_path or "not recorded"
+    delivery_summary_error = report.delivery_summary_error or "none"
     summary = job_execution_summary(report)
     rows = "".join(
         f"""
@@ -466,6 +470,7 @@ def _job_execution_detail_html(
         <div><strong>{len(report.release_evidence_files)}</strong><span>Evidence files</span></div>
         <div><strong>{escape(content_assets_status)}</strong><span>Content assets</span></div>
         <div><strong>{len(report.content_assets_files)}</strong><span>Asset files</span></div>
+        <div><strong>{escape(delivery_summary_status)}</strong><span>Delivery summary</span></div>
         <div>
           <strong>{str(summary.action_required).lower()}</strong>
           <span>Action required</span>
@@ -475,6 +480,9 @@ def _job_execution_detail_html(
         Content assets: <code>{escape(content_assets)}</code><br>
         Content asset files: {escape(", ".join(report.content_assets_files) or "none")}<br>
         Content asset error: {escape(content_assets_error)}<br>
+        Delivery summary JSON: <code>{escape(delivery_summary)}</code><br>
+        Delivery summary Markdown: <code>{escape(delivery_summary_markdown)}</code><br>
+        Delivery summary error: {escape(delivery_summary_error)}<br>
         Release evidence: <code>{escape(release_evidence)}</code><br>
         Evidence error: {escape(release_evidence_error)}
       </p>

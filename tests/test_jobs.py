@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from contentops_core.jobs import (
     list_worker_job_catalog,
     load_job_file,
     notify_job_execution_alert,
+    write_job_execution_delivery_summary,
     write_job_execution_report,
 )
 from contentops_core.settings import Settings
@@ -232,6 +234,45 @@ def test_job_execution_summary_counts_outcomes() -> None:
     assert summary.homepage_handoff_failed == 1
     assert summary.release_evidence_ready is True
     assert summary.action_required is True
+
+
+def test_job_execution_delivery_summary_writes_json_and_markdown(tmp_path: Path) -> None:
+    report = JobExecutionReport(
+        name="delivery-summary",
+        total=1,
+        succeeded=1,
+        failed=0,
+        content_assets_path=str(tmp_path / "site"),
+        content_assets_status="generated",
+        content_assets_files=["feed.xml", "promotion-brief.md"],
+        release_evidence_path=str(tmp_path / "release-evidence"),
+        release_evidence_status="warn",
+        release_evidence_files=["summary.json", "worker_delivery_summaries.json"],
+        results=[
+            JobRunResult(
+                job_name="published",
+                topic="Published AI content",
+                publish=True,
+                run_id="run-summary",
+                status="published",
+                published_url="https://example.com/published",
+            )
+        ],
+    )
+    write_job_execution_report(report, tmp_path / "receipts")
+
+    json_path, markdown_path = write_job_execution_delivery_summary(report)
+
+    payload = json.loads(json_path.read_text(encoding="utf-8"))
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert payload["execution_id"] == report.execution_id
+    assert payload["summary"]["published_runs"] == 1
+    assert payload["content_assets"]["status"] == "generated"
+    assert payload["release_evidence"]["status"] == "warn"
+    assert "Worker Delivery Summary" in markdown
+    assert "Published AI content" in markdown
+    assert report.delivery_summary_path == str(json_path)
+    assert report.delivery_summary_markdown_path == str(markdown_path)
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

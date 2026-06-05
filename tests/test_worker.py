@@ -86,7 +86,7 @@ def test_worker_run_attaches_release_evidence_to_receipt(
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    receipt = next(receipt_dir.glob("*.json"))
+    receipt = _job_receipt(receipt_dir)
     receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert payload["release_evidence_path"] == str(evidence_dir)
     assert receipt_payload["release_evidence_path"] == str(evidence_dir)
@@ -136,7 +136,7 @@ jobs:
 
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    receipt = next(receipt_dir.glob("*.json"))
+    receipt = _job_receipt(receipt_dir)
     receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
     assert payload["content_assets_path"] == str(site_dir)
     assert receipt_payload["content_assets_status"] == "generated"
@@ -156,6 +156,19 @@ jobs:
         "content-distribution-manifest.json"
     )
     assert content_distribution["items"][0]["sha256"]
+    delivery_summary_path = Path(payload["delivery_summary_path"])
+    delivery_summary_markdown_path = Path(payload["delivery_summary_markdown_path"])
+    delivery_summary = json.loads(delivery_summary_path.read_text(encoding="utf-8"))
+    worker_delivery_summaries = json.loads(
+        (evidence_dir / "worker_delivery_summaries.json").read_text(encoding="utf-8")
+    )
+    assert delivery_summary_path.exists()
+    assert delivery_summary_markdown_path.exists()
+    assert delivery_summary["published_items"][0]["published_url"].startswith(
+        "https://example.com"
+    )
+    assert worker_delivery_summaries["total"] == 1
+    assert worker_delivery_summaries["items"][0]["execution_id"] == payload["execution_id"]
 
 
 def test_worker_run_can_prepare_requested_homepage_handoff(
@@ -301,3 +314,12 @@ def _init_git_repo(path: Path) -> None:
     run(["git", "init"], cwd=path, check=True, capture_output=True)
     run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
     run(["git", "config", "user.name", "Test User"], cwd=path, check=True)
+
+
+def _job_receipt(receipt_dir: Path) -> Path:
+    return next(
+        path
+        for path in receipt_dir.glob("*.json")
+        if not path.name.endswith("-delivery-summary.json")
+        and path.name not in {"s3-mirror-log.json", "worker-alert-notification-log.json"}
+    )

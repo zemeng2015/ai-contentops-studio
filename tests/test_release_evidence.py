@@ -11,6 +11,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
     job_execution_dir,
+    write_job_execution_delivery_summary,
     write_job_execution_report,
 )
 from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest
@@ -49,6 +50,7 @@ def test_generate_release_evidence_writes_operational_artifacts(
         "worker_execution_alert_deliveries.json",
         "worker_execution_alerts.json",
         "worker_execution_trends.json",
+        "worker_delivery_summaries.json",
     }
     assert {path.name for path in output_dir.glob("*.json")} == expected_files
     assert bundle.summary.git_sha == "test-sha"
@@ -70,6 +72,9 @@ def test_generate_release_evidence_writes_operational_artifacts(
     worker_alert_deliveries = json.loads(
         (output_dir / "worker_execution_alert_deliveries.json").read_text(encoding="utf-8")
     )
+    worker_delivery_summaries = json.loads(
+        (output_dir / "worker_delivery_summaries.json").read_text(encoding="utf-8")
+    )
     source_reviews = json.loads(
         (output_dir / "source_reviews.json").read_text(encoding="utf-8")
     )
@@ -85,12 +90,14 @@ def test_generate_release_evidence_writes_operational_artifacts(
     assert worker_trends["summary"]["top_failure_reasons"] == []
     assert worker_alerts["severity"] == "info"
     assert worker_alert_deliveries == []
+    assert worker_delivery_summaries["total"] == 0
     assert source_reviews["total_runs"] == 0
     assert source_reviews["total_decisions"] == 0
     assert bundle.worker_execution_alerts["severity"] == "info"
     assert bundle.source_reviews.total_decisions == 0
     assert bundle.worker_execution_alert_deliveries == []
     assert bundle.worker_execution_trends["summary"]["execution_count"] == 0
+    assert bundle.worker_delivery_summaries.total == 0
     summary_sha = hashlib.sha256((output_dir / "summary.json").read_bytes()).hexdigest()
     assert evidence_manifest["artifacts"]["summary.json"]["sha256"] == summary_sha
 
@@ -140,6 +147,52 @@ def test_release_evidence_indexes_content_distribution_manifests(
     assert evidence_manifest["artifacts"]["content_distribution.json"]["media_type"] == (
         "application/json"
     )
+
+
+def test_release_evidence_indexes_worker_delivery_summaries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(artifact_root))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    receipt_dir = job_execution_dir(artifact_root)
+    report = JobExecutionReport(
+        name="delivery-calendar",
+        total=1,
+        succeeded=1,
+        failed=0,
+        content_assets_status="generated",
+        release_evidence_status="warn",
+        results=[
+            JobRunResult(
+                job_name="daily-ai",
+                topic="Daily AI publishing",
+                publish=True,
+                run_id="run-delivery",
+                status="published",
+                published_url="https://example.com/daily-ai",
+            )
+        ],
+    )
+    write_job_execution_report(report, receipt_dir)
+    write_job_execution_delivery_summary(report)
+    output_dir = tmp_path / "release-evidence"
+
+    bundle = generate_release_evidence(output_dir)
+
+    payload = json.loads(
+        (output_dir / "worker_delivery_summaries.json").read_text(encoding="utf-8")
+    )
+    assert payload["total"] == 1
+    assert payload["items"][0]["execution_id"] == report.execution_id
+    assert payload["items"][0]["published_runs"] == 1
+    assert payload["items"][0]["content_assets_status"] == "generated"
+    assert payload["items"][0]["release_evidence_status"] == "warn"
+    assert payload["items"][0]["markdown_path"].endswith("-delivery-summary.md")
+    assert bundle.worker_delivery_summaries.total == 1
+    assert "worker_delivery_summaries.json" in bundle.summary.artifact_files
 
 
 def test_release_evidence_indexes_homepage_handoff_bundles(
