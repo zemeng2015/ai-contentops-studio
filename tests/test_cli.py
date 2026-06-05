@@ -711,8 +711,13 @@ def test_cli_job_execution_commands(
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
     path = tmp_path / "job.yaml"
     path.write_text("name: cli-job-history\ntopic: CLI job history\n", encoding="utf-8")
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    (site_dir / "feed.xml").write_text("<rss />", encoding="utf-8")
+    (site_dir / "promotion-brief.md").write_text("# Promotion", encoding="utf-8")
+    (site_dir / "content-distribution-manifest.json").write_text("{}", encoding="utf-8")
     report = JobRunner.dry_run_report(load_job_file(path))
-    report.content_assets_path = str(tmp_path / "site")
+    report.content_assets_path = str(site_dir)
     report.content_assets_status = "generated"
     report.content_assets_files = [
         "feed.xml",
@@ -867,6 +872,27 @@ def test_cli_job_execution_commands(
     assert scheduled_verify_result.exit_code == 0
     scheduled_verify_payload = json.loads(scheduled_verify_result.output)
     assert scheduled_verify_payload["status"] == "pass"
+    scheduled_review_archive = tmp_path / "scheduled-review-package.zip"
+    scheduled_archive_result = runner.invoke(
+        app,
+        [
+            "scheduled-workflow-archive",
+            str(scheduled_review_manifest),
+            str(scheduled_review_archive),
+            "--json",
+        ],
+    )
+    assert scheduled_archive_result.exit_code == 0
+    scheduled_archive_payload = json.loads(scheduled_archive_result.output)
+    assert scheduled_archive_payload["status"] == "pass"
+    assert scheduled_archive_payload["archive_sha256"] == hashlib.sha256(
+        scheduled_review_archive.read_bytes()
+    ).hexdigest()
+    with ZipFile(scheduled_review_archive) as archive:
+        archive_names = set(archive.namelist())
+    assert "scheduled-review-package.json" in archive_names
+    assert "scheduled-review-manifest.json" in archive_names
+    assert any(name.endswith("/content-distribution-manifest.json") for name in archive_names)
     scheduled_summary_markdown.write_text("drift", encoding="utf-8")
     scheduled_verify_drift_result = runner.invoke(
         app,
@@ -875,6 +901,17 @@ def test_cli_job_execution_commands(
     assert scheduled_verify_drift_result.exit_code != 0
     scheduled_verify_drift_payload = json.loads(scheduled_verify_drift_result.output)
     assert scheduled_verify_drift_payload["status"] == "fail"
+    scheduled_archive_drift_result = runner.invoke(
+        app,
+        [
+            "scheduled-workflow-archive",
+            str(scheduled_review_manifest),
+            str(tmp_path / "drifted-scheduled-review-package.zip"),
+            "--json",
+        ],
+    )
+    assert scheduled_archive_drift_result.exit_code != 0
+    assert "verification failed" in scheduled_archive_drift_result.output
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
     assert recovery_payload["failed_count"] == 0

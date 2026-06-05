@@ -66,6 +66,9 @@ unattended cron runs unless every scheduled execution should create a review bra
 Use `contentops scheduled-workflow-verify <manifest.json> --json` before merging a scheduled
 review PR to confirm every indexed artifact still exists and matches its recorded size and
 SHA-256.
+Use `contentops scheduled-workflow-archive <manifest.json> <package.zip> --json` when a reviewer
+or release manager needs one downloadable evidence package. The command reruns verification first
+and refuses to archive drifted or missing artifacts.
 
 For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
 durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs
@@ -84,6 +87,7 @@ contentops scheduled-workflow-summary `
   --pr-metadata-output artifacts/scheduled-pr-metadata.json `
   --manifest-output artifacts/scheduled-review-manifest.json
 contentops scheduled-workflow-verify artifacts/scheduled-review-manifest.json --json
+contentops scheduled-workflow-archive artifacts/scheduled-review-manifest.json artifacts/scheduled-review-package.zip --json
 contentops job-recovery-plan <execution_id> --output recovery.yaml
 ```
 

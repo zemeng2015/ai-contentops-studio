@@ -5,6 +5,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
+from zipfile import ZipFile
 
 import pytest
 from contentops_core.factory import build_pipeline
@@ -14,6 +15,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobRunner,
     JobRunResult,
+    create_scheduled_workflow_review_archive,
     get_job_execution_report,
     job_execution_alert_notification_log,
     job_execution_alert_report,
@@ -433,6 +435,21 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     verification = verify_scheduled_workflow_review_manifest(manifest_path)
     assert verification.status == "pass"
     assert verification.checked_count == manifest["metadata"]["artifact_count"]
+    archive_path = tmp_path / "scheduled-review-package.zip"
+    archive_report = create_scheduled_workflow_review_archive(manifest_path, archive_path)
+    assert archive_report.status == "pass"
+    assert archive_report.artifact_count == manifest["metadata"]["artifact_count"]
+    assert archive_report.archive_size_bytes == archive_path.stat().st_size
+    assert archive_report.archive_sha256 == hashlib.sha256(
+        archive_path.read_bytes()
+    ).hexdigest()
+    with ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+    assert "scheduled-review-manifest.json" in names
+    assert "scheduled-review-verification.json" in names
+    assert "scheduled-review-package.json" in names
+    assert any(name.endswith("/feed.xml") for name in names)
+    assert any(name.endswith("/run-scheduled-homepage-handoff.zip") for name in names)
     markdown_path.write_text("drift", encoding="utf-8")
     drift_verification = verify_scheduled_workflow_review_manifest(manifest_path)
     assert drift_verification.status == "fail"
@@ -443,6 +460,11 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
         and "sha256" in item.message
         for item in drift_verification.items
     )
+    with pytest.raises(ValueError, match="verification failed"):
+        create_scheduled_workflow_review_archive(
+            manifest_path,
+            tmp_path / "drifted-scheduled-review-package.zip",
+        )
 
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:

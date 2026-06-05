@@ -273,6 +273,9 @@ and published URLs committed by a manual draft PR workflow, including size, medi
 and missing-file metadata for each local artifact.
 `contentops scheduled-workflow-verify` reloads that manifest and recomputes the metadata so CI can
 fail review packages whose artifacts are missing or whose hashes have drifted.
+`contentops scheduled-workflow-archive` builds on that check by producing a ZIP with the manifest,
+verification report, package index, receipts, release evidence, content assets, and homepage
+handoff files, giving scheduled automation a portable review artifact.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
 dashboard aggregate those summaries by day for scheduled automation success rate, publish rate,
 handoff success rate, and action-required counts.

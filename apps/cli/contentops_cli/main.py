@@ -18,6 +18,7 @@ from contentops_core.diagnostics import (
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobRunner,
+    create_scheduled_workflow_review_archive,
     get_job_execution_report,
     job_execution_alert_notification_log,
     job_execution_alert_report,
@@ -840,6 +841,32 @@ def scheduled_workflow_verify_command(
             if item.status == "fail":
                 typer.echo(f"- {item.path}: {item.message}")
     raise typer.Exit(0 if report.status == "pass" else 1)
+
+
+@app.command("scheduled-workflow-archive")
+def scheduled_workflow_archive_command(
+    manifest_path: Annotated[
+        Path,
+        typer.Argument(help="Path to a scheduled review manifest JSON file."),
+    ],
+    output_path: Annotated[
+        Path,
+        typer.Argument(help="Path to the scheduled review archive zip file."),
+    ],
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    try:
+        report = create_scheduled_workflow_review_archive(manifest_path, output_path)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    typer.echo(f"Scheduled review archive: {report.status}")
+    typer.echo(str(output_path))
 
 
 @app.command("job-execution")

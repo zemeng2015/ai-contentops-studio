@@ -315,6 +315,7 @@ contentops scheduled-workflow-summary `
   --pr-metadata-output artifacts/scheduled-pr-metadata.json `
   --manifest-output artifacts/scheduled-review-manifest.json
 contentops scheduled-workflow-verify artifacts/scheduled-review-manifest.json --json
+contentops scheduled-workflow-archive artifacts/scheduled-review-manifest.json artifacts/scheduled-review-package.zip --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --receipt-dir artifacts/job-executions
 ```
@@ -352,6 +353,10 @@ automatically.
 `contentops scheduled-workflow-verify` reloads that manifest, recomputes artifact metadata, and
 fails when files are missing or hashes drift, making the review package suitable for pre-merge
 automation.
+`contentops scheduled-workflow-archive` verifies the manifest again before writing a ZIP that
+contains the manifest, verification report, package index, worker receipts, release evidence,
+content assets, and homepage handoff files. The scheduled workflow uploads this ZIP beside the
+normal Actions artifacts so reviewers can download one complete evidence package.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,

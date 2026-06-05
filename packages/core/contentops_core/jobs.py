@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import httpx
 import yaml
@@ -326,6 +327,28 @@ class ScheduledWorkflowReviewVerificationReport(BaseModel):
     missing_count: int = Field(ge=0)
     mismatch_count: int = Field(ge=0)
     items: list[ScheduledWorkflowReviewVerificationItem] = Field(default_factory=list)
+
+
+class ScheduledWorkflowReviewArchiveItem(BaseModel):
+    path: str
+    archive_paths: list[str] = Field(default_factory=list)
+    exists: bool = False
+    media_type: str = "application/octet-stream"
+    size_bytes: int = Field(ge=0, default=0)
+    sha256: str | None = None
+
+
+class ScheduledWorkflowReviewArchiveReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    manifest_path: str
+    archive_path: str
+    status: str
+    artifact_count: int = Field(ge=0)
+    archived_file_count: int = Field(ge=0)
+    archive_size_bytes: int = Field(ge=0, default=0)
+    archive_sha256: str | None = None
+    verification: ScheduledWorkflowReviewVerificationReport
+    items: list[ScheduledWorkflowReviewArchiveItem] = Field(default_factory=list)
 
 
 class JobExecutionListResponse(BaseModel):
@@ -1099,6 +1122,103 @@ def verify_scheduled_workflow_review_manifest(
         mismatch_count=mismatch_count,
         items=items,
     )
+
+
+def create_scheduled_workflow_review_archive(
+    manifest_path: Path,
+    output_path: Path,
+    *,
+    require_pass: bool = True,
+) -> ScheduledWorkflowReviewArchiveReport:
+    verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    if require_pass and verification.status != "pass":
+        raise ValueError(
+            "Scheduled review manifest verification failed; regenerate or fix artifacts "
+            "before creating an archive."
+        )
+    manifest = ScheduledWorkflowReviewManifest.model_validate_json(
+        manifest_path.read_text(encoding="utf-8")
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    items = _scheduled_review_archive_items(manifest)
+    report = ScheduledWorkflowReviewArchiveReport(
+        manifest_path=str(manifest_path),
+        archive_path=str(output_path),
+        status=verification.status,
+        artifact_count=len(items),
+        archived_file_count=sum(len(item.archive_paths) for item in items),
+        verification=verification,
+        items=items,
+    )
+    with ZipFile(output_path, "w", compression=ZIP_DEFLATED) as archive:
+        archive.write(manifest_path, "scheduled-review-manifest.json")
+        archive.writestr(
+            "scheduled-review-verification.json",
+            verification.model_dump_json(indent=2),
+        )
+        archive.writestr(
+            "scheduled-review-package.json",
+            report.model_dump_json(indent=2),
+        )
+        for item in items:
+            source = Path(item.path)
+            for archive_path in item.archive_paths:
+                _write_scheduled_review_archive_member(archive, source, archive_path)
+    stat = output_path.stat()
+    report.archive_size_bytes = stat.st_size
+    report.archive_sha256 = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    return report
+
+
+def _scheduled_review_archive_items(
+    manifest: ScheduledWorkflowReviewManifest,
+) -> list[ScheduledWorkflowReviewArchiveItem]:
+    items: list[ScheduledWorkflowReviewArchiveItem] = []
+    for index, (path_value, artifact) in enumerate(sorted(manifest.artifacts.items()), start=1):
+        source = Path(path_value)
+        archive_base = _scheduled_review_archive_base(index, source)
+        archive_paths: list[str] = []
+        if source.is_dir():
+            archive_paths = [
+                f"{archive_base}/{member.relative_to(source).as_posix()}"
+                for member in sorted(source.rglob("*"))
+                if member.is_file()
+            ]
+        elif source.exists():
+            archive_paths = [f"{archive_base}/{source.name}"]
+        items.append(
+            ScheduledWorkflowReviewArchiveItem(
+                path=path_value,
+                archive_paths=archive_paths,
+                exists=artifact.exists,
+                media_type=artifact.media_type,
+                size_bytes=artifact.size_bytes,
+                sha256=artifact.sha256,
+            )
+        )
+    return items
+
+
+def _scheduled_review_archive_base(index: int, source: Path) -> str:
+    safe_name = "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "-"
+        for char in (source.name or "artifact")
+    ).strip("-")
+    if not safe_name:
+        safe_name = "artifact"
+    return f"artifacts/{index:03d}-{safe_name}"
+
+
+def _write_scheduled_review_archive_member(
+    archive: ZipFile,
+    source: Path,
+    archive_path: str,
+) -> None:
+    if source.is_dir():
+        relative = Path(*Path(archive_path).parts[2:])
+        archive.write(source / relative, archive_path)
+        return
+    archive.write(source, archive_path)
 
 
 def _verify_scheduled_review_artifact(

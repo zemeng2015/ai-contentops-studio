@@ -287,6 +287,10 @@ missing-file metadata. Keep this manual until the team is comfortable with autom
 review branches.
 The workflow verifies that manifest immediately with `contentops scheduled-workflow-verify`; rerun
 the same command before merging if a review branch is updated after creation.
+It then runs `contentops scheduled-workflow-archive` to upload a ZIP package containing the
+manifest, verification report, package index, receipts, release evidence, content assets, and
+homepage handoff files. Treat this ZIP as the portable review artifact for release notes or audit
+handoff.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes
