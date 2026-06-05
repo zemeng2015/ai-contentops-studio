@@ -458,8 +458,76 @@ def test_release_gate_fails_when_worker_automation_has_failed_jobs(
     assert report.can_deploy is False
     assert worker_check.status == "fail"
     assert worker_check.evidence["failed_jobs"] == 1
+    assert worker_check.evidence["unrecovered_executions"] == 1
     assert worker_check.evidence["latest_execution_ids"] == [receipt.execution_id]
-    assert "job-recovery-plan" in worker_check.remediation_steps[1]
+    assert "job-recovery-lineage" in worker_check.remediation_steps[1]
+
+
+def test_release_gate_warns_when_worker_failure_was_recovered(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    failed = JobExecutionReport(
+        name="worker-recovered-gate",
+        total=1,
+        succeeded=0,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="provider-timeout",
+                topic="Recovered worker failure",
+                publish=False,
+                status="failed",
+                error="model provider timeout",
+            )
+        ],
+    )
+    recovery = JobExecutionReport(
+        name="worker-recovered-gate-recovery",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="provider-timeout",
+                topic="Recovered worker failure",
+                publish=False,
+                status="needs_review",
+                run_id="run-recovered-gate",
+                metadata={
+                    "recovery_source_execution_id": failed.execution_id,
+                    "recovery_actor": "zack",
+                    "recovery_notes": "Retry provider timeout.",
+                },
+            )
+        ],
+    )
+    write_job_execution_report(failed, job_execution_dir(settings.artifact_root))
+    write_job_execution_report(recovery, job_execution_dir(settings.artifact_root))
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="worker-recovered-sha",
+        require_approval=False,
+    )
+
+    worker_check = next(
+        check for check in report.checks if check.name == "worker_automation_health"
+    )
+    assert worker_check.status == "warn"
+    assert worker_check.evidence["failed_jobs"] == 1
+    assert worker_check.evidence["recovered_executions"] == 1
+    assert worker_check.evidence["unrecovered_executions"] == 0
+    assert worker_check.evidence["recovery_attempts"] == 1
+    assert "recovered" in worker_check.message
 
 
 def test_release_gate_fails_when_scheduled_review_package_verification_fails(

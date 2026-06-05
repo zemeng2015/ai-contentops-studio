@@ -165,12 +165,18 @@ def _deployment_preflight_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
 
 def _worker_automation_health_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
     alerts = bundle.worker_execution_alerts
+    recovery = bundle.worker_recovery_lineage
     trend_summary = alerts.get("trend_summary", {})
     signals = alerts.get("signals", [])
     severity = str(alerts.get("severity", "info"))
     action_required = bool(alerts.get("action_required", False))
     failed_jobs = _int_field(trend_summary, "failed_jobs")
     failed_executions = _int_field(trend_summary, "action_required")
+    total_failed_executions = _int_field(recovery, "total_failed_executions")
+    recovered_executions = _int_field(recovery, "recovered_execution_count")
+    unrecovered_executions = _int_field(recovery, "unrecovered_execution_count")
+    recovery_attempts = _int_field(recovery, "recovery_attempt_count")
+    recovery_action_required = bool(recovery.get("action_required", False))
     top_failure_reasons = _string_field_list(
         reason.get("reason")
         for reason in trend_summary.get("top_failure_reasons", [])
@@ -186,19 +192,37 @@ def _worker_automation_health_check(bundle: ReleaseEvidenceBundle) -> ReleaseGat
         "action_required": action_required,
         "failed_jobs": failed_jobs,
         "failed_executions": failed_executions,
+        "recovery_total_failed_executions": total_failed_executions,
+        "recovered_executions": recovered_executions,
+        "unrecovered_executions": unrecovered_executions,
+        "recovery_attempts": recovery_attempts,
+        "recovery_action_required": recovery_action_required,
         "latest_execution_ids": latest_execution_ids,
         "top_failure_reasons": top_failure_reasons,
     }
-    if severity == "critical" or failed_jobs > 0:
+    if unrecovered_executions > 0 or recovery_action_required:
         return ReleaseGateItem(
             name="worker_automation_health",
             status="fail",
-            message="Recent worker automation failures block deployment.",
+            message="Recent worker failures still have unrecovered execution backlog.",
             evidence=evidence,
             remediation_steps=[
                 "Open `/dashboard/job-execution-trends` and review worker alert signals.",
-                "Run `contentops job-recovery-plan <execution_id>` for failed worker jobs.",
-                "Rerun failed jobs, regenerate release evidence, and rerun the release gate.",
+                "Run `contentops job-recovery-lineage --days 14` to inspect recovery backlog.",
+                "Run `contentops job-recovery-plan <execution_id> --run` for unrecovered jobs.",
+                "Regenerate release evidence and rerun the release gate after recovery succeeds.",
+            ],
+        )
+    if severity == "critical" or failed_jobs > 0:
+        return ReleaseGateItem(
+            name="worker_automation_health",
+            status="warn",
+            message="Recent worker failures were recovered but should be reviewed before release.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `/dashboard/job-execution-trends` and review the recovery lineage.",
+                "Attach the successful recovery receipt to the release review trail.",
+                "Monitor the next scheduled worker execution for repeated provider failures.",
             ],
         )
     if action_required or severity == "warning" or failed_executions > 0:

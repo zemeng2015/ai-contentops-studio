@@ -207,6 +207,10 @@ without reverse-engineering the worker receipt.
 `worker_execution_alerts.json` condenses the same worker signal into severity, action-required
 state, alert signals, signal-level remediation steps, and recommended actions for release managers
 or on-call handoff.
+`worker_recovery_lineage.json` links failed worker executions to recovery attempts and marks each
+source execution as recovered, partially recovered, or not started. The release gate fails when
+this lineage still has an unrecovered backlog and downgrades fully recovered worker failures to a
+warning so reviewers can inspect the closed-loop evidence before promotion.
 `worker_execution_alert_deliveries.json` records worker alert notification receipts so release
 reviewers can distinguish healthy no-op checks, local skipped delivery, successful webhook delivery,
 and failed notification attempts.
@@ -373,7 +377,8 @@ Terraform also defines a disabled-by-default worker alert notifier task. Enable
 `worker_alert_schedule_expression` plus `worker_alert_window_days` to run
 `contentops job-execution-alert-notify` after the worker schedule. The notifier records
 `worker-alert-notification-log.json`; release evidence mirrors those receipts in
-`worker_execution_alert_deliveries.json`.
+`worker_execution_alert_deliveries.json`. Release evidence also writes
+`worker_recovery_lineage.json`, which the release gate uses to block unrecovered worker backlog.
 Terraform also defines a disabled-by-default operations brief notifier task. Enable
 `ops_brief_schedule_enabled=true` after the recurring worker is writing useful run history, and
 tune `ops_brief_schedule_expression`, `ops_brief_window_days`, and `ops_brief_window_size` to run
