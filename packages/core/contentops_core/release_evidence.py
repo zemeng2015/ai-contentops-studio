@@ -49,6 +49,7 @@ from contentops_core.models import (
     WorkerDeliverySummaryEvidence,
     WorkerDeliverySummaryEvidenceItem,
 )
+from contentops_core.ops_brief import build_ops_brief
 from contentops_core.repository import RunRepository
 from contentops_core.review import ReviewService
 from contentops_core.settings import Settings
@@ -67,6 +68,11 @@ def build_release_evidence(
     providers = provider_health(settings)
     manifest = deployment_manifest(settings, repository)
     operations = review_service.operations_summary(window_size=window_size)
+    ops_brief = build_ops_brief(
+        settings=settings,
+        review_service=review_service,
+        window_size=window_size,
+    )
     readiness = release_readiness(settings, repository, operations)
     preflight = deployment_check(settings, repository, operations)
     approval = _latest_release_approval(settings.artifact_root)
@@ -115,6 +121,7 @@ def build_release_evidence(
         "evidence_manifest.json",
         "homepage_handoffs.json",
         "operations_summary.json",
+        "ops_brief.json",
         "provider_health.json",
         "publish_recovery_executions.json",
         "publish_verifications.json",
@@ -140,6 +147,7 @@ def build_release_evidence(
         summary=summary,
         doctor=doctor,
         provider_health=providers,
+        ops_brief=ops_brief,
         deployment_manifest=manifest,
         operations_summary=operations,
         release_readiness=readiness,
@@ -175,6 +183,7 @@ def write_release_evidence(
         "content_distribution": bundle.content_distribution.model_dump(mode="json"),
         "homepage_handoffs": bundle.homepage_handoffs.model_dump(mode="json"),
         "operations_summary": bundle.operations_summary.model_dump(mode="json"),
+        "ops_brief": bundle.ops_brief.model_dump(mode="json"),
         "provider_health": bundle.provider_health.model_dump(mode="json"),
         "publish_recovery_executions": bundle.publish_recovery_executions.model_dump(
             mode="json"

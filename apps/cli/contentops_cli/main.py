@@ -44,6 +44,7 @@ from contentops_core.models import (
     SourceReviewDecision,
     SourceReviewRequest,
 )
+from contentops_core.ops_brief import build_ops_brief
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
 from contentops_core.release_gate import (
@@ -476,6 +477,52 @@ def ops_summary(
     typer.echo(f"Quality pass rate: {summary.quality_pass_rate:.0%}")
     typer.echo(f"Budget pass rate: {summary.budget_pass_rate:.0%}")
     typer.echo(f"Estimated window tokens: {summary.estimated_total_tokens}")
+
+
+@app.command("ops-brief")
+def ops_brief(
+    days: Annotated[
+        int,
+        typer.Option(help="Number of recent calendar days to include."),
+    ] = 14,
+    window_size: Annotated[
+        int,
+        typer.Option(help="Number of recent runs to scan."),
+    ] = 100,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    service = build_review_service(settings)
+    report = build_ops_brief(
+        settings=settings,
+        review_service=service,
+        days=days,
+        window_size=window_size,
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        return
+    typer.echo(f"Status: {report.status}")
+    typer.echo(report.headline)
+    typer.echo(
+        f"Runs={report.summary.total_runs} review={report.summary.review_queue_depth} "
+        f"failed={report.summary.failed_count} incidents={report.summary.action_required_incidents}"
+    )
+    typer.echo("Top risks:")
+    for risk in report.top_risks:
+        typer.echo(
+            f"- [{risk.severity.value}] {risk.category}: {risk.message}"
+            + (f" ({risk.evidence})" if risk.evidence else "")
+        )
+    typer.echo("Recommended actions:")
+    for action in report.recommended_actions:
+        typer.echo(
+            f"- P{action.priority} {action.owner}: {action.action} "
+            f"Reason: {action.reason}"
+        )
 
 
 @app.command("ops-trends")

@@ -151,6 +151,10 @@ Operations trends bucket the same run, scorecard, cost, and incident evidence by
 They are exposed through `/ops-trends`, `contentops ops-trends`, and `/dashboard/ops-trends` so
 operators can inspect publishing throughput, quality pass rate, budget posture, and incident
 pressure without manually stitching together individual reports.
+The operations brief is the decision layer above those signals. It combines provider health,
+worker execution alerts, incidents, quality, budget, and review queue pressure into a headline,
+top risks, and recommended actions through `/ops-brief`, `contentops ops-brief`,
+`/dashboard/ops-brief`, and release evidence `ops_brief.json`.
 The deployment manifest reuses readiness checks and adds redacted runtime, security, operations,
 and capability evidence. It is intended for release reviews, interview walkthroughs, and
 automation that needs to understand deployment posture without exposing secrets.

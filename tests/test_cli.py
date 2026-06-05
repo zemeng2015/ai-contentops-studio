@@ -407,6 +407,7 @@ def test_cli_queue_and_manifest_commands(
         ["incident-reports", "--query", "searchable", "--json"],
     )
     ops_summary_result = runner.invoke(app, ["ops-summary", "--json"])
+    ops_brief_result = runner.invoke(app, ["ops-brief", "--days", "7", "--json"])
     ops_trends_result = runner.invoke(app, ["ops-trends", "--days", "7", "--json"])
     release_readiness_result = runner.invoke(app, ["release-readiness", "--json"])
     release_evidence_dir = tmp_path / "release-evidence"
@@ -454,6 +455,11 @@ def test_cli_queue_and_manifest_commands(
     ops_summary_payload = json.loads(ops_summary_result.output)
     assert ops_summary_payload["total_runs"] == 1
     assert ops_summary_payload["review_queue_depth"] == 1
+    assert ops_brief_result.exit_code == 0
+    ops_brief_payload = json.loads(ops_brief_result.output)
+    assert ops_brief_payload["days"] == 7
+    assert ops_brief_payload["summary"]["total_runs"] == 1
+    assert ops_brief_payload["recommended_actions"]
     assert ops_trends_result.exit_code == 0
     ops_trends_payload = json.loads(ops_trends_result.output)
     assert ops_trends_payload["days"] == 7
@@ -466,6 +472,7 @@ def test_cli_queue_and_manifest_commands(
     release_evidence_payload = json.loads(release_evidence_result.output)
     assert release_evidence_payload["summary"]["can_release"] is True
     assert release_evidence_payload["operations_summary"]["total_runs"] == 1
+    assert release_evidence_payload["ops_brief"]["summary"]["total_runs"] == 1
     assert release_evidence_payload["deployment_check"]["profile"] == "production"
     assert release_evidence_payload["content_distribution"]["total"] >= 0
     assert release_evidence_payload["publish_recovery_executions"]["total"] >= 0
@@ -481,6 +488,7 @@ def test_cli_queue_and_manifest_commands(
     assert (release_evidence_dir / "homepage_handoffs.json").exists()
     assert (release_evidence_dir / "source_reviews.json").exists()
     assert (release_evidence_dir / "worker_execution_trends.json").exists()
+    assert (release_evidence_dir / "ops_brief.json").exists()
     assert (release_evidence_dir / "evidence_manifest.json").exists()
     assert (release_evidence_dir / "release_readiness.json").exists()
     evidence_manifest = json.loads(

@@ -237,6 +237,9 @@ Review `provider_health.json` in release evidence or run `contentops provider-he
 before enabling scheduled jobs. Search research should show configured credentials, feed/discovery
 providers should show scheduled readiness, and GitHub research should record whether a token is
 configured for higher API limits or private repositories.
+Review `ops_brief.json` or run `contentops ops-brief --days 14 --json` after each scheduled
+execution window. It summarizes provider health, worker alerts, run incidents, quality, budget,
+and review queue pressure into a status, top risks, and recommended operator actions.
 Recorded gate reports are stored under `artifacts/release-gates` and can be inspected through
 `contentops release-gates --json` or `GET /release-gates`. Both surfaces include a release gate
 history summary with pass rate, blocked deployment count, consecutive failures, latest status, and

@@ -49,6 +49,7 @@ from contentops_core.models import (
     JobExecutionPublishRequest,
     JobExecutionReviewRequest,
     OperationsSummary,
+    OpsBriefReport,
     OpsTrendReport,
     ProviderHealthReport,
     PublishedContentListResponse,
@@ -65,6 +66,7 @@ from contentops_core.models import (
     ScorecardListResponse,
     SystemStatus,
 )
+from contentops_core.ops_brief import build_ops_brief
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import (
@@ -644,6 +646,22 @@ def build_ops_router(
         window_size: int = Query(default=100, ge=1, le=500),
     ) -> OperationsSummary:
         return review_service.operations_summary(window_size=window_size)
+
+    @router.get(
+        "/ops-brief",
+        response_model=OpsBriefReport,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_ops_brief(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=100, ge=1, le=500),
+    ) -> OpsBriefReport:
+        return build_ops_brief(
+            settings=settings,
+            review_service=review_service,
+            days=days,
+            window_size=window_size,
+        )
 
     @router.get(
         "/ops-trends",

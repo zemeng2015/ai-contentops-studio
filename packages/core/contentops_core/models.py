@@ -486,6 +486,35 @@ class OpsTrendReport(BaseModel):
     summary: OperationsSummary
 
 
+class OpsBriefRisk(BaseModel):
+    severity: IncidentSeverity
+    category: str
+    message: str
+    evidence: str | None = None
+
+
+class OpsBriefAction(BaseModel):
+    priority: int = Field(ge=1, le=5)
+    owner: str
+    action: str
+    reason: str
+
+
+class OpsBriefReport(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    days: int = Field(ge=1)
+    window_size: int = Field(ge=1)
+    headline: str
+    summary: OperationsSummary
+    provider_health: ProviderHealthReport
+    worker_execution_alerts: dict[str, Any] = Field(default_factory=dict)
+    incidents: IncidentReportListResponse
+    trends: OpsTrendReport
+    top_risks: list[OpsBriefRisk] = Field(default_factory=list)
+    recommended_actions: list[OpsBriefAction] = Field(default_factory=list)
+
+
 class RetentionCandidate(BaseModel):
     run_id: str
     status: RunStatus
@@ -717,6 +746,7 @@ class ReleaseEvidenceBundle(BaseModel):
     summary: ReleaseEvidenceSummary
     doctor: SystemStatus
     provider_health: ProviderHealthReport
+    ops_brief: OpsBriefReport
     deployment_manifest: DeploymentManifest
     operations_summary: OperationsSummary
     release_readiness: ReleaseReadinessReport

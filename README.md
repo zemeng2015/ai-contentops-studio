@@ -142,14 +142,17 @@ contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
 contentops release-gates --json
+contentops ops-brief --days 14 --json
 contentops ops-trends --days 14 --json
 ```
 
 `release-evidence` writes system status, deployment preflight, release gates, homepage handoff
 inventory, content distribution manifests, publish verification summaries, publish recovery
-execution summaries, source review summaries, worker execution trends, and `evidence_manifest.json`
-with SHA-256 hashes and file metadata for every evidence artifact, so CI output can be archived and
-compared during deployment reviews.
+execution summaries, source review summaries, worker execution trends, the daily operations brief,
+and `evidence_manifest.json` with SHA-256 hashes and file metadata for every evidence artifact, so
+CI output can be archived and compared during deployment reviews.
+The operations brief rolls provider health, worker alerts, run incidents, quality, budget, and
+review queue pressure into a headline, top risks, and recommended actions for daily triage.
 When a release approval exists, the evidence bundle also includes `release_approval.json` and the
 API response includes `latest_release_approval`, closing the audit loop between review and deploy.
 Source review decisions are operational gates, not just notes: excluded sources are removed from
@@ -165,6 +168,7 @@ Representative endpoints:
 POST /runs
 GET  /runs
 GET  /dashboard
+GET  /dashboard/ops-brief
 GET  /dashboard/ops-trends
 GET  /dashboard/system-status
 GET  /dashboard/release-evidence
@@ -182,6 +186,7 @@ GET  /runs/{run_id}/publish-recovery-plan
 POST /runs/{run_id}/publish-recovery
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
+GET  /ops-brief
 GET  /ops-trends
 GET  /content
 POST /content-assets

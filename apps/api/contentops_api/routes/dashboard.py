@@ -35,6 +35,7 @@ from contentops_core.models import (
     SourceReviewDecision,
     SourceReviewRequest,
 )
+from contentops_core.ops_brief import build_ops_brief
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence
@@ -68,6 +69,7 @@ from contentops_api.views import (
     _job_executions_html,
     _notification_log_html,
     _operations_summary_html,
+    _ops_brief_html,
     _ops_trends_html,
     _page,
     _pagination_html,
@@ -146,6 +148,11 @@ def build_dashboard_router(
         audit_events = review_service.audit_events(limit=5)
         retention_report = review_service.retention_report()
         operations_summary = review_service.operations_summary()
+        ops_brief = build_ops_brief(
+            settings=settings,
+            review_service=review_service,
+            window_size=100,
+        )
         metrics = [_safe_metrics(run.id) for run in runs]
         completed = sum(
             1 for item in metrics if item is not None and item.total_duration_ms is not None
@@ -226,6 +233,12 @@ def build_dashboard_router(
                   </table>
                 </form>
                 {pagination}
+                <section class="hero compact">
+                  <h2>Ops Brief</h2>
+                  <p>Daily operational risks, provider health, and recommended actions.</p>
+                  <p><a href="/dashboard/ops-brief">Open ops brief</a></p>
+                  {_ops_brief_html(ops_brief)}
+                </section>
                 <section class="hero compact">
                   <h2>Operations Summary</h2>
                   <p>
@@ -314,6 +327,40 @@ def build_dashboard_router(
             channel_url=_publisher_public_url(settings),
         )
         return RedirectResponse(f"/dashboard{_api_key_query(api_key)}", status_code=303)
+
+
+    @router.get(
+        "/dashboard/ops-brief",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_ops_brief(
+        days: int = Query(default=14, ge=1, le=90),
+        window_size: int = Query(default=100, ge=1, le=500),
+        api_key: str = Query(default=""),
+    ) -> HTMLResponse:
+        report = build_ops_brief(
+            settings=settings,
+            review_service=review_service,
+            days=days,
+            window_size=window_size,
+        )
+        return HTMLResponse(
+            _page(
+                "Operations Brief",
+                f"""
+                <section class="hero compact">
+                  <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                  <h2>Daily Operations Brief</h2>
+                  <p>
+                    Actionable summary of provider health, worker alerts, incidents,
+                    quality, budget, and review queue posture.
+                  </p>
+                  {_ops_brief_html(report)}
+                </section>
+                """,
+            )
+        )
 
 
     @router.get(

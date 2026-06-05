@@ -405,6 +405,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     incident_report_response = client.get(f"/runs/{run['id']}/incident-report")
     incident_reports_response = client.get("/incident-reports?limit=5")
     ops_summary_response = client.get("/ops-summary")
+    ops_brief_response = client.get("/ops-brief?days=7")
     ops_trends_response = client.get("/ops-trends?days=7")
     worker_alerts_response = client.get("/job-executions/alerts?days=7")
     worker_alert_notify_response = client.post("/job-executions/alerts/notify?days=7")
@@ -475,6 +476,10 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert ops_summary_response.status_code == 200
     assert ops_summary_response.json()["total_runs"] >= 1
     assert "needs_review" in ops_summary_response.json()["status_counts"]
+    assert ops_brief_response.status_code == 200
+    assert ops_brief_response.json()["days"] == 7
+    assert ops_brief_response.json()["summary"]["total_runs"] >= 1
+    assert ops_brief_response.json()["recommended_actions"]
     assert ops_trends_response.status_code == 200
     assert ops_trends_response.json()["days"] == 7
     assert ops_trends_response.json()["summary"]["total_runs"] >= 1
@@ -493,6 +498,7 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert release_evidence_payload["summary"]["release_status"] in {"pass", "warn", "fail"}
     assert release_evidence_payload["release_readiness"]["operations"]["total_runs"] >= 1
     assert "deployment_manifest" in release_evidence_payload
+    assert "ops_brief" in release_evidence_payload
     assert "worker_execution_trends" in release_evidence_payload
     assert "worker_execution_alerts" in release_evidence_payload
     assert "worker_execution_alert_deliveries" in release_evidence_payload
@@ -1131,6 +1137,8 @@ def test_dashboard_renders() -> None:
     assert "Quality Scorecards" in response.text
     assert "Token Budgets" in response.text
     assert "Incident Reports" in response.text
+    assert "Ops Brief" in response.text
+    assert "Open ops brief" in response.text
     assert "Operations Summary" in response.text
     assert "Open operations trends" in response.text
     assert "System status dashboard" in response.text
@@ -1150,6 +1158,18 @@ def test_dashboard_ops_trends_renders() -> None:
     assert "Ops trends JSON" in response.text
     assert "Quality" in response.text
     assert "Budget" in response.text
+
+
+def test_dashboard_ops_brief_renders() -> None:
+    client = TestClient(app)
+
+    response = client.get("/dashboard/ops-brief?days=7")
+
+    assert response.status_code == 200
+    assert "Operations Brief" in response.text
+    assert "Ops brief JSON" in response.text
+    assert "Top Risks" in response.text
+    assert "Recommended Actions" in response.text
 
 
 def test_dashboard_job_execution_trends_renders() -> None:
@@ -1198,6 +1218,7 @@ def test_dashboard_release_evidence_renders() -> None:
 
     assert response.status_code == 200
     assert "Release Evidence" in response.text
+    assert "Operations Brief" in response.text
     assert "Deployment Gate" in response.text
     assert "Deployment Preflight" in response.text
     assert "Release Gate Checks" in response.text

@@ -126,6 +126,9 @@ contentops publish <run_id>
 contentops publish-receipt <run_id>
 contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops release-evidence --output-dir release-evidence
+contentops provider-health --json
+contentops ops-brief --days 14 --json
+contentops ops-trends --days 14 --json
 ```
 
 ## API
@@ -136,6 +139,8 @@ contentops release-evidence --output-dir release-evidence
 POST /runs
 GET  /runs
 GET  /dashboard
+GET  /dashboard/ops-brief
+GET  /dashboard/ops-trends
 GET  /review-queue
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/scorecard
@@ -145,6 +150,9 @@ GET  /runs/{run_id}/publish-receipt
 GET  /runs/{run_id}/publish-verification
 GET  /runs/{run_id}/homepage-handoff
 GET  /ops-summary
+GET  /ops-brief
+GET  /ops-trends
+GET  /provider-health
 GET  /deployment-manifest
 GET  /release-readiness
 GET  /release-evidence

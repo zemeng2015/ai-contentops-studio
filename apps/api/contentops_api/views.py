@@ -28,6 +28,7 @@ from contentops_core.models import (
     IncidentReportListResponse,
     NotificationDelivery,
     OperationsSummary,
+    OpsBriefReport,
     OpsTrendReport,
     PublishedContentListResponse,
     PublishPlan,
@@ -921,6 +922,64 @@ def _ops_trends_html(report: OpsTrendReport) -> str:
     """
 
 
+def _ops_brief_html(report: OpsBriefReport) -> str:
+    risk_rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(risk.severity.value)}</td>
+          <td>{escape(risk.category)}</td>
+          <td>{escape(risk.message)}</td>
+          <td>{escape(risk.evidence or "")}</td>
+        </tr>
+        """
+        for risk in report.top_risks
+    )
+    action_rows = "".join(
+        f"""
+        <tr>
+          <td>P{action.priority}</td>
+          <td>{escape(action.owner)}</td>
+          <td>{escape(action.action)}</td>
+          <td>{escape(action.reason)}</td>
+        </tr>
+        """
+        for action in report.recommended_actions
+    )
+    return f"""
+      <p>
+        <a href="/ops-brief">Ops brief JSON</a> |
+        <a href="/dashboard/ops-trends">Operations trends</a> |
+        <a href="/dashboard">Back to dashboard</a>
+      </p>
+      <div class="metrics">
+        <div><strong>{escape(report.status)}</strong><span>Status</span></div>
+        <div><strong>{report.summary.total_runs}</strong><span>Total runs</span></div>
+        <div><strong>{report.summary.review_queue_depth}</strong><span>Review queue</span></div>
+        <div><strong>{report.summary.failed_count}</strong><span>Failed runs</span></div>
+        <div>
+          <strong>{report.summary.action_required_incidents}</strong>
+          <span>Action incidents</span>
+        </div>
+        <div><strong>{escape(report.provider_health.status)}</strong><span>Providers</span></div>
+      </div>
+      <p>{escape(report.headline)}</p>
+      <h2>Top Risks</h2>
+      <table>
+        <thead>
+          <tr><th>Severity</th><th>Category</th><th>Message</th><th>Evidence</th></tr>
+        </thead>
+        <tbody>{risk_rows}</tbody>
+      </table>
+      <h2>Recommended Actions</h2>
+      <table>
+        <thead>
+          <tr><th>Priority</th><th>Owner</th><th>Action</th><th>Reason</th></tr>
+        </thead>
+        <tbody>{action_rows}</tbody>
+      </table>
+    """
+
+
 def _job_execution_trends_html(report: JobExecutionTrendReport) -> str:
     latest_success = (
         report.summary.latest_success_at.isoformat() if report.summary.latest_success_at else "n/a"
@@ -1718,6 +1777,8 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
         </div>
         <div><strong>{escape(summary.generated_at.isoformat())}</strong><span>Generated</span></div>
       </div>
+      <h2>Operations Brief</h2>
+      {_ops_brief_html(bundle.ops_brief)}
       <h2>Provider Health</h2>
       <table>
         <thead>
