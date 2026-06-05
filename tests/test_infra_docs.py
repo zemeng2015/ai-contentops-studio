@@ -106,6 +106,10 @@ def test_ci_validates_terraform() -> None:
     assert "--cov-report=xml:coverage.xml" in workflow
     assert "--cov-fail-under=75" in workflow
     assert "coverage-py${{ matrix.python-version }}" in workflow
+    assert "Repository security baseline" in workflow
+    assert "scripts/check_security_baseline.py" in workflow
+    assert "python -m pip_audit --skip-editable" in workflow
+    assert "security-baseline" in workflow
 
 
 def test_long_term_ci_plan_documents_quality_roadmap() -> None:
@@ -136,6 +140,19 @@ def test_phase_two_ci_scripts_exist() -> None:
     assert "DashboardSmokeReport" in dashboard_smoke
     assert "/dashboard/release-evidence" in dashboard_smoke
     assert "/dashboard/system-status" in dashboard_smoke
+
+
+def test_phase_three_security_baseline_exists() -> None:
+    security_script = Path("scripts/check_security_baseline.py").read_text(encoding="utf-8")
+    dockerfile = Path("infra/docker/Dockerfile").read_text(encoding="utf-8")
+
+    assert "SecurityBaselineReport" in security_script
+    assert "pull_request_target is not allowed" in security_script
+    assert "terraform:rds-encryption" in security_script
+    assert "terraform:no-wildcard-iam" in security_script
+    assert "docker:non-root-user" in security_script
+    assert "USER contentops" in dockerfile
+    assert "PYTHONDONTWRITEBYTECODE=1" in dockerfile
 
 
 def test_scheduled_contentops_workflow_runs_worker_gates() -> None:

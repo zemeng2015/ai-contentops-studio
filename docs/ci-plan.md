@@ -29,7 +29,7 @@ Status: complete.
 
 ## Phase 2: Quality And Regression Signals
 
-Status: active.
+Status: complete.
 
 - Add coverage reporting for core packages and API routes.
 - Split slow API/dashboard tests from fast provider/unit tests while keeping a single required
@@ -38,6 +38,8 @@ Status: active.
 - Track release evidence size and artifact count over time to catch accidental evidence loss.
 
 ## Phase 3: Security And Supply Chain
+
+Status: active.
 
 - Add dependency vulnerability scanning for Python dependencies.
 - Add static checks for GitHub Actions permissions, secret usage, and unsafe shell patterns.
