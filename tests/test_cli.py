@@ -392,6 +392,42 @@ def test_cli_queue_and_manifest_commands(
         assert "artifacts/eval-report.json" in bundle.namelist()
 
 
+def test_cli_source_review_records_decision(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_STATIC_SITE_DIR", str(tmp_path / "site"))
+
+    runner = CliRunner()
+    run_result = runner.invoke(app, ["run", "--topic", "CLI source review workflow"])
+    run_id = _run_id(run_result.output)
+    review_result = runner.invoke(
+        app,
+        [
+            "source-review",
+            run_id,
+            "--source-key",
+            "AI engineering pattern library",
+            "--decision",
+            "include",
+            "--reviewer",
+            "zack",
+            "--notes",
+            "Keep this source.",
+        ],
+    )
+    reviews_result = runner.invoke(app, ["source-reviews", run_id])
+
+    assert review_result.exit_code == 0
+    assert '"decision": "include"' in review_result.output
+    assert reviews_result.exit_code == 0
+    reviews = json.loads(reviews_result.output)
+    assert reviews[0]["source_title"] == "AI engineering pattern library"
+    assert reviews[0]["notes"] == "Keep this source."
+
+
 def test_cli_homepage_handoff_exports_zip(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

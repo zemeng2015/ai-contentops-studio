@@ -33,6 +33,8 @@ from contentops_core.models import (
     RunRequest,
     RunStatus,
     SourceAuditReport,
+    SourceReviewDecision,
+    SourceReviewRequest,
 )
 from contentops_core.release_approvals import approve_release, list_release_approvals
 from contentops_core.release_evidence import build_release_evidence, write_release_evidence
@@ -1150,6 +1152,43 @@ def source_audit(
             f"- {assessment.grade:6} {assessment.score:.2f} "
             f"{assessment.source_title}: {assessment.recommendation}"
         )
+
+
+@app.command("source-review")
+def source_review(
+    run_id: str,
+    source_key: Annotated[str, typer.Option(help="Canonical URL, URL, or title to review.")],
+    decision: Annotated[
+        SourceReviewDecision,
+        typer.Option(help="Review decision for this source."),
+    ],
+    reviewer: Annotated[str, typer.Option(help="Reviewer name.")] = "operator",
+    notes: Annotated[str, typer.Option(help="Reviewer notes.")] = "",
+) -> None:
+    service = build_review_service(Settings())
+    try:
+        record = service.review_source(
+            run_id,
+            SourceReviewRequest(
+                source_key=source_key,
+                decision=decision,
+                reviewer=reviewer,
+                notes=notes,
+            ),
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(record.model_dump_json(indent=2))
+
+
+@app.command("source-reviews")
+def source_reviews(run_id: str) -> None:
+    service = build_review_service(Settings())
+    try:
+        reviews = service.source_reviews(run_id)
+    except FileNotFoundError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    typer.echo(json.dumps([review.model_dump(mode="json") for review in reviews], indent=2))
 
 
 @app.command()

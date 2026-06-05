@@ -41,6 +41,7 @@ from contentops_core.models import (
     RunScorecard,
     ScorecardListResponse,
     SourceAuditReport,
+    SourceReviewRecord,
     SystemStatus,
 )
 
@@ -1933,6 +1934,74 @@ def _source_review_rows(research_json: str) -> str:
             """
         )
     return "\n".join(rows)
+
+
+def _source_review_table_html(
+    run_id: str,
+    research_json: str,
+    reviews: list[SourceReviewRecord],
+    api_key: str = "",
+) -> str:
+    data = json.loads(research_json)
+    review_by_key = {review.source_key: review for review in reviews}
+    rows: list[str] = []
+    for source in data.get("sources", []):
+        title = escape(str(source.get("title", "Untitled source")))
+        url = source.get("url")
+        canonical_url = str(source.get("canonical_url") or url or title).strip()
+        source_key = canonical_url.casefold()
+        action_url = (
+            f"/dashboard/runs/{escape(run_id)}/source-reviews{_api_key_query(api_key)}"
+        )
+        source_label = f'<a href="{escape(str(url))}">{title}</a>' if url else title
+        status = escape(str(source.get("extraction_status", "unknown")))
+        quality = float(source.get("extraction_quality", 0))
+        summary = escape(str(source.get("summary", ""))[:220])
+        review = review_by_key.get(source_key)
+        decision = review.decision.value if review else "unreviewed"
+        notes = review.notes if review else ""
+        rows.append(
+            f"""
+            <tr>
+              <td>{source_label}</td>
+              <td>{status}</td>
+              <td>{quality:.2f}</td>
+              <td>{escape(decision)}</td>
+              <td>{summary}</td>
+              <td>
+                <form method="post" action="{action_url}">
+                  <input type="hidden" name="source_key" value="{escape(source_key)}">
+                  <select name="decision">
+                    <option value="include">Include</option>
+                    <option value="exclude">Exclude</option>
+                    <option value="needs_review">Needs review</option>
+                  </select>
+                  <input name="reviewer" placeholder="Reviewer" value="operator">
+                  <input name="notes" placeholder="Notes" value="{escape(notes)}">
+                  <button type="submit">Save</button>
+                </form>
+              </td>
+            </tr>
+            """
+        )
+    if not rows:
+        return "<p>No sources recorded.</p>"
+    return f"""
+      <p><a href="/runs/{escape(run_id)}/source-reviews">Source review JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Status</th>
+            <th>Quality</th>
+            <th>Decision</th>
+            <th>Summary</th>
+            <th>Review</th>
+          </tr>
+        </thead>
+        <tbody>{"".join(rows)}</tbody>
+      </table>
+    """
 
 
 def _research_provider_metadata_html(research_json: str) -> str:

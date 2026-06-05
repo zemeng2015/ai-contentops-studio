@@ -79,6 +79,10 @@ Each run now persists `request.json`, which enables reproducible reruns through 
 dashboard without relying on operator memory or external logs.
 The CLI exposes the same review queue, artifact manifest, source audit, scorecard, and cost-report
 surfaces as the API, so operators can script review checks without scraping dashboard HTML.
+Source review is a first-class review artifact. Operators can mark individual sources as included,
+excluded, or still needing review through the API, CLI, or dashboard. Decisions are persisted to
+`source-review.json` with reviewer, notes, and timestamp fields, and each source decision writes an
+audit event so source curation is visible during later approval and publishing checks.
 
 Run comparison is part of the review layer. It compares duration, source counts, source overlap,
 publish readiness, and evaluation score deltas between a base run and a candidate run. This makes

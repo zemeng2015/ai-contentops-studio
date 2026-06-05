@@ -56,6 +56,8 @@ from contentops_core.models import (
     ScorecardListResponse,
     Source,
     SourceOverlap,
+    SourceReviewRecord,
+    SourceReviewRequest,
 )
 from contentops_core.notifications import LocalNotificationPublisher, NotificationPublisher
 from contentops_core.repository import RunRepository
@@ -115,6 +117,58 @@ class ReviewService:
         run = self._get_run(run_id)
         artifact_path = self._safe_artifact_path(run.artifact_dir, artifact_name)
         return artifact_path.read_text(encoding="utf-8")
+
+    def source_reviews(self, run_id: str) -> list[SourceReviewRecord]:
+        run = self._get_run(run_id)
+        path = run.artifact_dir / "source-review.json"
+        if not path.exists():
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, list):
+            return []
+        return [SourceReviewRecord.model_validate(item) for item in data]
+
+    def review_source(
+        self,
+        run_id: str,
+        request: SourceReviewRequest,
+    ) -> SourceReviewRecord:
+        run = self._get_run(run_id)
+        sources = self._load_sources(run)
+        source_by_key = {self._source_key(source): source for source in sources}
+        normalized_key = request.source_key.strip().casefold()
+        source = source_by_key.get(normalized_key)
+        if source is None:
+            raise ValueError(f"Source not found for key: {request.source_key}")
+        record = SourceReviewRecord(
+            source_key=normalized_key,
+            source_title=source.title,
+            decision=request.decision,
+            reviewer=request.reviewer,
+            notes=request.notes,
+        )
+        reviews = [
+            existing
+            for existing in self.source_reviews(run_id)
+            if existing.source_key != normalized_key
+        ]
+        reviews.append(record)
+        self._write_source_reviews(run, reviews)
+        self._record_audit_event(
+            run,
+            AuditEvent(
+                run_id=run_id,
+                action="source_review",
+                actor=request.reviewer,
+                fields={
+                    "source_key": normalized_key,
+                    "source_title": source.title,
+                    "decision": request.decision.value,
+                    "notes": request.notes,
+                },
+            ),
+        )
+        return record
 
     def s3_mirror_log(self, run_id: str) -> list[ArtifactMirrorRecord]:
         run = self._get_run(run_id)
@@ -848,6 +902,12 @@ class ReviewService:
     def _write_approval(run: RunRecord, approval: ApprovalRecord) -> None:
         path = run.artifact_dir / "approval.json"
         path.write_text(approval.model_dump_json(indent=2), encoding="utf-8")
+
+    @staticmethod
+    def _write_source_reviews(run: RunRecord, reviews: list[SourceReviewRecord]) -> None:
+        path = run.artifact_dir / "source-review.json"
+        data = [review.model_dump(mode="json") for review in reviews]
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     @staticmethod
     def _write_publish_receipt(run: RunRecord, receipt: PublishReceipt) -> None:

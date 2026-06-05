@@ -27,6 +27,8 @@ from contentops_core.models import (
     RunMetrics,
     RunRequest,
     RunStatus,
+    SourceReviewDecision,
+    SourceReviewRequest,
 )
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.release_approvals import approve_release, list_release_approvals
@@ -77,7 +79,7 @@ from contentops_api.views import (
     _scorecard_html,
     _scorecards_html,
     _source_audit_html,
-    _source_review_rows,
+    _source_review_table_html,
     _status_options,
     _system_status_html,
     _timeline_rows,
@@ -627,12 +629,17 @@ def build_dashboard_router(
             plan_html = _publish_plan_html(review_service.publish_plan(run_id))
         except (FileNotFoundError, ValueError):
             plan_html = "<p>Publish plan unavailable.</p>"
-        source_rows = ""
+        source_review_html = ""
         research_provider_html = ""
         if "research.json" in artifacts:
             research_json = review_service.read_artifact(run_id, "research.json")
-            source_rows = _source_review_rows(research_json)
             research_provider_html = _research_provider_metadata_html(research_json)
+            source_review_html = _source_review_table_html(
+                run_id,
+                research_json,
+                review_service.source_reviews(run_id),
+                api_key,
+            )
         source_audit_html = ""
         if "source-audit.json" in artifacts:
             source_audit_html = _source_audit_html(
@@ -765,17 +772,7 @@ def build_dashboard_router(
                   <h4>Research Provider</h4>
                   {research_provider_html}
                   {source_audit_html}
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Source</th>
-                        <th>Status</th>
-                        <th>Quality</th>
-                        <th>Summary</th>
-                      </tr>
-                    </thead>
-                    <tbody>{source_rows}</tbody>
-                  </table>
+                  {source_review_html}
                 </section>
                 """,
             )
@@ -818,6 +815,38 @@ def build_dashboard_router(
         return RedirectResponse(f"/dashboard/runs/{run_id}", status_code=303)
     
     
+    @router.post(
+        "/dashboard/runs/{run_id}/source-reviews",
+        dependencies=[Depends(require_operator)],
+    )
+    def dashboard_review_source(
+        run_id: str,
+        source_key: Annotated[str, Form()],
+        decision: Annotated[SourceReviewDecision, Form()],
+        reviewer: Annotated[str, Form()] = "operator",
+        notes: Annotated[str, Form()] = "",
+        api_key: str = Query(default=""),
+    ) -> RedirectResponse:
+        try:
+            review_service.review_source(
+                run_id,
+                SourceReviewRequest(
+                    source_key=source_key,
+                    decision=decision,
+                    reviewer=reviewer,
+                    notes=notes,
+                ),
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return RedirectResponse(
+            f"/dashboard/runs/{run_id}{_api_key_query(api_key)}",
+            status_code=303,
+        )
+
+
     @router.post(
         "/dashboard/runs/{run_id}/rollback-publish",
         dependencies=[Depends(require_operator)],

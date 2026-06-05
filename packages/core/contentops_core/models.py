@@ -78,6 +78,28 @@ class SourceAuditReport(BaseModel):
     assessments: list[SourceAssessment]
 
 
+class SourceReviewDecision(StrEnum):
+    INCLUDE = "include"
+    EXCLUDE = "exclude"
+    NEEDS_REVIEW = "needs_review"
+
+
+class SourceReviewRequest(BaseModel):
+    source_key: str
+    decision: SourceReviewDecision
+    reviewer: str = "operator"
+    notes: str = ""
+
+
+class SourceReviewRecord(BaseModel):
+    source_key: str
+    source_title: str
+    decision: SourceReviewDecision
+    reviewer: str = "operator"
+    notes: str = ""
+    decided_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class ContentPlan(BaseModel):
     title: str
     slug: str

@@ -24,6 +24,8 @@ from contentops_core.models import (
     RunScorecard,
     RunStatus,
     SourceAuditReport,
+    SourceReviewRecord,
+    SourceReviewRequest,
 )
 from contentops_core.pipeline import ContentOpsPipeline
 from contentops_core.repository import RunRepository
@@ -455,6 +457,32 @@ def build_runs_router(
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return SourceAuditReport.model_validate_json(raw)
+
+
+    @router.get(
+        "/runs/{run_id}/source-reviews",
+        response_model=list[SourceReviewRecord],
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_source_reviews(run_id: str) -> list[SourceReviewRecord]:
+        try:
+            return review_service.source_reviews(run_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+    @router.post(
+        "/runs/{run_id}/source-reviews",
+        response_model=SourceReviewRecord,
+        dependencies=[Depends(require_operator)],
+    )
+    def review_source(run_id: str, request: SourceReviewRequest) -> SourceReviewRecord:
+        try:
+            return review_service.review_source(run_id, request)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
     @router.get(

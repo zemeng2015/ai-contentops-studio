@@ -123,6 +123,8 @@ contentops queue --status needs_review --json
 contentops config-audit --json
 contentops scorecard <run_id>
 contentops source-audit <run_id>
+contentops source-review <run_id> --source-key "https://example.com/source" --decision include
+contentops source-reviews <run_id>
 contentops publish-plan <run_id>
 contentops approve <run_id> --reviewer "operator"
 contentops publish <run_id>
@@ -159,6 +161,8 @@ GET  /review-queue
 GET  /runs/{run_id}/artifacts
 GET  /runs/{run_id}/scorecard
 GET  /runs/{run_id}/source-audit
+GET  /runs/{run_id}/source-reviews
+POST /runs/{run_id}/source-reviews
 GET  /runs/{run_id}/s3-mirror-log
 GET  /runs/{run_id}/publish-plan
 GET  /runs/{run_id}/publish-receipt

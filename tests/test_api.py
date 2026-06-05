@@ -323,6 +323,17 @@ def test_run_artifact_and_publish_endpoints() -> None:
     artifact_response = client.get(f"/runs/{run['id']}/artifacts/eval-report.json")
     plan_response = client.get(f"/runs/{run['id']}/publish-plan")
     source_audit_response = client.get(f"/runs/{run['id']}/source-audit")
+    source_reviews_empty_response = client.get(f"/runs/{run['id']}/source-reviews")
+    review_source_response = client.post(
+        f"/runs/{run['id']}/source-reviews",
+        json={
+            "source_key": "AI engineering pattern library",
+            "decision": "include",
+            "reviewer": "zack",
+            "notes": "Useful grounding source.",
+        },
+    )
+    source_reviews_response = client.get(f"/runs/{run['id']}/source-reviews")
     metrics_response = client.get(f"/runs/{run['id']}/metrics")
     scorecard_response = client.get(f"/runs/{run['id']}/scorecard")
     scorecards_response = client.get("/scorecards?limit=5")
@@ -366,6 +377,13 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert plan_response.json()["ready"] is True
     assert source_audit_response.status_code == 200
     assert source_audit_response.json()["source_count"] >= 1
+    assert source_reviews_empty_response.status_code == 200
+    assert source_reviews_empty_response.json() == []
+    assert review_source_response.status_code == 200
+    assert review_source_response.json()["decision"] == "include"
+    assert review_source_response.json()["reviewer"] == "zack"
+    assert source_reviews_response.status_code == 200
+    assert source_reviews_response.json()[0]["notes"] == "Useful grounding source."
     assert metrics_response.status_code == 200
     assert metrics_response.json()["source_count"] >= 1
     assert scorecard_response.status_code == 200
@@ -430,11 +448,17 @@ def test_run_artifact_and_publish_endpoints() -> None:
     assert verification_response.json()["verified"] is True
     assert len(verification_response.json()["items"]) == 3
     assert notifications_response.status_code == 200
-    assert [item["action"] for item in notifications_response.json()] == ["approve", "publish"]
+    notification_actions = [item["action"] for item in notifications_response.json()]
+    assert "source_review" in notification_actions
+    assert "approve" in notification_actions
+    assert "publish" in notification_actions
     assert content_response.status_code == 200
     assert any(item["run_id"] == run["id"] for item in content_response.json()["items"])
     assert audit_response.status_code == 200
-    assert [event["action"] for event in audit_response.json()] == ["approve", "publish"]
+    audit_actions = [event["action"] for event in audit_response.json()]
+    assert "source_review" in audit_actions
+    assert "approve" in audit_actions
+    assert "publish" in audit_actions
     assert audit_events_response.status_code == 200
     audit_events_payload = audit_events_response.json()
     assert audit_events_payload["total"] >= 1
@@ -985,6 +1009,8 @@ def test_dashboard_run_detail_shows_source_review() -> None:
     assert "Dashboard source review production architecture" in detail_response.text
     assert "Selected URLs" in detail_response.text
     assert "https://example.com/research" in detail_response.text
+    assert "Source review JSON" in detail_response.text
+    assert "Needs review" in detail_response.text
     assert "Publish Plan" in detail_response.text
     assert "Approval" in detail_response.text
     assert "Publish Receipt" in detail_response.text
