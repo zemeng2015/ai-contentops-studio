@@ -234,7 +234,7 @@ def test_job_execution_summary_counts_outcomes() -> None:
 
 def test_job_execution_trends_aggregate_receipts(tmp_path: Path) -> None:
     receipt_dir = tmp_path / "receipts"
-    completed_at = datetime.now(UTC)
+    completed_at = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
     first = JobExecutionReport(
         name="first",
         total=2,

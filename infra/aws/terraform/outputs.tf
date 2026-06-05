@@ -18,6 +18,11 @@ output "worker_task_definition_arn" {
   value       = aws_ecs_task_definition.worker.arn
 }
 
+output "worker_alert_notifier_task_definition_arn" {
+  description = "Worker alert notifier task definition ARN."
+  value       = aws_ecs_task_definition.worker_alert_notifier.arn
+}
+
 output "metadata_db_endpoint" {
   description = "RDS Postgres endpoint for run metadata."
   value       = aws_db_instance.metadata.endpoint
@@ -31,6 +36,11 @@ output "database_url_secret_arn" {
 output "daily_worker_schedule_arn" {
   description = "EventBridge Scheduler ARN for the recurring worker."
   value       = aws_scheduler_schedule.daily_worker.arn
+}
+
+output "worker_alert_notifier_schedule_arn" {
+  description = "EventBridge Scheduler ARN for recurring worker alert notifications."
+  value       = aws_scheduler_schedule.worker_alert_notifier.arn
 }
 
 output "operations_dashboard_name" {

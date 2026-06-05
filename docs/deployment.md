@@ -237,6 +237,12 @@ evidence path, release status, evidence files, and any evidence generation error
 automation can be audited from a single JSON record.
 In ECS/EventBridge deployments, keep artifact mirroring enabled so these receipts are copied to S3
 with the rest of the run artifacts and release evidence.
+Terraform also defines a disabled-by-default worker alert notifier task. Enable
+`worker_alert_schedule_enabled=true` after the recurring worker is writing receipts, and tune
+`worker_alert_schedule_expression` plus `worker_alert_window_days` to run
+`contentops job-execution-alert-notify` after the worker schedule. The notifier records
+`worker-alert-notification-log.json`; release evidence mirrors those receipts in
+`worker_execution_alert_deliveries.json`.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.

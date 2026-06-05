@@ -169,6 +169,24 @@ variable "worker_pipeline_path" {
   default     = "pipelines/daily_ai_roundup.yaml"
 }
 
+variable "worker_alert_schedule_expression" {
+  description = "EventBridge Scheduler expression for recurring worker alert notification checks."
+  type        = string
+  default     = "cron(30 13 * * ? *)"
+}
+
+variable "worker_alert_schedule_enabled" {
+  description = "Whether the recurring worker alert notifier schedule is enabled."
+  type        = bool
+  default     = false
+}
+
+variable "worker_alert_window_days" {
+  description = "Number of recent days included by the worker alert notifier task."
+  type        = number
+  default     = 14
+}
+
 variable "alarm_actions" {
   description = "SNS topic ARNs or other CloudWatch alarm actions for alarm and OK transitions."
   type        = list(string)

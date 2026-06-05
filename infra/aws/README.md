@@ -26,12 +26,13 @@ before Terraform or CDK resources are added.
   `CONTENTOPS_RESEARCH_SEARCH_API_KEY`,
   `CONTENTOPS_RESEARCH_GITHUB_TOKEN`, and `CONTENTOPS_NOTIFICATION_WEBHOOK_URL`
 - ECS Fargate task definitions for API and worker
+- ECS Fargate task definition for the worker alert notifier
 - task execution and artifact access IAM roles
 - CloudWatch log groups
 - CloudWatch log metric filters for API errors and worker failures
 - CloudWatch alarms for API errors, worker failures, and high RDS connections
 - CloudWatch operations dashboard for errors, ECS resources, RDS health, and recent failure logs
-- EventBridge Scheduler recurring worker run
+- EventBridge Scheduler recurring worker run and worker alert notification check
 
 It intentionally stops short of creating public networking and an ALB until the runtime deployment
 choice is finalized.
@@ -50,6 +51,11 @@ terraform plan \
 
 The recurring worker schedule is disabled by default. Set `worker_schedule_enabled=true` after the
 image, networking, RDS metadata store, and publishing target are ready.
+The worker alert notifier schedule is also disabled by default. Set
+`worker_alert_schedule_enabled=true` after the worker has produced receipts in S3 and
+`notification_webhook_url_secret_arn` is configured when external delivery is required. The notifier
+runs `contentops job-execution-alert-notify`, writes `worker-alert-notification-log.json`, and makes
+the same receipts visible through `/job-executions/alerts/notifications` and release evidence.
 Set `worker_pipeline_path` to choose the scheduled content calendar. For example, use
 `pipelines/daily_ai_roundup.yaml` for AI trend monitoring or
 `pipelines/project_repository_updates.yaml` for GitHub project update drafts.
@@ -62,7 +68,7 @@ Set `read_api_key_secret_arn` and `require_read_api_key=true` to protect dashboa
 read routes with a read-only key. The operator key also works on read routes, but read keys cannot
 perform write actions.
 Set `notification_webhook_url_secret_arn` to deliver review and publishing events to an external
-webhook while retaining local `notification-log.json` receipts.
+webhook while retaining local `notification-log.json` and worker alert delivery receipts.
 Tune `latency_slo_ms` and `min_source_count` to make the dashboard and `/scorecards` API reflect
 the production quality bar for recurring content runs.
 Tune `token_budget_per_run` to make `/cost-reports` useful as a recurring-run budget guardrail.

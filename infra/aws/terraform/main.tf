@@ -466,6 +466,60 @@ resource "aws_ecs_task_definition" "worker" {
   tags = local.tags
 }
 
+resource "aws_ecs_task_definition" "worker_alert_notifier" {
+  family                   = "${local.name}-worker-alert-notifier"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.task_execution.arn
+  task_role_arn            = aws_iam_role.task.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "worker-alert-notifier"
+      image     = var.container_image
+      essential = true
+      command = [
+        "contentops",
+        "job-execution-alert-notify",
+        "--days",
+        tostring(var.worker_alert_window_days)
+      ]
+      environment = [
+        { name = "CONTENTOPS_ARTIFACT_STORE_PROVIDER", value = "s3" },
+        { name = "CONTENTOPS_ARTIFACT_S3_BUCKET", value = aws_s3_bucket.artifacts.bucket },
+        { name = "CONTENTOPS_ARTIFACT_S3_PREFIX", value = "contentops-artifacts" },
+        { name = "CONTENTOPS_NOTIFICATION_TIMEOUT_SECONDS", value = tostring(var.notification_timeout_seconds) },
+        { name = "CONTENTOPS_REQUIRE_READ_API_KEY", value = tostring(var.require_read_api_key) }
+      ]
+      secrets = concat(
+        [
+          {
+            name      = "CONTENTOPS_DATABASE_URL"
+            valueFrom = aws_secretsmanager_secret.database_url.arn
+          }
+        ],
+        var.notification_webhook_url_secret_arn != "" ? [
+          {
+            name      = "CONTENTOPS_NOTIFICATION_WEBHOOK_URL"
+            valueFrom = var.notification_webhook_url_secret_arn
+          }
+        ] : []
+      )
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.worker.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "worker-alert-notifier"
+        }
+      }
+    }
+  ])
+  tags = local.tags
+}
+
 resource "aws_scheduler_schedule_group" "contentops" {
   name = local.name
   tags = local.tags
@@ -497,7 +551,10 @@ resource "aws_iam_role_policy" "scheduler_run_worker" {
           "ecs:RunTask"
         ]
         Effect   = "Allow"
-        Resource = aws_ecs_task_definition.worker.arn
+        Resource = [
+          aws_ecs_task_definition.worker.arn,
+          aws_ecs_task_definition.worker_alert_notifier.arn
+        ]
       },
       {
         Action = [
@@ -542,6 +599,35 @@ resource "aws_scheduler_schedule" "daily_worker" {
   }
 }
 
+resource "aws_scheduler_schedule" "worker_alert_notifier" {
+  name                         = "${local.name}-worker-alert-notifier"
+  group_name                   = aws_scheduler_schedule_group.contentops.name
+  schedule_expression          = var.worker_alert_schedule_expression
+  schedule_expression_timezone = var.worker_schedule_timezone
+  state                        = var.worker_alert_schedule_enabled ? "ENABLED" : "DISABLED"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.main.arn
+    role_arn = aws_iam_role.scheduler.arn
+
+    ecs_parameters {
+      launch_type         = "FARGATE"
+      task_count          = 1
+      task_definition_arn = aws_ecs_task_definition.worker_alert_notifier.arn
+
+      network_configuration {
+        assign_public_ip = false
+        security_groups  = local.worker_security_group_ids
+        subnets          = var.private_subnet_ids
+      }
+    }
+  }
+}
+
 resource "aws_cloudwatch_dashboard" "operations" {
   dashboard_name = "${local.name}-operations"
 
@@ -554,7 +640,7 @@ resource "aws_cloudwatch_dashboard" "operations" {
         width  = 24
         height = 2
         properties = {
-          markdown = "# AI ContentOps Studio Operations\nRelease evidence: `/release-evidence`; worker receipts: `/job-executions`; job catalog: `/worker-jobs`."
+          markdown = "# AI ContentOps Studio Operations\nRelease evidence: `/release-evidence`; worker receipts: `/job-executions`; worker alerts: `/job-executions/alerts`; alert deliveries: `/job-executions/alerts/notifications`."
         }
       },
       {
@@ -626,6 +712,8 @@ resource "aws_cloudwatch_dashboard" "operations" {
           stacked = false
           metrics = [
             ["AWS/ECS", "CPUUtilization", "ClusterName", aws_ecs_cluster.main.name, "TaskDefinitionFamily", aws_ecs_task_definition.worker.family],
+            [".", "MemoryUtilization", ".", ".", ".", "."],
+            [".", "CPUUtilization", ".", ".", "TaskDefinitionFamily", aws_ecs_task_definition.worker_alert_notifier.family],
             [".", "MemoryUtilization", ".", ".", ".", "."]
           ]
           period = 300
