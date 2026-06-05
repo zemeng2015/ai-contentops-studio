@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
@@ -50,11 +51,23 @@ def test_release_gate_requires_approval_by_default(tmp_path: Path) -> None:
     assert "release-approve" in approval_check.remediation_steps[1]
 
 
-def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
+def test_release_gate_passes_with_matching_approval(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    homepage = tmp_path / "homepage"
+    homepage.mkdir()
+    monkeypatch.setenv("CONTENTOPS_RUN_INTEGRATION", "1")
+    monkeypatch.setenv("CONTENTOPS_OPENAI_API_KEY", "test-openai")
+    monkeypatch.setenv("CONTENTOPS_RESEARCH_SEARCH_API_KEY", "test-search")
+    monkeypatch.setenv("CONTENTOPS_HOMEPAGE_REPO_PATH", str(homepage))
     settings = Settings(
         artifact_root=tmp_path / "artifacts",
         database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
         site_output_dir=tmp_path / "site",
+        openai_api_key="test-openai",
+        research_search_api_key="test-search",
+        homepage_repo_path=homepage,
     )
     repository = RunRepository(settings.database_url)
     service = build_review_service(settings)
@@ -83,6 +96,34 @@ def test_release_gate_passes_with_matching_approval(tmp_path: Path) -> None:
     assert report.latest_release_approval.approval_id == approval.approval_id
     assert report.config_audit is not None
     assert report.config_audit.redacted is True
+    smoke_check = next(check for check in report.checks if check.name == "integration_smoke_plan")
+    assert smoke_check.status == "pass"
+
+
+def test_release_gate_warns_when_live_smoke_plan_is_not_ready(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CONTENTOPS_RUN_INTEGRATION", raising=False)
+    monkeypatch.delenv("CONTENTOPS_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("CONTENTOPS_RESEARCH_SEARCH_API_KEY", raising=False)
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=RunRepository(settings.database_url),
+        review_service=build_review_service(settings),
+        require_approval=False,
+    )
+
+    smoke_check = next(check for check in report.checks if check.name == "integration_smoke_plan")
+    assert smoke_check.status == "warn"
+    assert "integration_smoke_plan.json" in smoke_check.remediation_steps[0]
+    assert "CONTENTOPS_OPENAI_API_KEY" in smoke_check.evidence["missing_env"]
     check_names = {check.name for check in report.checks}
     assert "configuration_audit" in check_names
     assert "content_distribution" in check_names

@@ -114,6 +114,12 @@ def test_cli_release_approval_records_decision(
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
     monkeypatch.setenv("CONTENTOPS_GIT_SHA", "cli-release-sha")
+    homepage = tmp_path / "homepage"
+    homepage.mkdir()
+    monkeypatch.setenv("CONTENTOPS_RUN_INTEGRATION", "1")
+    monkeypatch.setenv("CONTENTOPS_OPENAI_API_KEY", "test-openai")
+    monkeypatch.setenv("CONTENTOPS_RESEARCH_SEARCH_API_KEY", "test-search")
+    monkeypatch.setenv("CONTENTOPS_HOMEPAGE_REPO_PATH", str(homepage))
     runner = CliRunner()
 
     approval_result = runner.invoke(

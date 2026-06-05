@@ -266,7 +266,8 @@ Release approval records capture the approver, decision, notes, force flag, rele
 status, evidence SHA, and evidence files in `artifacts/release-approvals`.
 `release-gate` combines readiness, deployment preflight, redacted configuration audit, approval
 state, publish drift detection, content distribution readiness, scheduled review package
-verification, and git SHA matching into a single CI/CD pass/fail report.
+verification, integration smoke readiness, and git SHA matching into a single CI/CD pass/fail
+report.
 Each check includes `remediation_steps`, giving operators concrete next actions when approval,
 configuration, source governance, publish verification, content distribution, scheduled review
 package verification, or deployment preflight blocks a release.

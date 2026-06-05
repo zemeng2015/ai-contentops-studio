@@ -47,6 +47,7 @@ def release_gate(
         _scheduled_review_package_check(bundle),
         _retention_archive_governance_check(bundle, review_service),
         _deployment_preflight_check(bundle),
+        _integration_smoke_plan_check(bundle),
         _configuration_audit_check(audit),
         _approval_check(bundle, require_approval),
         _approval_git_sha_check(bundle, resolved_git_sha, require_approval),
@@ -156,6 +157,59 @@ def _deployment_preflight_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
                 "Rerun the release gate after the deployment preflight is pass or warn.",
             ]
         ),
+    )
+
+
+def _integration_smoke_plan_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateItem:
+    plan = bundle.integration_smoke_plan
+    missing_env = sorted(
+        {
+            env
+            for item in plan.items
+            for env in item.missing_env
+            if env != "CONTENTOPS_RUN_INTEGRATION"
+        }
+    )
+    evidence = {
+        "status": plan.status,
+        "integration_enabled": plan.integration_enabled,
+        "command": plan.command,
+        "missing_env": missing_env,
+        "warn_count": plan.summary.get("warn", 0),
+        "fail_count": plan.summary.get("fail", 0),
+    }
+    if plan.status == "fail":
+        return ReleaseGateItem(
+            name="integration_smoke_plan",
+            status="fail",
+            message="Live provider smoke planning has invalid provider configuration.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `integration_smoke_plan.json` in release evidence.",
+                "Fix invalid provider configuration before running live smoke tests.",
+                "Regenerate release evidence and rerun `contentops release-gate`.",
+            ],
+        )
+    if plan.status == "warn":
+        return ReleaseGateItem(
+            name="integration_smoke_plan",
+            status="warn",
+            message="Live provider smoke tests are not fully ready to run.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `integration_smoke_plan.json` in release evidence.",
+                "Set missing provider credentials or paths before live provider validation.",
+                (
+                    "Run `contentops integration-smoke-plan --json` and then the listed "
+                    "pytest selectors."
+                ),
+            ],
+        )
+    return ReleaseGateItem(
+        name="integration_smoke_plan",
+        status="pass",
+        message="Live provider smoke tests are planned and ready.",
+        evidence=evidence,
     )
 
 
