@@ -253,6 +253,9 @@ run detail page and artifacts retain lineage back to the content calendar.
 `contentops content-calendar-lineage` and `GET /content-calendar/lineage` read those persisted run
 artifacts and enrich every planned item with run count, latest run id, latest status, published URL,
 action-required state, and the next recommended operator action.
+The release gate includes a `content_calendar_lineage` check. Failed latest runs block deployment;
+untouched items, pending review runs, and publish-intent items that have not shipped yet produce a
+warning with remediation steps for campaign review.
 
 Every worker invocation writes a job execution receipt under `artifact_root/job-executions` by
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,

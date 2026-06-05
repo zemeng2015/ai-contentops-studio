@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from contentops_core.config_audit import config_audit
+from contentops_core.jobs import content_calendar_lineage
 from contentops_core.models import (
     ConfigAuditReport,
     ReleaseApprovalDecision,
@@ -15,6 +16,7 @@ from contentops_core.models import (
     ReleaseGateItem,
     ReleaseGateListResponse,
     ReleaseGateReport,
+    RunStatus,
 )
 from contentops_core.release_evidence import build_release_evidence
 from contentops_core.repository import RunRepository
@@ -45,6 +47,7 @@ def release_gate(
         _source_review_governance_check(bundle),
         _publish_verification_check(bundle),
         _content_distribution_check(bundle),
+        _content_calendar_lineage_check(settings, repository, window_size),
         _scheduled_review_package_check(bundle),
         _retention_archive_governance_check(bundle, review_service),
         _worker_automation_health_check(bundle),
@@ -486,6 +489,81 @@ def _content_distribution_check(bundle: ReleaseEvidenceBundle) -> ReleaseGateIte
                 "Commit or intentionally stage distribution asset changes before deployment.",
             ]
         ),
+    )
+
+
+def _content_calendar_lineage_check(
+    settings: Settings,
+    repository: RunRepository,
+    window_size: int,
+) -> ReleaseGateItem:
+    lineage = content_calendar_lineage(
+        settings.pipeline_dir,
+        repository.list(limit=max(window_size, 200)),
+    )
+    publish_pending = [
+        item.item_key
+        for item in lineage.items
+        if item.intent == "publish" and item.status != "published"
+    ]
+    failed_items = [
+        item.item_key for item in lineage.items if item.latest_run_status == RunStatus.FAILED
+    ]
+    needs_review = [
+        item.item_key
+        for item in lineage.items
+        if item.latest_run_status == RunStatus.NEEDS_REVIEW
+    ]
+    untouched = [item.item_key for item in lineage.items if item.run_count == 0]
+    evidence = {
+        "total_items": lineage.total_items,
+        "tracked_run_count": lineage.tracked_run_count,
+        "untouched_count": lineage.untouched_count,
+        "needs_review_count": lineage.needs_review_count,
+        "published_count": lineage.published_count,
+        "failed_count": lineage.failed_count,
+        "action_required_count": lineage.action_required_count,
+        "publish_pending": publish_pending,
+        "failed_items": failed_items,
+        "needs_review": needs_review,
+        "untouched": untouched,
+    }
+    if lineage.total_items == 0:
+        return ReleaseGateItem(
+            name="content_calendar_lineage",
+            status="pass",
+            message="No content calendar items are configured for this release.",
+            evidence=evidence,
+        )
+    if lineage.failed_count:
+        return ReleaseGateItem(
+            name="content_calendar_lineage",
+            status="fail",
+            message="Content calendar has planned items whose latest runs failed.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open `/dashboard/worker-jobs` and inspect Calendar Lineage.",
+                "Rerun or recover failed calendar items before release.",
+                "Regenerate release evidence and rerun `contentops release-gate`.",
+            ],
+        )
+    if lineage.action_required_count:
+        return ReleaseGateItem(
+            name="content_calendar_lineage",
+            status="warn",
+            message="Content calendar has planned items that still need operator action.",
+            evidence=evidence,
+            remediation_steps=[
+                "Run `contentops content-calendar-lineage --json` to inspect pending items.",
+                "Create runs for untouched items that are in scope for this campaign.",
+                "Review pending runs and publish approved publish-intent items when ready.",
+            ],
+        )
+    return ReleaseGateItem(
+        name="content_calendar_lineage",
+        status="pass",
+        message="Content calendar planned items have completed lineage for release review.",
+        evidence=evidence,
     )
 
 

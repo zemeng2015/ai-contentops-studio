@@ -10,6 +10,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
+    content_calendar_run_request,
     create_scheduled_workflow_review_archive,
     job_execution_dir,
     scheduled_workflow_review_report,
@@ -24,7 +25,9 @@ from contentops_core.models import (
     IntegrationSmokeRunReport,
     ReleaseApprovalDecision,
     ReleaseApprovalRequest,
+    RunRecord,
     RunRequest,
+    RunStatus,
 )
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_gate import (
@@ -108,6 +111,7 @@ def test_release_gate_passes_with_matching_approval(
         openai_api_key="test-openai",
         research_search_api_key="test-search",
         homepage_repo_path=homepage,
+        pipeline_dir=tmp_path / "pipelines",
     )
     repository = RunRepository(settings.database_url)
     service = build_review_service(settings)
@@ -273,6 +277,90 @@ def test_release_gate_warns_for_dirty_distribution_assets(tmp_path: Path) -> Non
         "content-distribution-manifest.json"
     ]
     assert "content-assets" in distribution_check.remediation_steps[0]
+
+
+def test_release_gate_warns_for_pending_content_calendar_items(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: release-calendar
+jobs:
+  - name: launch-post
+    topic: Launch post for release
+    publish: true
+""",
+        encoding="utf-8",
+    )
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        pipeline_dir=pipeline_dir,
+    )
+    repository = RunRepository(settings.database_url)
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=build_review_service(settings),
+        require_approval=False,
+    )
+
+    check = next(check for check in report.checks if check.name == "content_calendar_lineage")
+    assert check.status == "warn"
+    assert check.evidence["untouched_count"] == 1
+    assert check.evidence["publish_pending"] == ["release-calendar/launch-post"]
+    assert "content-calendar-lineage" in check.remediation_steps[0]
+
+
+def test_release_gate_fails_for_failed_content_calendar_runs(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: release-calendar
+jobs:
+  - name: launch-post
+    topic: Launch post for release
+    publish: false
+""",
+        encoding="utf-8",
+    )
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+        pipeline_dir=pipeline_dir,
+    )
+    repository = RunRepository(settings.database_url)
+    request = content_calendar_run_request(
+        pipeline_dir,
+        workflow_name="release-calendar",
+        job_name="launch-post",
+    )
+    run = RunRecord.create(request, settings.artifact_root)
+    run.artifact_dir.mkdir(parents=True)
+    (run.artifact_dir / "request.json").write_text(
+        request.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    run.error = "provider failed"
+    run.touch(RunStatus.FAILED)
+    repository.save(run)
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=build_review_service(settings),
+        require_approval=False,
+    )
+
+    check = next(check for check in report.checks if check.name == "content_calendar_lineage")
+    assert check.status == "fail"
+    assert check.evidence["failed_count"] == 1
+    assert check.evidence["failed_items"] == ["release-calendar/launch-post"]
+    assert "Rerun or recover failed calendar items" in check.remediation_steps[1]
 
 
 def test_release_gate_fails_when_published_content_drifts(tmp_path: Path) -> None:

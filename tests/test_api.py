@@ -166,8 +166,10 @@ def test_release_approval_api_and_dashboard(
 ) -> None:
     client = TestClient(app)
     original_artifact_root = settings.artifact_root
+    original_pipeline_dir = settings.pipeline_dir
     monkeypatch.setenv("CONTENTOPS_GIT_SHA", "api-release-sha")
     settings.artifact_root = tmp_path / "artifacts"
+    settings.pipeline_dir = tmp_path / "pipelines"
     try:
         write_release_gate_report(
             release_gate(
@@ -207,6 +209,7 @@ def test_release_approval_api_and_dashboard(
         )
     finally:
         settings.artifact_root = original_artifact_root
+        settings.pipeline_dir = original_pipeline_dir
 
     assert blocked_gate_response.status_code == 409
     assert create_response.status_code == 200

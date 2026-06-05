@@ -300,6 +300,7 @@ def test_cli_release_approval_records_decision(
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(tmp_path / "pipelines"))
     monkeypatch.setenv("CONTENTOPS_GIT_SHA", "cli-release-sha")
     homepage = tmp_path / "homepage"
     homepage.mkdir()
@@ -383,6 +384,7 @@ def test_cli_release_gate_prints_remediation_steps(
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(tmp_path / "pipelines"))
     runner = CliRunner()
 
     result = runner.invoke(app, ["release-gate", "--git-sha", "missing-approval-sha"])
@@ -401,6 +403,7 @@ def test_cli_release_gate_can_record_blocking_snapshot_without_failing(
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
     monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(tmp_path / "pipelines"))
     checklist = tmp_path / "blocked-checklist.md"
     runner = CliRunner()
 
