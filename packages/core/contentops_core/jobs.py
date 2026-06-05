@@ -257,6 +257,7 @@ class ScheduledWorkflowReviewReport(BaseModel):
     action_required_count: int = Field(ge=0)
     published_count: int = Field(ge=0)
     handoff_count: int = Field(ge=0)
+    operations_console_summary: dict[str, Any] = Field(default_factory=dict)
     items: list[ScheduledWorkflowReviewItem] = Field(default_factory=list)
 
 
@@ -266,6 +267,7 @@ class ScheduledWorkflowPrMetadata(BaseModel):
     body: str
     source_execution_ids: list[str] = Field(default_factory=list)
     action_required: bool = False
+    operations_console_summary: dict[str, Any] = Field(default_factory=dict)
     checklist: list[str] = Field(default_factory=list)
 
 
@@ -870,14 +872,17 @@ def scheduled_workflow_review_report(
     receipt_dir: Path,
     *,
     limit: int = 5,
+    operations_console: dict[str, Any] | None = None,
 ) -> ScheduledWorkflowReviewReport:
     reports = list_job_execution_reports(receipt_dir, limit=limit).items
     items = [_scheduled_workflow_review_item(report) for report in reports]
+    operations_console_summary = _operations_console_summary(operations_console)
     return ScheduledWorkflowReviewReport(
         total=len(items),
         action_required_count=sum(1 for item in items if item.action_required),
         published_count=sum(len(item.published_urls) for item in items),
         handoff_count=sum(len(item.homepage_handoff_paths) for item in items),
+        operations_console_summary=operations_console_summary,
         items=items,
     )
 
@@ -899,7 +904,11 @@ def scheduled_workflow_pr_metadata(
         title=_scheduled_workflow_pr_title(report),
         body=_scheduled_workflow_pr_body(report, checklist),
         source_execution_ids=[item.execution_id for item in report.items],
-        action_required=report.action_required_count > 0,
+        action_required=(
+            report.action_required_count > 0
+            or bool(report.operations_console_summary.get("action_required"))
+        ),
+        operations_console_summary=report.operations_console_summary,
         checklist=checklist,
     )
 
@@ -912,6 +921,31 @@ def write_scheduled_workflow_pr_metadata(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(metadata.model_dump_json(indent=2), encoding="utf-8")
     return output_path
+
+
+def _operations_console_summary(
+    operations_console: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not operations_console:
+        return {}
+    summary = operations_console.get("summary")
+    if not isinstance(summary, dict):
+        return {}
+    keys = [
+        "status",
+        "action_required",
+        "brief_status",
+        "release_gate_status",
+        "retention_gate_status",
+        "worker_alert_severity",
+        "review_queue_depth",
+        "action_required_incidents",
+        "archive_candidate_count",
+        "worker_success_rate",
+        "top_risk_count",
+        "recommended_action_count",
+    ]
+    return {key: summary[key] for key in keys if key in summary}
 
 
 def job_execution_trends(receipt_dir: Path, days: int = 14) -> JobExecutionTrendReport:
@@ -1199,6 +1233,23 @@ def _scheduled_workflow_review_markdown(report: ScheduledWorkflowReviewReport) -
         f"- Homepage handoffs: `{report.handoff_count}`",
         "",
     ]
+    if report.operations_console_summary:
+        summary = report.operations_console_summary
+        lines.extend(
+            [
+                "## Operations Console",
+                "",
+                f"- Status: `{summary.get('status', 'unknown')}`",
+                f"- Action required: `{str(summary.get('action_required', False)).lower()}`",
+                f"- Brief status: `{summary.get('brief_status', 'unknown')}`",
+                f"- Release gate: `{summary.get('release_gate_status', 'unknown')}`",
+                f"- Retention gate: `{summary.get('retention_gate_status', 'unknown')}`",
+                f"- Worker alert severity: `{summary.get('worker_alert_severity', 'unknown')}`",
+                f"- Review queue: `{summary.get('review_queue_depth', 0)}`",
+                f"- Action-required incidents: `{summary.get('action_required_incidents', 0)}`",
+                "",
+            ]
+        )
     if not report.items:
         lines.extend(
             [
@@ -1300,6 +1351,11 @@ def _scheduled_workflow_pr_checklist(report: ScheduledWorkflowReviewReport) -> l
         "Review the scheduled workflow summary and linked Actions run.",
         "Confirm release evidence and delivery summary artifacts are attached.",
     ]
+    if report.operations_console_summary:
+        status = str(report.operations_console_summary.get("status") or "unknown")
+        checklist.append(f"Review Operations Console status `{status}` before merge.")
+        if report.operations_console_summary.get("action_required"):
+            checklist.append("Resolve Operations Console action-required signals.")
     if report.published_count:
         checklist.append("Verify published URLs and generated content assets.")
     if report.handoff_count:
@@ -1327,9 +1383,22 @@ def _scheduled_workflow_pr_body(
         f"- Published URLs: `{report.published_count}`",
         f"- Homepage handoffs: `{report.handoff_count}`",
         "",
-        "## Checklist",
-        "",
     ]
+    if report.operations_console_summary:
+        summary = report.operations_console_summary
+        lines.extend(
+            [
+                "## Operations Console",
+                "",
+                f"- Status: `{summary.get('status', 'unknown')}`",
+                f"- Action required: `{str(summary.get('action_required', False)).lower()}`",
+                f"- Release gate: `{summary.get('release_gate_status', 'unknown')}`",
+                f"- Retention gate: `{summary.get('retention_gate_status', 'unknown')}`",
+                f"- Worker alert severity: `{summary.get('worker_alert_severity', 'unknown')}`",
+                "",
+            ]
+        )
+    lines.extend(["## Checklist", ""])
     lines.extend(f"- [ ] {item}" for item in checklist)
     lines.extend(["", "## Evidence", "", _scheduled_workflow_review_markdown(report)])
     return "\n".join(lines)

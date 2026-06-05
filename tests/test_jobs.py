@@ -307,7 +307,28 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     )
     write_job_execution_report(report, receipt_dir)
 
-    review = scheduled_workflow_review_report(receipt_dir, limit=5)
+    operations_console = {
+        "summary": {
+            "status": "warn",
+            "action_required": True,
+            "brief_status": "warn",
+            "release_gate_status": "pass",
+            "retention_gate_status": "warn",
+            "worker_alert_severity": "warning",
+            "review_queue_depth": 2,
+            "action_required_incidents": 1,
+            "archive_candidate_count": 3,
+            "worker_success_rate": 0.75,
+            "top_risk_count": 1,
+            "recommended_action_count": 2,
+        }
+    }
+
+    review = scheduled_workflow_review_report(
+        receipt_dir,
+        limit=5,
+        operations_console=operations_console,
+    )
     markdown_path = write_scheduled_workflow_review_markdown(
         review,
         tmp_path / "scheduled-review.md",
@@ -322,18 +343,25 @@ def test_scheduled_workflow_review_summary_writes_markdown(tmp_path: Path) -> No
     assert review.total == 1
     assert review.published_count == 1
     assert review.handoff_count == 1
+    assert review.operations_console_summary["status"] == "warn"
+    assert review.operations_console_summary["action_required"] is True
     assert review.items[0].published_urls == ["https://example.com/posts/scheduled.html"]
     assert review.items[0].pr_title.startswith("Publish scheduled ContentOps output")
     assert any("homepage handoff" in item for item in review.items[0].pr_checklist)
     assert "Scheduled ContentOps Review" in markdown
+    assert "Operations Console" in markdown
+    assert "Release gate: `pass`" in markdown
     assert "https://example.com/posts/scheduled.html" in markdown
     assert "run-scheduled-homepage-handoff.zip" in markdown
     assert "PR Handoff" in markdown
     assert "Suggested PR title" in markdown
     assert "Apply homepage handoff zip files" in markdown
     assert metadata["title"].startswith("Review scheduled ContentOps output")
+    assert metadata["action_required"] is True
+    assert metadata["operations_console_summary"]["retention_gate_status"] == "warn"
     assert metadata["source_execution_ids"] == [report.execution_id]
     assert "Scheduled ContentOps Publish Review" in metadata["body"]
+    assert "Resolve Operations Console action-required signals." in metadata["body"]
     assert metadata["checklist"]
 
 

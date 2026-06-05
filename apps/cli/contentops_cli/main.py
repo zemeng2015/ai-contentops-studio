@@ -754,6 +754,10 @@ def worker_job_readiness_command(
 @app.command("scheduled-workflow-summary")
 def scheduled_workflow_summary_command(
     limit: Annotated[int, typer.Option(help="Number of recent worker receipts to summarize.")] = 5,
+    operations_days: Annotated[
+        int,
+        typer.Option(help="Number of recent days for the Operations Console snapshot."),
+    ] = 14,
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Optional Markdown summary path to write."),
@@ -768,9 +772,18 @@ def scheduled_workflow_summary_command(
     ] = False,
 ) -> None:
     settings = Settings()
+    repository = RunRepository(settings.database_url)
+    review_service = build_review_service(settings)
+    operations_console = build_operations_console(
+        settings=settings,
+        repository=repository,
+        review_service=review_service,
+        days=operations_days,
+    )
     report = scheduled_workflow_review_report(
         job_execution_dir(settings.artifact_root),
         limit=limit,
+        operations_console=operations_console.model_dump(mode="json"),
     )
     if pr_metadata_output is not None:
         write_scheduled_workflow_pr_metadata(report, pr_metadata_output)

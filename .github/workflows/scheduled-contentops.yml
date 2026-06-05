@@ -90,6 +90,9 @@ jobs:
           if [ -f artifacts/ops-brief-notification-log.json ]; then
             cp artifacts/ops-brief-notification-log.json scheduled-worker/daily-ops-brief-notifications.json
           fi
+      - name: Write operations console snapshot
+        if: always()
+        run: contentops operations-console --days 14 --json | tee scheduled-worker/daily-operations-console.json
       - name: Write workflow review summary
         if: always()
         run: |
@@ -191,6 +194,9 @@ jobs:
           if [ -f artifacts/ops-brief-notification-log.json ]; then
             cp artifacts/ops-brief-notification-log.json scheduled-worker/project-updates-ops-brief-notifications.json
           fi
+      - name: Write operations console snapshot
+        if: always()
+        run: contentops operations-console --days 14 --json | tee scheduled-worker/project-updates-operations-console.json
       - name: Write workflow review summary
         if: always()
         run: |

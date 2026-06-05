@@ -706,6 +706,8 @@ def test_cli_job_execution_commands(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
     path = tmp_path / "job.yaml"
     path.write_text("name: cli-job-history\ntopic: CLI job history\n", encoding="utf-8")
     report = JobRunner.dry_run_report(load_job_file(path))
@@ -798,6 +800,11 @@ def test_cli_job_execution_commands(
     )
     assert scheduled_summary_result.exit_code == 0
     scheduled_summary_payload = json.loads(scheduled_summary_result.output)
+    assert scheduled_summary_payload["operations_console_summary"]["status"] in {
+        "pass",
+        "warn",
+        "fail",
+    }
     assert scheduled_summary_payload["items"][0]["execution_id"] == report.execution_id
     assert scheduled_summary_payload["items"][0]["pr_title"].startswith(
         "Publish scheduled ContentOps output"
@@ -807,9 +814,15 @@ def test_cli_job_execution_commands(
     assert "Scheduled ContentOps Review" in scheduled_summary_markdown.read_text(
         encoding="utf-8"
     )
+    assert "Operations Console" in scheduled_summary_markdown.read_text(encoding="utf-8")
     assert "PR Handoff" in scheduled_summary_markdown.read_text(encoding="utf-8")
     pr_metadata_payload = json.loads(scheduled_pr_metadata.read_text(encoding="utf-8"))
     assert pr_metadata_payload["title"].startswith("Review scheduled ContentOps output")
+    assert pr_metadata_payload["operations_console_summary"]["status"] in {
+        "pass",
+        "warn",
+        "fail",
+    }
     assert pr_metadata_payload["checklist"]
     assert recovery_result.exit_code == 0
     recovery_payload = json.loads(recovery_result.output)
