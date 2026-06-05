@@ -21,7 +21,12 @@ from contentops_core.jobs import (
     write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
-from contentops_core.models import ReleaseApprovalDecision, ReleaseApprovalRequest, RunRequest
+from contentops_core.models import (
+    ArtifactMirrorRecord,
+    ReleaseApprovalDecision,
+    ReleaseApprovalRequest,
+    RunRequest,
+)
 from contentops_core.release_approvals import approve_release
 from contentops_core.release_evidence import create_release_evidence_archive
 from contentops_core.repository import RunRepository
@@ -558,6 +563,27 @@ def test_release_evidence_includes_scheduled_review_packages(
         archive_report.model_dump_json(indent=2),
         encoding="utf-8",
     )
+    mirror_records = [
+        ArtifactMirrorRecord(
+            run_id="scheduled-reviews/test-package",
+            artifact_name=name,
+            provider="s3",
+            bucket="release-evidence-bucket",
+            key=f"contentops-artifacts/scheduled-reviews/test-package/{name}",
+            content_type="application/octet-stream",
+            status="mirrored",
+        )
+        for name in [
+            "daily-review-manifest.json",
+            "daily-review-manifest-verification.json",
+            "daily-review-package.json",
+            "daily-review-package.zip",
+        ]
+    ]
+    (scheduled_dir / "s3-mirror-log.json").write_text(
+        json.dumps([record.model_dump(mode="json") for record in mirror_records]),
+        encoding="utf-8",
+    )
     output_dir = tmp_path / "release-evidence"
 
     bundle = generate_release_evidence(output_dir)
@@ -576,6 +602,8 @@ def test_release_evidence_includes_scheduled_review_packages(
     )
     assert payload["items"][0]["manifest_path"] == "scheduled/daily-review-manifest.json"
     assert payload["items"][0]["archive_path"] == "scheduled/daily-review-package.zip"
+    assert payload["items"][0]["s3_mirror_status"] == "mirrored"
+    assert payload["items"][0]["s3_mirror_log_path"] == "scheduled/s3-mirror-log.json"
     assert "scheduled_review_packages.json" in bundle.summary.artifact_files
     assert evidence_manifest["artifacts"]["scheduled_review_packages.json"][
         "media_type"

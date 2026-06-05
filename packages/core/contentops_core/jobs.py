@@ -15,6 +15,11 @@ import httpx
 import yaml
 from pydantic import BaseModel, Field
 
+from contentops_core.artifacts import (
+    failed_s3_mirror_records,
+    mirror_files_to_s3,
+    write_s3_mirror_log,
+)
 from contentops_core.models import IncidentSeverity, RunRequest, RunStatus
 from contentops_core.pipeline import ContentOpsPipeline
 
@@ -347,6 +352,9 @@ class ScheduledWorkflowReviewArchiveReport(BaseModel):
     archived_file_count: int = Field(ge=0)
     archive_size_bytes: int = Field(ge=0, default=0)
     archive_sha256: str | None = None
+    s3_mirror_status: str = "not_configured"
+    s3_mirror_log_path: str | None = None
+    s3_mirror_failures: int = Field(ge=0, default=0)
     verification: ScheduledWorkflowReviewVerificationReport
     items: list[ScheduledWorkflowReviewArchiveItem] = Field(default_factory=list)
 
@@ -370,6 +378,9 @@ class ScheduledWorkflowReviewPackageItem(BaseModel):
     archive_exists: bool = False
     archive_size_bytes: int = Field(ge=0, default=0)
     archive_sha256: str | None = None
+    s3_mirror_status: str = "not_configured"
+    s3_mirror_log_path: str | None = None
+    s3_mirror_failures: int = Field(ge=0, default=0)
     updated_at: datetime | None = None
     error: str | None = None
 
@@ -1200,6 +1211,55 @@ def create_scheduled_workflow_review_archive(
     return report
 
 
+def write_scheduled_workflow_review_archive_report(
+    report: ScheduledWorkflowReviewArchiveReport,
+    output_path: Path | None = None,
+) -> Path:
+    path = output_path or Path(report.archive_path).with_suffix(".json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    return path
+
+
+def mirror_scheduled_workflow_review_package_to_s3(
+    manifest_path: Path,
+    *,
+    bucket: str,
+    prefix: str,
+) -> ScheduledWorkflowReviewPackageItem:
+    item = _scheduled_review_package_item(manifest_path)
+    paths = _scheduled_review_package_paths(manifest_path)
+    mirror_paths = [
+        path
+        for path in [
+            manifest_path,
+            paths["verification"],
+            paths["package"],
+            paths["archive"],
+        ]
+        if path.exists()
+    ]
+    records = mirror_files_to_s3(
+        mirror_paths,
+        bucket=bucket,
+        prefix=prefix,
+        collection_id=f"scheduled-reviews/{item.id}",
+    )
+    log_path = manifest_path.parent / "s3-mirror-log.json"
+    write_s3_mirror_log(records, log_path)
+    failures = failed_s3_mirror_records(records)
+    item.s3_mirror_status = "failed" if failures else "mirrored"
+    item.s3_mirror_log_path = str(log_path)
+    item.s3_mirror_failures = len(failures)
+    if failures:
+        details = "; ".join(
+            f"{record.artifact_name}: {record.error or 'mirror failed'}"
+            for record in failures
+        )
+        raise RuntimeError(f"Failed to mirror scheduled review package to S3: {details}")
+    return item
+
+
 def list_scheduled_workflow_review_packages(
     artifact_root: Path,
     *,
@@ -1264,6 +1324,9 @@ def _scheduled_review_package_item(
         )
     verification = _read_scheduled_review_verification(paths["verification"])
     package_metadata = _read_scheduled_review_archive_report(paths["package"])
+    s3_mirror_status, s3_mirror_log_path, s3_mirror_failures = (
+        _scheduled_review_package_mirror_status(manifest_path)
+    )
     archive_path = paths["archive"]
     archive_exists = archive_path.exists()
     archive_size = archive_path.stat().st_size if archive_exists else 0
@@ -1301,6 +1364,9 @@ def _scheduled_review_package_item(
             if package_metadata is not None and package_metadata.archive_sha256
             else archive_sha
         ),
+        s3_mirror_status=s3_mirror_status,
+        s3_mirror_log_path=s3_mirror_log_path,
+        s3_mirror_failures=s3_mirror_failures,
         updated_at=updated_at,
     )
 
@@ -1347,6 +1413,34 @@ def _read_scheduled_review_archive_report(
     return ScheduledWorkflowReviewArchiveReport.model_validate_json(
         path.read_text(encoding="utf-8")
     )
+
+
+def _scheduled_review_package_mirror_status(
+    manifest_path: Path,
+) -> tuple[str, str | None, int]:
+    log_path = manifest_path.parent / "s3-mirror-log.json"
+    if not log_path.exists():
+        return "not_configured", None, 0
+    try:
+        payload = json.loads(log_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return "failed", str(log_path), 1
+    if not isinstance(payload, list):
+        return "failed", str(log_path), 1
+    expected_names = {
+        path.name
+        for path in _scheduled_review_package_paths(manifest_path).values()
+    }
+    expected_names.add(manifest_path.name)
+    records = [
+        item
+        for item in payload
+        if isinstance(item, dict) and item.get("artifact_name") in expected_names
+    ]
+    if not records:
+        return "not_configured", str(log_path), 0
+    failures = sum(1 for record in records if record.get("status") != "mirrored")
+    return ("failed" if failures else "mirrored", str(log_path), failures)
 
 
 def _scheduled_review_package_id(manifest_path: Path) -> str:

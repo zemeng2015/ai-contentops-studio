@@ -628,6 +628,95 @@ def test_retention_archive_mirrors_to_s3_when_configured(
     assert any(name.endswith("-retention-archive.json") for name in mirrored_names)
 
 
+def test_scheduled_review_archive_mirrors_to_s3_when_configured(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(tmp_path / "site"))
+    runner = CliRunner()
+    path = tmp_path / "job.yaml"
+    path.write_text(
+        "name: mirrored-scheduled\ntopic: Mirrored scheduled review\n",
+        encoding="utf-8",
+    )
+    report = JobRunner.dry_run_report(load_job_file(path))
+    write_job_execution_report(report, job_execution_dir(Settings().artifact_root))
+    manifest_path = tmp_path / "daily-review-manifest.json"
+    review_path = tmp_path / "daily-review.md"
+    metadata_path = tmp_path / "daily-pr-metadata.json"
+    operations_path = tmp_path / "daily-operations-console.json"
+    operations_path.write_text("{}", encoding="utf-8")
+    runner.invoke(
+        app,
+        [
+            "scheduled-workflow-summary",
+            "--output",
+            str(review_path),
+            "--pr-metadata-output",
+            str(metadata_path),
+            "--manifest-output",
+            str(manifest_path),
+            "--operations-console-path",
+            str(operations_path),
+        ],
+    )
+    runner.invoke(app, ["scheduled-workflow-verify", str(manifest_path), "--json"])
+    verification_path = tmp_path / "daily-review-manifest-verification.json"
+    verification_path.write_text(
+        runner.invoke(app, ["scheduled-workflow-verify", str(manifest_path), "--json"]).output,
+        encoding="utf-8",
+    )
+    mirrored_names: list[str] = []
+
+    def fake_mirror_files_to_s3(
+        paths: list[Path],
+        *,
+        bucket: str,
+        prefix: str,
+        collection_id: str,
+    ) -> list[ArtifactMirrorRecord]:
+        mirrored_names.extend(path.name for path in paths)
+        return [
+            ArtifactMirrorRecord(
+                run_id=collection_id,
+                artifact_name=path.name,
+                provider="s3",
+                bucket=bucket,
+                key=f"{prefix}/{collection_id}/{path.name}",
+                content_type="application/octet-stream",
+                status="mirrored",
+            )
+            for path in paths
+        ]
+
+    monkeypatch.setattr("contentops_core.jobs.mirror_files_to_s3", fake_mirror_files_to_s3)
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_STORE_PROVIDER", "s3")
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_S3_BUCKET", "contentops-test-bucket")
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_S3_PREFIX", "contentops-artifacts")
+
+    archive_result = runner.invoke(
+        app,
+        [
+            "scheduled-workflow-archive",
+            str(manifest_path),
+            str(tmp_path / "daily-review-package.zip"),
+            "--json",
+        ],
+    )
+
+    assert archive_result.exit_code == 0
+    payload = json.loads(archive_result.output)
+    assert payload["s3_mirror_status"] == "mirrored"
+    assert payload["s3_mirror_failures"] == 0
+    assert (tmp_path / "s3-mirror-log.json").exists()
+    assert "daily-review-manifest.json" in mirrored_names
+    assert "daily-review-manifest-verification.json" in mirrored_names
+    assert "daily-review-package.json" in mirrored_names
+    assert "daily-review-package.zip" in mirrored_names
+
+
 def test_cli_source_review_records_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

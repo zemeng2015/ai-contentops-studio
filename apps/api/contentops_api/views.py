@@ -447,6 +447,7 @@ def _scheduled_review_packages_html(
           <td>{item.artifact_count}</td>
           <td>{str(item.action_required).lower()}</td>
           <td>{escape(str(item.archive_size_bytes))}</td>
+          <td>{escape(item.s3_mirror_status)}</td>
           <td>{_scheduled_review_archive_link(item)}</td>
           <td>{escape(item.updated_at.isoformat() if item.updated_at else "n/a")}</td>
         </tr>
@@ -459,7 +460,7 @@ def _scheduled_review_packages_html(
         <thead>
           <tr>
             <th>Package</th><th>Status</th><th>Verification</th><th>Failed</th>
-            <th>Artifacts</th><th>Action required</th><th>Zip bytes</th>
+            <th>Artifacts</th><th>Action required</th><th>Zip bytes</th><th>S3 mirror</th>
             <th>Archive</th><th>Updated</th>
           </tr>
         </thead>
@@ -1741,6 +1742,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <td>{escape(item.manifest_path)}</td>
           <td>{escape(item.archive_path or "not available")}</td>
           <td>{item.archive_size_bytes}</td>
+          <td>{escape(item.s3_mirror_status)}</td>
           <td>{escape((item.archive_sha256 or "n/a")[:16])}</td>
         </tr>
         """
@@ -1749,7 +1751,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
     if not scheduled_review_rows:
         scheduled_review_rows = """
         <tr>
-          <td colspan="10">
+          <td colspan="11">
             <span class="muted">No scheduled review packages recorded.</span>
           </td>
         </tr>
@@ -1976,7 +1978,7 @@ def _release_evidence_html(bundle: ReleaseEvidenceBundle) -> str:
           <tr>
             <th>Package</th><th>Status</th><th>Verification</th><th>Failed</th>
             <th>Artifacts</th><th>Action</th><th>Manifest</th><th>Archive</th>
-            <th>Zip bytes</th><th>SHA256</th>
+            <th>Zip bytes</th><th>S3 mirror</th><th>SHA256</th>
           </tr>
         </thead>
         <tbody>{scheduled_review_rows}</tbody>

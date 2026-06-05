@@ -359,10 +359,12 @@ automation.
 `contentops scheduled-workflow-archive` verifies the manifest again before writing a ZIP that
 contains the manifest, verification report, package index, worker receipts, release evidence,
 content assets, and homepage handoff files. The scheduled workflow uploads this ZIP beside the
-normal Actions artifacts so reviewers can download one complete evidence package.
+normal Actions artifacts so reviewers can download one complete evidence package. In S3 artifact
+mode, the same archive command mirrors the manifest, verification report, package index, and ZIP to
+the configured bucket and records the result in `s3-mirror-log.json`.
 `GET /scheduled-reviews` and `/dashboard/scheduled-reviews` expose recent review packages from the
 artifact root, including verification status, failed counts, ZIP size, ZIP hash, and archive
-download links.
+download links, plus S3 mirror health when package archives are mirrored.
 
 Executed worker jobs automatically write post-run release evidence under
 `artifacts/release-evidence/job-executions/<execution_id>` and record the evidence path, status,
@@ -489,9 +491,9 @@ CONTENTOPS_ARTIFACT_S3_BUCKET=your-artifact-bucket
 CONTENTOPS_ARTIFACT_S3_PREFIX=contentops-artifacts
 ```
 
-With S3 mirroring enabled, run artifacts, release evidence output, and worker execution receipts
-write local `s3-mirror-log.json` records that include the bucket, key, content type, and mirror
-status for each object.
+With S3 mirroring enabled, run artifacts, release evidence output, worker execution receipts, and
+scheduled review package archives write local `s3-mirror-log.json` records that include the bucket,
+key, content type, and mirror status for each object.
 
 Use Postgres/RDS:
 

@@ -544,6 +544,13 @@ def _scheduled_review_package_evidence(
             archive_exists=item.archive_exists,
             archive_size_bytes=item.archive_size_bytes,
             archive_sha256=item.archive_sha256,
+            s3_mirror_status=item.s3_mirror_status,
+            s3_mirror_log_path=(
+                _best_relative_path_to_root(artifact_root, Path(item.s3_mirror_log_path))
+                if item.s3_mirror_log_path
+                else None
+            ),
+            s3_mirror_failures=item.s3_mirror_failures,
             updated_at=item.updated_at,
         )
         for item in packages.items

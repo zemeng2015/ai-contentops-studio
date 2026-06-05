@@ -28,6 +28,7 @@ from contentops_core.jobs import (
     job_recovery_plan,
     list_job_execution_reports,
     list_worker_job_catalog,
+    mirror_scheduled_workflow_review_package_to_s3,
     notify_job_execution_alert,
     notify_worker_delivery_summary,
     scheduled_workflow_review_report,
@@ -35,6 +36,7 @@ from contentops_core.jobs import (
     worker_delivery_summary_notification_log,
     worker_job_readiness,
     write_scheduled_workflow_pr_metadata,
+    write_scheduled_workflow_review_archive_report,
     write_scheduled_workflow_review_manifest,
     write_scheduled_workflow_review_markdown,
 )
@@ -858,9 +860,27 @@ def scheduled_workflow_archive_command(
         typer.Option("--json", help="Print structured JSON."),
     ] = False,
 ) -> None:
+    settings = Settings()
     try:
         report = create_scheduled_workflow_review_archive(manifest_path, output_path)
+        write_scheduled_workflow_review_archive_report(report)
+        if settings.artifact_store_provider == "s3":
+            if not settings.artifact_s3_bucket:
+                raise typer.BadParameter(
+                    "CONTENTOPS_ARTIFACT_S3_BUCKET is required for S3 scheduled review mirroring."
+                )
+            mirror_item = mirror_scheduled_workflow_review_package_to_s3(
+                manifest_path,
+                bucket=settings.artifact_s3_bucket,
+                prefix=settings.artifact_s3_prefix,
+            )
+            report.s3_mirror_status = mirror_item.s3_mirror_status
+            report.s3_mirror_log_path = mirror_item.s3_mirror_log_path
+            report.s3_mirror_failures = mirror_item.s3_mirror_failures
+            write_scheduled_workflow_review_archive_report(report)
     except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    except RuntimeError as exc:
         raise typer.BadParameter(str(exc)) from exc
     if json_output:
         typer.echo(report.model_dump_json(indent=2))

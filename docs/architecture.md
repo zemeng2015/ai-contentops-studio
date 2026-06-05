@@ -277,10 +277,12 @@ and missing-file metadata for each local artifact.
 fail review packages whose artifacts are missing or whose hashes have drifted.
 `contentops scheduled-workflow-archive` builds on that check by producing a ZIP with the manifest,
 verification report, package index, receipts, release evidence, content assets, and homepage
-handoff files, giving scheduled automation a portable review artifact.
+handoff files, giving scheduled automation a portable review artifact. When S3 artifact mirroring
+is enabled, the archive command mirrors the manifest, verification report, package index, and ZIP
+to the configured bucket and keeps a package-level `s3-mirror-log.json`.
 `GET /scheduled-reviews`, `GET /scheduled-reviews/{package_id}/archive`, and
 `/dashboard/scheduled-reviews` make those packages inspectable without opening raw Actions
-artifacts, including verification state, failed counts, ZIP size, and SHA-256.
+artifacts, including verification state, failed counts, ZIP size, SHA-256, and S3 mirror health.
 Release evidence includes the same inventory in `scheduled_review_packages.json`, so scheduled
 review packages are preserved with deployment evidence and the release evidence dashboard.
 `GET /job-executions/trends`, `contentops job-execution-trends`, and the worker execution trends
@@ -317,7 +319,9 @@ AWS-ready equivalents:
 The S3 artifact store keeps the local filesystem copy authoritative and mirrors each write to
 S3. Every mirror attempt appends `s3-mirror-log.json` beside the run artifacts with provider,
 bucket, key, content type, status, error, and timestamp fields. This makes object-level storage
-state auditable even when cloud logs have rotated or a worker fails midway through a run.
+state auditable even when cloud logs have rotated or a worker fails midway through a run. Scheduled
+review packages use the same receipt shape at the package directory level, so release evidence and
+the release gate can distinguish missing package archives from failed S3 replication.
 
 The Terraform baseline now provisions an RDS Postgres metadata database and writes a
 `postgresql+psycopg://` `CONTENTOPS_DATABASE_URL` into Secrets Manager for ECS task injection.

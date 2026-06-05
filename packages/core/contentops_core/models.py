@@ -827,6 +827,9 @@ class ScheduledReviewPackageEvidenceItem(BaseModel):
     archive_exists: bool = False
     archive_size_bytes: int = Field(ge=0, default=0)
     archive_sha256: str | None = None
+    s3_mirror_status: str = "not_configured"
+    s3_mirror_log_path: str | None = None
+    s3_mirror_failures: int = Field(ge=0, default=0)
     updated_at: datetime | None = None
 
 

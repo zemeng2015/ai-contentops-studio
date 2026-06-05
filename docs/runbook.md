@@ -107,7 +107,8 @@ The scheduled GitHub workflow also uploads `daily-operations-console.json` or
 `project-updates-operations-console.json` as structured artifact data.
 Use `GET /scheduled-reviews` or `/dashboard/scheduled-reviews` to review the persisted scheduled
 package inventory from the artifact root. The dashboard shows manifest status, verification
-failures, action-required state, ZIP size, ZIP hash, and archive download links for release review.
+failures, action-required state, ZIP size, ZIP hash, S3 mirror status, and archive download links
+for release review.
 Use `contentops job-execution-trends --days 14`, `GET /job-executions/trends?days=14`, or
 `/dashboard/job-execution-trends` to check recurring automation success, publish, handoff, and
 action-required rates before changing the EventBridge schedule. The trend view also lists the
@@ -128,11 +129,12 @@ The same trend, alert, and notification payloads are written to release evidence
 `worker_execution_alert_deliveries.json`, so compare the dashboard with the latest CI evidence
 bundle when investigating scheduled automation regressions.
 Release evidence also writes `scheduled_review_packages.json`, which records recent scheduled
-review manifest status, verification failures, archive readiness, ZIP hashes, and action-required
-state for audit handoff.
+review manifest status, verification failures, archive readiness, ZIP hashes, S3 mirror status,
+and action-required state for audit handoff.
 The release gate fails when any package verification status is `fail`, and warns when verified
-manifests do not yet have an archive ZIP. Use `/dashboard/scheduled-reviews` to inspect the package
-and rerun `contentops scheduled-workflow-archive` before promotion.
+manifests do not yet have an archive ZIP. It also fails when package S3 mirroring failed. Use
+`/dashboard/scheduled-reviews` to inspect the package and rerun
+`contentops scheduled-workflow-archive` before promotion.
 In AWS, mirror `artifacts/job-executions` to S3 with the rest of the artifact tree.
 For non-dry-run worker executions, open the receipt's `release_evidence_path` to review the same
 deployment preflight, release readiness, homepage handoff inventory, and evidence manifest produced

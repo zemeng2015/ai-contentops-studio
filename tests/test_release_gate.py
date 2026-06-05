@@ -8,6 +8,7 @@ from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
     JobRunResult,
+    create_scheduled_workflow_review_archive,
     job_execution_dir,
     scheduled_workflow_review_report,
     verify_scheduled_workflow_review_manifest,
@@ -420,6 +421,105 @@ def test_release_gate_warns_when_scheduled_review_archive_is_missing(
     assert scheduled_check.status == "warn"
     assert scheduled_check.evidence["missing_archive_package_ids"]
     assert "scheduled-workflow-archive" in scheduled_check.remediation_steps[0]
+
+
+def test_release_gate_fails_when_scheduled_review_package_mirror_fails(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        artifact_root=tmp_path / "artifacts",
+        database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
+        site_output_dir=tmp_path / "site",
+    )
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    receipt = JobExecutionReport(
+        name="scheduled-review-mirror-fail",
+        total=1,
+        succeeded=1,
+        failed=0,
+        results=[
+            JobRunResult(
+                job_name="review",
+                topic="Scheduled review mirror fail",
+                publish=False,
+                run_id="run-scheduled-mirror-fail",
+                status="needs_review",
+            )
+        ],
+    )
+    write_job_execution_report(receipt, job_execution_dir(settings.artifact_root))
+    scheduled_dir = settings.artifact_root / "scheduled"
+    scheduled_dir.mkdir(parents=True)
+    operations_console_path = scheduled_dir / "daily-operations-console.json"
+    operations_console_path.write_text("{}", encoding="utf-8")
+    review = scheduled_workflow_review_report(
+        job_execution_dir(settings.artifact_root),
+        limit=5,
+        operations_console={"status": "pass"},
+    )
+    markdown_path = write_scheduled_workflow_review_markdown(
+        review,
+        scheduled_dir / "daily-review.md",
+    )
+    metadata_path = write_scheduled_workflow_pr_metadata(
+        review,
+        scheduled_dir / "daily-pr-metadata.json",
+    )
+    manifest_path = write_scheduled_workflow_review_manifest(
+        review,
+        scheduled_dir / "daily-review-manifest.json",
+        review_markdown_path=markdown_path,
+        pr_metadata_path=metadata_path,
+        operations_console_path=operations_console_path,
+    )
+    verification = verify_scheduled_workflow_review_manifest(manifest_path)
+    (scheduled_dir / "daily-review-manifest-verification.json").write_text(
+        verification.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    archive_report = create_scheduled_workflow_review_archive(
+        manifest_path,
+        scheduled_dir / "daily-review-package.zip",
+    )
+    (scheduled_dir / "daily-review-package.json").write_text(
+        archive_report.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+    (scheduled_dir / "s3-mirror-log.json").write_text(
+        json.dumps(
+            [
+                {
+                    "run_id": "scheduled-reviews/mirror-fail",
+                    "artifact_name": "daily-review-package.zip",
+                    "provider": "s3",
+                    "bucket": "contentops-test-bucket",
+                    "key": "contentops-artifacts/scheduled-reviews/mirror-fail.zip",
+                    "content_type": "application/zip",
+                    "status": "failed",
+                    "error": "AccessDenied",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="scheduled-review-mirror-fail-sha",
+        require_approval=False,
+    )
+
+    scheduled_check = next(
+        check for check in report.checks if check.name == "scheduled_review_packages"
+    )
+    assert report.status == "fail"
+    assert report.can_deploy is False
+    assert scheduled_check.status == "fail"
+    assert scheduled_check.evidence["failed_s3_mirror_package_ids"]
+    assert "s3-mirror-log.json" in scheduled_check.remediation_steps[0]
 
 
 def test_release_gate_warns_when_retention_candidates_lack_archive(tmp_path: Path) -> None:

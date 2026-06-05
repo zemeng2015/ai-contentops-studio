@@ -324,6 +324,9 @@ def _scheduled_review_package_check(bundle: ReleaseEvidenceBundle) -> ReleaseGat
         for item in packages.items
         if item.verification_status == "pass" and not item.archive_exists
     ]
+    failed_mirrors = [
+        item.id for item in packages.items if item.s3_mirror_status == "failed"
+    ]
     evidence = {
         "total": packages.total,
         "archived_count": packages.archived_count,
@@ -331,6 +334,7 @@ def _scheduled_review_package_check(bundle: ReleaseEvidenceBundle) -> ReleaseGat
         "action_required_count": packages.action_required_count,
         "failed_package_ids": failed,
         "missing_archive_package_ids": missing_archives,
+        "failed_s3_mirror_package_ids": failed_mirrors,
     }
     if failed:
         return ReleaseGateItem(
@@ -345,6 +349,18 @@ def _scheduled_review_package_check(bundle: ReleaseEvidenceBundle) -> ReleaseGat
                     "are fixed."
                 ),
                 "Rerun `contentops scheduled-workflow-verify` and regenerate release evidence.",
+            ],
+        )
+    if failed_mirrors:
+        return ReleaseGateItem(
+            name="scheduled_review_packages",
+            status="fail",
+            message="Scheduled review package S3 mirroring failed.",
+            evidence=evidence,
+            remediation_steps=[
+                "Open the package `s3-mirror-log.json` and inspect failed records.",
+                "Fix S3 bucket, IAM, or network configuration for artifact mirroring.",
+                "Rerun `contentops scheduled-workflow-archive` and regenerate release evidence.",
             ],
         )
     if missing_archives:

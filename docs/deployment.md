@@ -132,6 +132,10 @@ retention zip files and archive receipts to S3 and writes a local `s3-mirror-log
 retention archive scheduler runs the same command with `retention_archive_schedule_expression`,
 `retention_archive_days`, and `retention_archive_scan_limit`; keep
 `retention_archive_schedule_enabled=false` until the database and S3 artifact bucket are stable.
+The same S3 settings are used by `contentops scheduled-workflow-archive`, which mirrors scheduled
+review manifests, verification reports, package indexes, and archive ZIPs. Each package directory
+keeps its own `s3-mirror-log.json`, and the scheduled review dashboard surfaces the mirror status
+beside the package download link.
 
 For RDS-backed deployments, install the optional AWS dependency so SQLAlchemy can use the
 `postgresql+psycopg://` URL:
@@ -227,9 +231,9 @@ Invoke-RestMethod "http://127.0.0.1:8000/release-gate?git_sha=$env:GITHUB_SHA"
 
 The gate fails when release readiness fails, deployment preflight fails, required configuration
 audit items are missing, published files drift from their receipts, distribution manifests are
-incomplete, scheduled review package verification failed, retention archive S3 mirroring failed,
-no approval exists, the latest approval rejects deployment, or the approval git SHA does not match
-the commit being released.
+incomplete, scheduled review package verification failed, scheduled review package S3 mirroring
+failed, retention archive S3 mirroring failed, no approval exists, the latest approval rejects
+deployment, or the approval git SHA does not match the commit being released.
 It warns when published content has no distribution evidence, generated distribution files are
 still dirty in git, scheduled review manifests are verified but missing archive ZIPs, or old
 artifact candidates exist without a non-dry-run retention archive receipt.
@@ -291,10 +295,12 @@ the same command before merging if a review branch is updated after creation.
 It then runs `contentops scheduled-workflow-archive` to upload a ZIP package containing the
 manifest, verification report, package index, receipts, release evidence, content assets, and
 homepage handoff files. Treat this ZIP as the portable review artifact for release notes or audit
-handoff.
+handoff. In S3 artifact mode, this command also mirrors the package files and writes
+`s3-mirror-log.json` so archive storage can be audited independently from GitHub Actions artifacts.
 When those scheduled artifacts are retained under the configured artifact root, operators can use
 `GET /scheduled-reviews` or `/dashboard/scheduled-reviews` to inspect verification status and
-download the archive ZIP without opening the raw Actions artifact browser.
+download the archive ZIP without opening the raw Actions artifact browser. Release evidence copies
+the same package inventory, including S3 mirror status, into `scheduled_review_packages.json`.
 
 For shared API or dashboard deployments, store an operator key in Secrets Manager and pass its ARN
 through `operator_api_key_secret_arn`. Once `CONTENTOPS_OPERATOR_API_KEY` is set, mutating routes
