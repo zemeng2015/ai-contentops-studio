@@ -27,6 +27,7 @@ from contentops_core.models import (
     DeploymentManifest,
     GenerationReceipt,
     IncidentReportListResponse,
+    IntegrationSmokeRunListResponse,
     NotificationDelivery,
     OperationsSummary,
     OpsBriefDelivery,
@@ -2195,6 +2196,55 @@ def _release_gate_history_html(reports: ReleaseGateListResponse) -> str:
         <thead>
           <tr>
             <th>Generated</th><th>Status</th><th>Can deploy</th><th>Git SHA</th><th>Checks</th>
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    """
+
+
+def _integration_smoke_runs_html(reports: IntegrationSmokeRunListResponse) -> str:
+    summary = reports.summary
+    rows = "".join(
+        f"""
+        <tr>
+          <td>{escape(report.generated_at.isoformat())}</td>
+          <td><span class="pill">{escape(report.status)}</span></td>
+          <td>{escape(str(report.integration_enabled).lower())}</td>
+          <td>{escape(str(report.dry_run).lower())}</td>
+          <td>{escape(", ".join(report.selected) or "all")}</td>
+          <td>{len(report.items)}</td>
+          <td>{escape(str(report.summary.get("pass", 0)))}</td>
+          <td>{escape(str(report.summary.get("skip", 0)))}</td>
+          <td>{escape(str(report.summary.get("fail", 0)))}</td>
+          <td>{escape(report.artifact_path or "n/a")}</td>
+        </tr>
+        """
+        for report in reports.items
+    )
+    if not rows:
+        rows = """
+        <tr>
+          <td colspan="10">
+            <span class="muted">No integration smoke run reports recorded.</span>
+          </td>
+        </tr>
+        """
+    return f"""
+      <div class="metrics">
+        <div><strong>{summary.total_reports}</strong><span>Total reports</span></div>
+        <div><strong>{escape(summary.latest_status or "n/a")}</strong><span>Latest</span></div>
+        <div><strong>{summary.pass_count}</strong><span>Pass</span></div>
+        <div><strong>{summary.warn_count}</strong><span>Warn</span></div>
+        <div><strong>{summary.fail_count}</strong><span>Fail</span></div>
+      </div>
+      <p><a href="/integration-smoke-runs">Integration smoke run JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Generated</th><th>Status</th><th>Enabled</th><th>Dry run</th>
+            <th>Selected</th><th>Items</th><th>Pass</th><th>Skip</th><th>Fail</th>
+            <th>Artifact</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>

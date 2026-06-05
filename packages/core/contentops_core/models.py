@@ -692,6 +692,23 @@ class IntegrationSmokeRunReport(BaseModel):
     artifact_path: str | None = None
 
 
+class IntegrationSmokeRunHistorySummary(BaseModel):
+    total_reports: int = Field(ge=0)
+    pass_count: int = Field(ge=0)
+    warn_count: int = Field(ge=0)
+    fail_count: int = Field(ge=0)
+    latest_status: str | None = None
+    latest_generated_at: datetime | None = None
+
+
+class IntegrationSmokeRunListResponse(BaseModel):
+    items: list[IntegrationSmokeRunReport]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    summary: IntegrationSmokeRunHistorySummary
+
+
 class SystemStatus(BaseModel):
     status: str
     checks: list[ComponentCheck]

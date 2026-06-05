@@ -68,6 +68,18 @@ def test_cli_doctor_reports_system_status(
             "--json",
         ],
     )
+    smoke_record_result = runner.invoke(
+        app,
+        [
+            "integration-smoke-run",
+            "--selector",
+            "feed",
+            "--dry-run",
+            "--record",
+            "--json",
+        ],
+    )
+    smoke_history_result = runner.invoke(app, ["integration-smoke-runs", "--json"])
     manifest_result = runner.invoke(app, ["deployment-manifest"])
     deployment_check_result = runner.invoke(app, ["deployment-check", "--json"])
     release_result = runner.invoke(app, ["release-readiness", "--json"])
@@ -77,12 +89,16 @@ def test_cli_doctor_reports_system_status(
     assert provider_health_result.exit_code == 0
     assert smoke_plan_result.exit_code == 0
     assert smoke_run_result.exit_code == 0
+    assert smoke_record_result.exit_code == 0
+    assert smoke_history_result.exit_code == 0
     assert smoke_run_output.exists()
     payload = json.loads(result.output)
     config_payload = json.loads(config_audit_result.output)
     provider_payload = json.loads(provider_health_result.output)
     smoke_payload = json.loads(smoke_plan_result.output)
     smoke_run_payload = json.loads(smoke_run_result.output)
+    smoke_record_payload = json.loads(smoke_record_result.output)
+    smoke_history_payload = json.loads(smoke_history_result.output)
     assert config_payload["redacted"] is True
     assert "items" in config_payload
     assert {item["category"] for item in provider_payload["items"]} >= {
@@ -98,6 +114,9 @@ def test_cli_doctor_reports_system_status(
     )
     assert smoke_run_payload["items"][0]["name"] == "openai"
     assert smoke_run_payload["items"][0]["status"] == "skip"
+    assert smoke_record_payload["items"][0]["status"] == "planned"
+    assert smoke_history_payload["summary"]["total_reports"] == 1
+    assert smoke_history_payload["items"][0]["artifact_path"]
     assert payload["status"] in {"ok", "degraded"}
     assert {check["name"] for check in payload["checks"]} >= {
         "database",

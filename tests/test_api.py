@@ -8,6 +8,7 @@ import pytest
 from contentops_api.main import app, settings
 from contentops_api.routes.dashboard import build_dashboard_router
 from contentops_api.routes.runs import build_runs_router
+from contentops_core.diagnostics import integration_smoke_dir, run_integration_smoke
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobExecutionReport,
@@ -41,6 +42,7 @@ def test_health_endpoint() -> None:
     config_audit_response = client.get("/config-audit")
     provider_health_response = client.get("/provider-health")
     smoke_plan_response = client.get("/integration-smoke-plan")
+    smoke_runs_response = client.get("/integration-smoke-runs")
     deployment_check_response = client.get("/deployment-check")
     env_template_response = client.get("/deployment-env-template")
     release_response = client.get("/release-readiness")
@@ -84,6 +86,8 @@ def test_health_endpoint() -> None:
         "openai",
         "homepage",
     }
+    assert smoke_runs_response.status_code == 200
+    assert "summary" in smoke_runs_response.json()
     assert "openai_api_key" in config_audit_response.text
     assert "sk-" not in config_audit_response.text
     assert deployment_check_response.status_code == 200
@@ -1291,6 +1295,8 @@ def test_dashboard_renders() -> None:
     assert "Operations Summary" in response.text
     assert "Open operations console" in response.text
     assert "Open operations trends" in response.text
+    assert "Integration Smoke" in response.text
+    assert "Open integration smoke history" in response.text
     assert "System status dashboard" in response.text
     assert "Release evidence dashboard" in response.text
     assert "Audit Events" in response.text
@@ -1316,6 +1322,28 @@ def test_dashboard_operations_console_renders() -> None:
     assert "Worker Automation" in response.text
     assert "Retention Governance" in response.text
     assert "Retention lifecycle" in response.text
+
+
+def test_dashboard_integration_smoke_history_renders() -> None:
+    output_path = integration_smoke_dir(settings.artifact_root) / "api-smoke-test.json"
+    run_integration_smoke(
+        settings,
+        selected=["openai"],
+        output_path=output_path,
+        dry_run=True,
+    )
+    client = TestClient(app)
+
+    api_response = client.get("/integration-smoke-runs")
+    dashboard_response = client.get("/dashboard/integration-smoke")
+
+    assert api_response.status_code == 200
+    payload = api_response.json()
+    assert payload["summary"]["total_reports"] >= 1
+    assert any(item["artifact_path"] == str(output_path) for item in payload["items"])
+    assert dashboard_response.status_code == 200
+    assert "Integration Smoke" in dashboard_response.text
+    assert "api-smoke-test.json" in dashboard_response.text
 
 
 def test_operations_console_endpoint_renders_machine_readable_report() -> None:

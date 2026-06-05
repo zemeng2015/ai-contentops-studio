@@ -216,6 +216,7 @@ GET  /content-assets/manifest
 GET  /config-audit
 GET  /provider-health
 GET  /integration-smoke-plan
+GET  /integration-smoke-runs
 GET  /retention-report
 POST /retention-archives
 GET  /retention-archives
@@ -262,6 +263,9 @@ after setting live credentials to execute those provider checks and keep a JSON 
 with per-provider exit codes and output tails.
 The manual GitHub Actions `Integration Smoke` workflow runs the same command in dry-run mode by
 default and can be switched to live provider validation once repository secrets are configured.
+Recorded smoke reports are stored under `artifacts/integration-smoke` and exposed through
+`contentops integration-smoke-runs --json`, `GET /integration-smoke-runs`, and
+`/dashboard/integration-smoke`.
 CI includes `deployment_check.json` inside release evidence and also uploads the standalone
 `deployment-check/deployment-check.json` artifact, so deployment reviews can inspect the preflight
 gate output without rerunning local commands.

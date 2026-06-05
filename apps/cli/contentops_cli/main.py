@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 import typer
 import yaml
@@ -11,7 +12,9 @@ from contentops_core.config_templates import render_env_template
 from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
+    integration_smoke_dir,
     integration_smoke_plan,
+    list_integration_smoke_reports,
     provider_health,
     release_readiness,
     run_integration_smoke,
@@ -268,6 +271,12 @@ def integration_smoke_run(
         Path | None,
         typer.Option("--output", "-o", help="Optional JSON report path."),
     ] = None,
+    record: Annotated[
+        bool,
+        typer.Option(
+            help="Persist the report under the artifact root integration-smoke directory."
+        ),
+    ] = False,
     dry_run: Annotated[
         bool,
         typer.Option(help="Only report selected smoke commands without executing pytest."),
@@ -281,10 +290,14 @@ def integration_smoke_run(
         typer.Option("--json", help="Print structured JSON."),
     ] = False,
 ) -> None:
+    settings = Settings()
+    output_path = output
+    if record and output_path is None:
+        output_path = integration_smoke_dir(settings.artifact_root) / f"{uuid4().hex}.json"
     report = run_integration_smoke(
-        Settings(),
+        settings,
         selected=selector,
-        output_path=output,
+        output_path=output_path,
         dry_run=dry_run,
         force=force,
     )
@@ -301,6 +314,36 @@ def integration_smoke_run(
         if item.exit_code is not None:
             typer.echo(f"  exit code: {item.exit_code}")
     raise typer.Exit(0 if report.status != "fail" else 1)
+
+
+@app.command("integration-smoke-runs")
+def integration_smoke_runs(
+    limit: Annotated[int, typer.Option(help="Maximum smoke reports to show.")] = 20,
+    offset: Annotated[int, typer.Option(help="Number of smoke reports to skip.")] = 0,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    reports = list_integration_smoke_reports(
+        Settings().artifact_root,
+        limit=limit,
+        offset=offset,
+    )
+    if json_output:
+        typer.echo(reports.model_dump_json(indent=2))
+        return
+    typer.echo(f"Showing {len(reports.items)} of {reports.total} integration smoke reports")
+    typer.echo(
+        f"Summary: latest={reports.summary.latest_status or 'n/a'} "
+        f"pass={reports.summary.pass_count} warn={reports.summary.warn_count} "
+        f"fail={reports.summary.fail_count}"
+    )
+    for report in reports.items:
+        typer.echo(
+            f"{report.generated_at.isoformat()}  {report.status:5}  "
+            f"items={len(report.items)}  artifact={report.artifact_path or 'n/a'}"
+        )
 
 
 @app.command("deployment-check")

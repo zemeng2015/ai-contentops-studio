@@ -9,7 +9,9 @@ import pytest
 from contentops_core.artifacts import S3MirroringArtifactStore
 from contentops_core.diagnostics import (
     deployment_manifest,
+    integration_smoke_dir,
     integration_smoke_plan,
+    list_integration_smoke_reports,
     provider_health,
     run_integration_smoke,
     system_status,
@@ -828,6 +830,27 @@ def test_run_integration_smoke_writes_skip_report_for_missing_credentials(
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["artifact_path"] == str(output_path)
     assert payload["items"][0]["status"] == "skip"
+    history = list_integration_smoke_reports(tmp_path / "artifacts")
+    assert history.total == 0
+
+
+def test_integration_smoke_history_lists_recorded_reports(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    output_path = integration_smoke_dir(artifact_root) / "smoke.json"
+
+    report = run_integration_smoke(
+        Settings(artifact_root=artifact_root),
+        selected=["feed"],
+        output_path=output_path,
+        dry_run=True,
+    )
+    history = list_integration_smoke_reports(artifact_root)
+
+    assert report.status == "pass"
+    assert history.total == 1
+    assert history.summary.latest_status == "pass"
+    assert history.items[0].artifact_path == str(output_path)
+    assert history.items[0].items[0].status == "planned"
 
 
 def test_system_status_reports_static_publishing_readiness(tmp_path: Path) -> None:

@@ -9,6 +9,7 @@ from contentops_core.diagnostics import (
     deployment_check,
     deployment_manifest,
     integration_smoke_plan,
+    list_integration_smoke_reports,
     provider_health,
     release_readiness,
     system_status,
@@ -55,6 +56,7 @@ from contentops_core.models import (
     DeploymentManifest,
     IncidentReportListResponse,
     IntegrationSmokePlanReport,
+    IntegrationSmokeRunListResponse,
     JobExecutionPublishRequest,
     JobExecutionReviewRequest,
     OperationsConsoleReport,
@@ -179,6 +181,21 @@ def build_ops_router(
         if report.status == "fail":
             response.status_code = 409
         return report
+
+    @router.get(
+        "/integration-smoke-runs",
+        response_model=IntegrationSmokeRunListResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_integration_smoke_runs(
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> IntegrationSmokeRunListResponse:
+        return list_integration_smoke_reports(
+            settings.artifact_root,
+            limit=limit,
+            offset=offset,
+        )
 
     @router.get(
         "/deployment-check",

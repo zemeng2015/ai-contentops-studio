@@ -15,7 +15,9 @@ from contentops_core.models import (
     DeploymentManifest,
     IntegrationSmokePlanItem,
     IntegrationSmokePlanReport,
+    IntegrationSmokeRunHistorySummary,
     IntegrationSmokeRunItem,
+    IntegrationSmokeRunListResponse,
     IntegrationSmokeRunReport,
     OperationsSummary,
     ProviderHealthItem,
@@ -223,9 +225,46 @@ def run_integration_smoke(
         artifact_path=str(output_path) if output_path else None,
     )
     if output_path is not None:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        write_integration_smoke_report(report, output_path)
     return report
+
+
+def write_integration_smoke_report(
+    report: IntegrationSmokeRunReport,
+    output_path: Path,
+) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    persisted = report.model_copy(update={"artifact_path": str(output_path)})
+    output_path.write_text(persisted.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    return output_path
+
+
+def list_integration_smoke_reports(
+    artifact_root: Path,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+) -> IntegrationSmokeRunListResponse:
+    reports = sorted(
+        (
+            _read_integration_smoke_report(path)
+            for path in integration_smoke_dir(artifact_root).glob("*.json")
+            if path.name not in {"plan.json", "report.stdout.json"}
+        ),
+        key=lambda report: report.generated_at,
+        reverse=True,
+    )
+    return IntegrationSmokeRunListResponse(
+        items=reports[offset : offset + limit],
+        total=len(reports),
+        limit=limit,
+        offset=offset,
+        summary=_integration_smoke_history_summary(reports),
+    )
+
+
+def integration_smoke_dir(artifact_root: Path) -> Path:
+    return artifact_root / "integration-smoke"
 
 
 def deployment_manifest(
@@ -325,6 +364,23 @@ def _tail(value: str, limit: int = 4000) -> str:
     if len(value) <= limit:
         return value
     return value[-limit:]
+
+
+def _read_integration_smoke_report(path: Path) -> IntegrationSmokeRunReport:
+    return IntegrationSmokeRunReport.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def _integration_smoke_history_summary(
+    reports: list[IntegrationSmokeRunReport],
+) -> IntegrationSmokeRunHistorySummary:
+    return IntegrationSmokeRunHistorySummary(
+        total_reports=len(reports),
+        pass_count=sum(1 for report in reports if report.status == "pass"),
+        warn_count=sum(1 for report in reports if report.status == "warn"),
+        fail_count=sum(1 for report in reports if report.status == "fail"),
+        latest_status=reports[0].status if reports else None,
+        latest_generated_at=reports[0].generated_at if reports else None,
+    )
 
 
 def _database_check(repository: RunRepository) -> ComponentCheck:

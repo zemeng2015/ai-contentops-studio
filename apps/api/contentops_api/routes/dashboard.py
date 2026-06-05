@@ -7,7 +7,11 @@ from pathlib import Path
 from typing import Annotated
 
 from contentops_core.config_audit import config_audit
-from contentops_core.diagnostics import deployment_manifest, system_status
+from contentops_core.diagnostics import (
+    deployment_manifest,
+    list_integration_smoke_reports,
+    system_status,
+)
 from contentops_core.jobs import (
     JobExecutionAlertReport,
     JobExecutionReport,
@@ -73,6 +77,7 @@ from contentops_api.views import (
     _generation_receipt_html,
     _incident_report_html,
     _incident_reports_html,
+    _integration_smoke_runs_html,
     _job_execution_alert_deliveries_html,
     _job_execution_alerts_html,
     _job_execution_detail_html,
@@ -165,6 +170,7 @@ def build_dashboard_router(
         audit_events = review_service.audit_events(limit=5)
         retention_report = review_service.retention_report()
         retention_archives = review_service.retention_archives(limit=5)
+        smoke_runs = list_integration_smoke_reports(settings.artifact_root, limit=5)
         retention_archive_action = f"/dashboard/retention/archive{_api_key_query(api_key)}"
         operations_summary = review_service.operations_summary()
         ops_brief = build_ops_brief(
@@ -266,6 +272,15 @@ def build_dashboard_router(
                   <p><a href="/dashboard/operations">Open operations console</a></p>
                   <p><a href="/dashboard/ops-trends">Open operations trends</a></p>
                   {_operations_summary_html(operations_summary)}
+                </section>
+                <section class="hero compact">
+                  <h2>Integration Smoke</h2>
+                  <p>
+                    Recent live provider validation reports for feed, search, OpenAI, and
+                    homepage paths.
+                  </p>
+                  <p><a href="/dashboard/integration-smoke">Open integration smoke history</a></p>
+                  {_integration_smoke_runs_html(smoke_runs)}
                 </section>
                 <section class="hero compact">
                   <h2>Artifact Retention</h2>
@@ -895,6 +910,37 @@ def build_dashboard_router(
                   {_release_gate_history_html(gate_history)}
                   {_release_evidence_html(bundle)}
                   {_release_approvals_html(approvals, api_key)}
+                </section>
+                """,
+            )
+        )
+
+    @router.get(
+        "/dashboard/integration-smoke",
+        response_class=HTMLResponse,
+        dependencies=[Depends(require_read_access)],
+    )
+    def dashboard_integration_smoke(
+        api_key: str = Query(default=""),
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ) -> HTMLResponse:
+        smoke_runs = list_integration_smoke_reports(
+            settings.artifact_root,
+            limit=limit,
+            offset=offset,
+        )
+        return HTMLResponse(
+            _page(
+                "Integration Smoke",
+                f"""
+                <p><a href="/dashboard{_api_key_query(api_key)}">Back to dashboard</a></p>
+                <section class="hero">
+                  <p>
+                    Review recorded provider smoke reports before enabling live automation or
+                    approving a production release.
+                  </p>
+                  {_integration_smoke_runs_html(smoke_runs)}
                 </section>
                 """,
             )
