@@ -331,6 +331,9 @@ availability, activity evidence, and repository maturity signals.
 Research providers normalize canonical URLs, merge duplicates, classify source types, and attach
 authority/relevance scores so `research.json` and `source-audit.json` explain why a source is
 strong, weak, or needs reviewer spot-checking.
+Set `CONTENTOPS_RESEARCH_CACHE_DIR` to enable URL fetch caching for direct URL research and search
+result enrichment. `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` controls how long cached page extracts
+can be reused, reducing repeated network calls during scheduled worker reruns.
 The search provider records its planned query variants, selected URLs, result counts, and
 enrichment mode in `research.json`, which makes recurring web research easier to audit.
 

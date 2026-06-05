@@ -232,6 +232,11 @@ def _provider_config_check(settings: Settings) -> ComponentCheck:
             "publishing_readiness": publishing_readiness,
             "research_retry_attempts": settings.research_retry_attempts,
             "research_retry_backoff_seconds": settings.research_retry_backoff_seconds,
+            "research_cache_enabled": settings.research_cache_dir is not None,
+            "research_cache_dir": (
+                str(settings.research_cache_dir) if settings.research_cache_dir else None
+            ),
+            "research_cache_ttl_seconds": settings.research_cache_ttl_seconds,
             "research_search_enrich": settings.research_search_enrich,
             "research_github_token_configured": settings.research_github_token is not None,
             "generator_provider": settings.generator_provider,

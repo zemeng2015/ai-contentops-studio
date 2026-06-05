@@ -56,6 +56,8 @@ def _build_research_provider(
         return URLResearchProvider(
             retry_attempts=settings.research_retry_attempts,
             retry_backoff_seconds=settings.research_retry_backoff_seconds,
+            cache_dir=settings.research_cache_dir,
+            cache_ttl_seconds=settings.research_cache_ttl_seconds,
         )
     if settings.research_provider == "feed":
         return FeedResearchProvider(
@@ -74,6 +76,8 @@ def _build_research_provider(
             enrich_results=settings.research_search_enrich,
             retry_attempts=settings.research_retry_attempts,
             retry_backoff_seconds=settings.research_retry_backoff_seconds,
+            cache_dir=settings.research_cache_dir,
+            cache_ttl_seconds=settings.research_cache_ttl_seconds,
         )
     if settings.research_provider == "github":
         return GitHubResearchProvider(
@@ -89,10 +93,14 @@ def _build_research_provider(
             max_sources=settings.research_max_sources,
             retry_attempts=settings.research_retry_attempts,
             retry_backoff_seconds=settings.research_retry_backoff_seconds,
+            cache_dir=settings.research_cache_dir,
+            cache_ttl_seconds=settings.research_cache_ttl_seconds,
         )
     return HybridResearchProvider(
         retry_attempts=settings.research_retry_attempts,
         retry_backoff_seconds=settings.research_retry_backoff_seconds,
+        cache_dir=settings.research_cache_dir,
+        cache_ttl_seconds=settings.research_cache_ttl_seconds,
     )
 
 

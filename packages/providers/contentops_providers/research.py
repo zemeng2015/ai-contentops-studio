@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import json
 import re
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 from urllib.parse import urlparse
 
@@ -122,10 +125,14 @@ class URLResearchProvider:
         timeout_seconds: float = 12.0,
         retry_attempts: int = 2,
         retry_backoff_seconds: float = 0.1,
+        cache_dir: Path | None = None,
+        cache_ttl_seconds: int = 86400,
     ) -> None:
         self.timeout_seconds = timeout_seconds
         self.retry_attempts = retry_attempts
         self.retry_backoff_seconds = retry_backoff_seconds
+        self.cache_dir = cache_dir
+        self.cache_ttl_seconds = cache_ttl_seconds
 
     def collect(self, request: RunRequest) -> ResearchPacket:
         sources = dedupe_sources(
@@ -163,6 +170,9 @@ class URLResearchProvider:
         )
 
     def fetch_source(self, url: str) -> Source:
+        cached = self._read_cached_source(url)
+        if cached is not None:
+            return cached
         return self._fetch_source(url)
 
     def _fetch_source(self, url: str) -> Source:
@@ -183,7 +193,7 @@ class URLResearchProvider:
             html = response.text
             title = self._extract_title(html) or url
             summary = self._extract_summary(html)
-            return Source(
+            source = Source(
                 title=title[:180],
                 url=url,
                 canonical_url=_normalize_url(url),
@@ -194,6 +204,8 @@ class URLResearchProvider:
                 extraction_quality=self._score_extraction(title, summary, html),
                 content_length=len(_strip_tags(html)),
             )
+            self._write_cached_source(url, source)
+            return source
         except Exception as exc:
             return Source(
                 title=f"Unavailable source: {url}",
@@ -206,6 +218,37 @@ class URLResearchProvider:
                 extraction_quality=0.15,
                 content_length=0,
             )
+
+    def _read_cached_source(self, url: str) -> Source | None:
+        path = self._cache_path(url)
+        if path is None or not path.exists():
+            return None
+        if self.cache_ttl_seconds >= 0:
+            age_seconds = time.time() - path.stat().st_mtime
+            if age_seconds > self.cache_ttl_seconds:
+                return None
+        try:
+            return Source.model_validate_json(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+
+    def _write_cached_source(self, url: str, source: Source) -> None:
+        path = self._cache_path(url)
+        if path is None:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "cache_key": _normalize_url(url) or url,
+            "source": source.model_dump(mode="json"),
+        }
+        path.write_text(json.dumps(payload["source"], indent=2), encoding="utf-8")
+
+    def _cache_path(self, url: str) -> Path | None:
+        if self.cache_dir is None:
+            return None
+        key = _normalize_url(url) or url.strip().lower()
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        return self.cache_dir / f"{digest}.json"
 
     @staticmethod
     def _extract_title(html: str) -> str | None:
@@ -443,6 +486,8 @@ class SearchResearchProvider:
         enrich_results: bool = True,
         retry_attempts: int = 2,
         retry_backoff_seconds: float = 0.1,
+        cache_dir: Path | None = None,
+        cache_ttl_seconds: int = 86400,
     ) -> None:
         self.endpoint = endpoint
         self.api_key = api_key
@@ -455,6 +500,8 @@ class SearchResearchProvider:
             timeout_seconds=timeout_seconds,
             retry_attempts=retry_attempts,
             retry_backoff_seconds=retry_backoff_seconds,
+            cache_dir=cache_dir,
+            cache_ttl_seconds=cache_ttl_seconds,
         )
 
     def collect(self, request: RunRequest) -> ResearchPacket:
@@ -926,11 +973,15 @@ class DiscoveryResearchProvider:
         max_sources: int = 6,
         retry_attempts: int = 2,
         retry_backoff_seconds: float = 0.1,
+        cache_dir: Path | None = None,
+        cache_ttl_seconds: int = 86400,
     ) -> None:
         self.local = LocalResearchProvider()
         self.url = URLResearchProvider(
             retry_attempts=retry_attempts,
             retry_backoff_seconds=retry_backoff_seconds,
+            cache_dir=cache_dir,
+            cache_ttl_seconds=cache_ttl_seconds,
         )
         self.feed = FeedResearchProvider(
             feeds=feeds,
@@ -976,11 +1027,15 @@ class HybridResearchProvider:
         self,
         retry_attempts: int = 2,
         retry_backoff_seconds: float = 0.1,
+        cache_dir: Path | None = None,
+        cache_ttl_seconds: int = 86400,
     ) -> None:
         self.local = LocalResearchProvider()
         self.url = URLResearchProvider(
             retry_attempts=retry_attempts,
             retry_backoff_seconds=retry_backoff_seconds,
+            cache_dir=cache_dir,
+            cache_ttl_seconds=cache_ttl_seconds,
         )
 
     def collect(self, request: RunRequest) -> ResearchPacket:

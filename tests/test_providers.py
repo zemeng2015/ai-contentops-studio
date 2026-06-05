@@ -713,6 +713,56 @@ def test_url_research_records_extraction_quality(monkeypatch: pytest.MonkeyPatch
     assert packet.sources[0].relevance_score > 0.3
 
 
+def test_url_research_reuses_cached_sources(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeResponse:
+        headers = {"content-type": "text/html; charset=utf-8"}
+        text = (
+            "<html><head><title>Cached AI Source</title>"
+            '<meta name="description" content="Cached source summary about AI workflow '
+            'evaluation and production reliability."></head><body>'
+            + ("cached technical content " * 50)
+            + "</body></html>"
+        )
+        encoding = "utf-8"
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class FakeClient:
+        calls = 0
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            return None
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str) -> FakeResponse:
+            FakeClient.calls += 1
+            return FakeResponse()
+
+    monkeypatch.setattr("contentops_providers.research.httpx.Client", FakeClient)
+    provider = URLResearchProvider(cache_dir=tmp_path / "research-cache")
+
+    first = provider.collect(
+        RunRequest(topic="AI workflow", source_urls=["https://example.com/cache?ref=1"])
+    )
+    second = provider.collect(
+        RunRequest(topic="AI workflow", source_urls=["https://example.com/cache?ref=2"])
+    )
+
+    assert FakeClient.calls == 1
+    assert first.sources[0].title == "Cached AI Source"
+    assert second.sources[0].title == "Cached AI Source"
+    assert list((tmp_path / "research-cache").glob("*.json"))
+
+
 def test_source_intelligence_normalizes_and_merges_duplicate_urls() -> None:
     sources = dedupe_sources(
         [

@@ -68,6 +68,8 @@ CONTENTOPS_RESEARCH_FEEDS=https://export.arxiv.org/api/query?search_query=cat:cs
 CONTENTOPS_RESEARCH_MAX_SOURCES=6
 CONTENTOPS_RESEARCH_RETRY_ATTEMPTS=2
 CONTENTOPS_RESEARCH_RETRY_BACKOFF_SECONDS=0.1
+CONTENTOPS_RESEARCH_CACHE_DIR=/data/artifacts/research-cache
+CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS=86400
 CONTENTOPS_RESEARCH_SEARCH_ENDPOINT=https://api.search.brave.com/res/v1/web/search
 CONTENTOPS_RESEARCH_SEARCH_API_KEY=
 CONTENTOPS_RESEARCH_SEARCH_ENRICH=true
@@ -91,6 +93,10 @@ CONTENTOPS_REQUIRE_READ_API_KEY=false
 CONTENTOPS_HOMEPAGE_REPO_PATH=
 CONTENTOPS_HOMEPAGE_PUBLIC_BASE_URL=https://zemeng2015.github.io/zack-ai-homepage
 ```
+
+`CONTENTOPS_RESEARCH_CACHE_DIR` enables persistent URL extraction caching for URL research and
+search-result enrichment. Keep it on durable worker storage in production so recurring jobs can
+reuse recent extracts and reduce repeated external provider calls.
 
 For ECS or Lambda workers, set `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` so each local artifact
 write is mirrored to S3 under:

@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     research_max_sources: int = 6
     research_retry_attempts: int = 2
     research_retry_backoff_seconds: float = 0.1
+    research_cache_dir: Path | None = None
+    research_cache_ttl_seconds: int = 86400
     research_search_endpoint: str = "https://api.search.brave.com/res/v1/web/search"
     research_search_api_key: str | None = None
     research_search_enrich: bool = True

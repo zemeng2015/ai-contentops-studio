@@ -150,6 +150,9 @@ Each run can also be exported as an evidence bundle through `/runs/{id}/bundle` 
 `contentops export-run`. The zip contains a bundle manifest plus every run artifact, which makes
 generated research, evaluation, traces, approval records, and publishing receipts portable for
 portfolio reviews or incident handoffs.
+URL research and search enrichment can use a persistent research cache. The cache stores normalized
+`Source` extracts by canonical URL and TTL, reducing repeated network fetches during scheduled
+worker reruns while keeping the source audit and research artifact contract unchanged.
 
 ```text
 needs_review -> approved -> publishing -> published

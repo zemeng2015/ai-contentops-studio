@@ -45,6 +45,10 @@ $env:CONTENTOPS_RESEARCH_GITHUB_TOKEN="..."
 contentops-worker run-pipeline pipelines/project_repository_updates.yaml --receipt-dir artifacts/job-executions
 ```
 
+For feed, URL, discovery, or search-backed workers, set `CONTENTOPS_RESEARCH_CACHE_DIR` to a
+durable artifact path and tune `CONTENTOPS_RESEARCH_CACHE_TTL_SECONDS` so repeated scheduled runs
+reuse recent URL extracts instead of refetching unchanged pages.
+
 After the worker runs:
 
 ```powershell
