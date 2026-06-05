@@ -39,7 +39,7 @@ Status: complete.
 
 ## Phase 3: Security And Supply Chain
 
-Status: active.
+Status: complete.
 
 - Add dependency vulnerability scanning for Python dependencies.
 - Add static checks for GitHub Actions permissions, secret usage, and unsafe shell patterns.
@@ -47,6 +47,8 @@ Status: active.
 - Add Terraform security checks for public exposure, encryption, and IAM privilege drift.
 
 ## Phase 4: Live Provider And Scheduled Operations
+
+Status: active.
 
 - Keep the manual Integration Smoke workflow dry-run by default.
 - Run live provider smoke checks only with explicit `workflow_dispatch` and configured secrets.

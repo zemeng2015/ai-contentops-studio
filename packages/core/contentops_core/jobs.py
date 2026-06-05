@@ -39,11 +39,20 @@ class ContentJob(BaseModel):
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, str] = Field(default_factory=dict)
 
-    def to_request(self, workflow_name: str | None = None) -> RunRequest:
+    def to_request(
+        self,
+        workflow_name: str | None = None,
+        *,
+        publish: bool | None = None,
+    ) -> RunRequest:
+        effective_publish = self.publish if publish is None else publish
         metadata = dict(self.metadata)
         metadata["contentops_job_name"] = self.name
         metadata["contentops_publish_intent"] = "publish" if self.publish else "review"
+        metadata["contentops_execution_publish"] = "publish" if effective_publish else "review"
         metadata["contentops_homepage_handoff"] = str(self.homepage_handoff).lower()
+        if publish is not None and publish != self.publish:
+            metadata["contentops_publish_override"] = "review_only"
         if self.tags:
             metadata["contentops_job_tags"] = ",".join(self.tags)
         if workflow_name:
@@ -51,7 +60,7 @@ class ContentJob(BaseModel):
         return RunRequest(
             topic=self.topic,
             source_urls=self.source_urls,
-            publish=self.publish,
+            publish=effective_publish,
             metadata=metadata,
         )
 
@@ -589,13 +598,24 @@ class JobRunner:
     def __init__(self, pipeline: ContentOpsPipeline) -> None:
         self.pipeline = pipeline
 
-    def run(self, job_file: ContentJobFile, receipt_dir: Path | None = None) -> JobExecutionReport:
+    def run(
+        self,
+        job_file: ContentJobFile,
+        receipt_dir: Path | None = None,
+        *,
+        review_only: bool = False,
+    ) -> JobExecutionReport:
         started_at = datetime.now(UTC)
         results: list[JobRunResult] = []
         for job in job_file.jobs:
             job_started = datetime.now(UTC)
             try:
-                run_result = self.pipeline.run(job.to_request(workflow_name=job_file.name))
+                run_result = self.pipeline.run(
+                    job.to_request(
+                        workflow_name=job_file.name,
+                        publish=False if review_only else None,
+                    )
+                )
                 results.append(
                     JobRunResult(
                         job_name=job.name,

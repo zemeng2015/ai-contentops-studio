@@ -80,6 +80,7 @@ jobs:
           contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml \
             --receipt-dir artifacts/job-executions \
             --release-evidence-dir artifacts/release-evidence/daily-ai-roundup \
+            --review-only \
             | tee scheduled-worker/daily-execution.txt
       - name: Notify worker alerts
         if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)
@@ -211,6 +212,7 @@ jobs:
           contentops-worker run-pipeline pipelines/project_repository_updates.yaml \
             --receipt-dir artifacts/job-executions \
             --release-evidence-dir artifacts/release-evidence/project-repository-updates \
+            --review-only \
             | tee scheduled-worker/project-updates-execution.txt
       - name: Notify worker alerts
         if: always() && (github.event_name == 'schedule' || inputs.dry_run_only == false)

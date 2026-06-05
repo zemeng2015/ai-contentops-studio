@@ -190,6 +190,58 @@ jobs:
     assert ops_brief_deliveries[0]["delivery_id"] == ops_brief_notification_log[0]["delivery_id"]
 
 
+def test_worker_review_only_preserves_publish_intent_without_publishing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    site_dir = tmp_path / "site"
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("CONTENTOPS_DATABASE_URL", f"sqlite:///{tmp_path / 'contentops.db'}")
+    monkeypatch.setenv("CONTENTOPS_SITE_OUTPUT_DIR", str(site_dir))
+    monkeypatch.setenv("CONTENTOPS_MIN_PUBLISH_SCORE", "0.1")
+    path = tmp_path / "jobs.yaml"
+    path.write_text(
+        """
+name: review-only-job
+jobs:
+  - name: scheduled-publish-intent
+    topic: Scheduled publishing should wait for review
+    publish: true
+""",
+        encoding="utf-8",
+    )
+    receipt_dir = tmp_path / "receipts"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "run-pipeline",
+            str(path),
+            "--receipt-dir",
+            str(receipt_dir),
+            "--review-only",
+            "--skip-release-evidence",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    job_result = payload["results"][0]
+    request_payload = json.loads(
+        (Path(job_result["artifact_dir"]) / "request.json").read_text(encoding="utf-8")
+    )
+    assert job_result["publish"] is True
+    assert job_result["status"] == "needs_review"
+    assert job_result["published_url"] is None
+    assert request_payload["publish"] is False
+    assert request_payload["metadata"]["contentops_publish_intent"] == "publish"
+    assert request_payload["metadata"]["contentops_execution_publish"] == "review"
+    assert request_payload["metadata"]["contentops_publish_override"] == "review_only"
+    assert not list(site_dir.glob("*.html"))
+
+
 def test_worker_run_can_prepare_requested_homepage_handoff(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

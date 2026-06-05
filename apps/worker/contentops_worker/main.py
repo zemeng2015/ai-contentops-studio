@@ -68,6 +68,15 @@ def run_pipeline(
             help="Skip post-publish RSS, sitemap, promotion brief, and manifest output."
         ),
     ] = False,
+    review_only: Annotated[
+        bool,
+        typer.Option(
+            help=(
+                "Execute jobs as review packages even when the YAML declares publish=true. "
+                "The original publish intent is preserved in run metadata."
+            )
+        ),
+    ] = False,
     skip_delivery_summary: Annotated[
         bool,
         typer.Option(help="Skip post-run worker delivery summary generation."),
@@ -98,7 +107,11 @@ def run_pipeline(
             typer.echo(f"- {job.name}: {job.topic} ({publish_label})")
         return
 
-    report = JobRunner(build_pipeline(settings)).run(job_file, receipt_dir=resolved_receipt_dir)
+    report = JobRunner(build_pipeline(settings)).run(
+        job_file,
+        receipt_dir=resolved_receipt_dir,
+        review_only=review_only,
+    )
     handoff_errors: list[str] = []
     if not skip_homepage_handoff:
         handoff_errors = _attach_homepage_handoffs(settings, report)

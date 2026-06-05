@@ -118,6 +118,8 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Repository security baseline
         run: python scripts/check_security_baseline.py --output security-baseline/security-baseline.json
+      - name: Operations policy baseline
+        run: python scripts/check_operations_policy.py --output security-baseline/operations-policy.json
       - name: Python dependency audit
         run: |
           mkdir -p security-baseline

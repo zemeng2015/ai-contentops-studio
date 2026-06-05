@@ -108,6 +108,8 @@ def test_ci_validates_terraform() -> None:
     assert "coverage-py${{ matrix.python-version }}" in workflow
     assert "Repository security baseline" in workflow
     assert "scripts/check_security_baseline.py" in workflow
+    assert "Operations policy baseline" in workflow
+    assert "scripts/check_operations_policy.py" in workflow
     assert "python -m pip_audit --skip-editable" in workflow
     assert "security-baseline" in workflow
 
@@ -125,6 +127,8 @@ def test_long_term_ci_plan_documents_quality_roadmap() -> None:
     assert "rendered dashboard smoke check" in plan
     assert "container image vulnerability scanning" in plan
     assert "Terraform security checks" in plan
+    assert "workflow_dispatch" in plan
+    assert "scheduled ContentOps artifacts" in plan
     assert "docs/ci-plan.md" in readme
 
 
@@ -153,6 +157,17 @@ def test_phase_three_security_baseline_exists() -> None:
     assert "docker:non-root-user" in security_script
     assert "USER contentops" in dockerfile
     assert "PYTHONDONTWRITEBYTECODE=1" in dockerfile
+
+
+def test_phase_four_operations_policy_exists() -> None:
+    operations_policy = Path("scripts/check_operations_policy.py").read_text(encoding="utf-8")
+    scheduled = Path(".github/workflows/scheduled-contentops.yml").read_text(encoding="utf-8")
+
+    assert "OperationsPolicyReport" in operations_policy
+    assert "integration-smoke:manual-only" in operations_policy
+    assert "scheduled:review-only-execution" in operations_policy
+    assert "scheduled:publish-intent-guarded" in operations_policy
+    assert "--review-only" in scheduled
 
 
 def test_scheduled_contentops_workflow_runs_worker_gates() -> None:
