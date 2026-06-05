@@ -98,6 +98,14 @@ After a publish, confirm `contentops-publish-index.json` changed with the genera
 report. Commit or deploy that JSON catalog with the site output because homepage aggregation,
 search indexing, RSS generation, and promotion scripts can use it as the authoritative published
 content feed.
+Then generate distribution assets:
+
+```powershell
+contentops content-assets --output-dir site
+```
+
+Review `promotion-brief.md` before posting externally, and deploy `feed.xml` with the site when
+the published content should be discoverable by feed readers, search crawlers, or automation.
 For S3-backed runs, inspect each run's `s3-mirror-log.json` to confirm the bucket/key path and
 whether any artifact mirror attempt failed before the worker completed.
 Worker receipt directories and release evidence directories also write `s3-mirror-log.json` when

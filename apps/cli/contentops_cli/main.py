@@ -46,6 +46,7 @@ from contentops_core.release_gate import (
 )
 from contentops_core.repository import RunRepository
 from contentops_core.settings import Settings
+from contentops_publishing.publish_index import write_distribution_assets
 
 app = typer.Typer(help="AI ContentOps Studio command line tools.")
 
@@ -706,6 +707,41 @@ def content_catalog(
         )
 
 
+@app.command("content-assets")
+def content_assets(
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", "-o", help="Directory for feed.xml and promotion brief."),
+    ] = None,
+    index_path: Annotated[
+        Path | None,
+        typer.Option("--index-path", help="Optional contentops-publish-index.json path."),
+    ] = None,
+    title: Annotated[str, typer.Option(help="RSS channel title.")] = "AI ContentOps Studio",
+    description: Annotated[
+        str,
+        typer.Option(help="RSS channel description."),
+    ] = "Reviewed AI and technical content.",
+    limit: Annotated[int, typer.Option(help="Maximum items to include.")] = 20,
+) -> None:
+    settings = Settings()
+    target_dir = _publisher_target_dir(settings)
+    resolved_index_path = index_path or target_dir / "contentops-publish-index.json"
+    if not resolved_index_path.exists():
+        raise typer.BadParameter(f"Publish index not found: {resolved_index_path}")
+    resolved_output_dir = output_dir or resolved_index_path.parent
+    assets = write_distribution_assets(
+        resolved_index_path,
+        resolved_output_dir,
+        channel_title=title,
+        channel_description=description,
+        channel_url=_publisher_public_url(settings),
+        limit=limit,
+    )
+    typer.echo(f"Feed: {assets['feed']}")
+    typer.echo(f"Promotion brief: {assets['promotion_brief']}")
+
+
 @app.command("scorecards")
 def scorecards(
     limit: Annotated[int, typer.Option(help="Number of scorecards to show.")] = 20,
@@ -1274,6 +1310,22 @@ def init_config(
         raise typer.BadParameter(str(exc)) from exc
     path.write_text(template, encoding="utf-8")
     typer.echo(f"Created {path} from {profile} profile")
+
+
+def _publisher_target_dir(settings: Settings) -> Path:
+    if settings.publisher_provider == "homepage":
+        if settings.homepage_repo_path is None:
+            raise typer.BadParameter(
+                "CONTENTOPS_HOMEPAGE_REPO_PATH is required for homepage content assets."
+            )
+        return settings.homepage_repo_path
+    return settings.site_output_dir
+
+
+def _publisher_public_url(settings: Settings) -> str:
+    if settings.publisher_provider == "homepage":
+        return settings.homepage_public_base_url
+    return settings.public_base_url
 
 
 def _parse_status(status: str) -> RunStatus | None:

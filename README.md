@@ -129,6 +129,7 @@ contentops publish-plan <run_id>
 contentops approve <run_id> --reviewer "operator"
 contentops publish <run_id>
 contentops publish-receipt <run_id>
+contentops content-assets --output-dir site
 contentops homepage-handoff <run_id> --output homepage-handoff.zip
 contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
@@ -339,6 +340,8 @@ Publishing adapters also maintain `contentops-publish-index.json` beside the tar
 machine-readable catalog records published article URLs, run ids, providers, timestamps, and
 quality scores so a homepage, search indexer, RSS generator, or promotion workflow can consume
 published content without scraping HTML.
+Run `contentops content-assets` after publishing to turn that catalog into `feed.xml` and
+`promotion-brief.md` for newsletters, search indexing, or social promotion.
 The search provider records its planned query variants, selected URLs, result counts, and
 enrichment mode in `research.json`, which makes recurring web research easier to audit.
 

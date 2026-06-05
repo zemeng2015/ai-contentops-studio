@@ -215,6 +215,11 @@ def test_cli_approve_then_publish(
     receipt_result = runner.invoke(app, ["publish-receipt", run_id])
     verification_result = runner.invoke(app, ["verify-publish", run_id])
     content_result = runner.invoke(app, ["content", "--json"])
+    content_assets_dir = tmp_path / "content-assets"
+    content_assets_result = runner.invoke(
+        app,
+        ["content-assets", "--output-dir", str(content_assets_dir), "--title", "Zack AI Notes"],
+    )
     rollback_result = runner.invoke(app, ["rollback-publish", run_id, "--actor", "zack"])
     audit_result = runner.invoke(app, ["audit-log", run_id])
     audit_events_result = runner.invoke(app, ["audit-events", "--action", "publish", "--json"])
@@ -232,6 +237,13 @@ def test_cli_approve_then_publish(
     assert content_result.exit_code == 0
     assert run_id in content_result.output
     assert '"provider": "static"' in content_result.output
+    assert content_assets_result.exit_code == 0
+    assert "feed.xml" in content_assets_result.output
+    assert "promotion-brief.md" in content_assets_result.output
+    assert "Zack AI Notes" in (content_assets_dir / "feed.xml").read_text(encoding="utf-8")
+    assert "CLI approval publish" in (content_assets_dir / "promotion-brief.md").read_text(
+        encoding="utf-8"
+    )
     assert rollback_result.exit_code == 0
     assert '"deleted_files"' in rollback_result.output
     assert audit_result.exit_code == 0

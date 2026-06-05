@@ -102,6 +102,10 @@ When publishing to a static site or homepage repository, preserve
 `contentops-publish-index.json` with the rest of the site output. It is updated on every publish
 and should be committed or deployed with the generated post, eval report, and homepage index so
 downstream automation can discover published content from a stable JSON contract.
+Run `contentops content-assets --output-dir <site-output>` after approved publishes to generate
+`feed.xml` and `promotion-brief.md` from the same index. Deploy `feed.xml` with the site if RSS or
+search discovery matters, and archive the promotion brief with release evidence when a reviewer
+needs to approve external distribution copy.
 
 For ECS or Lambda workers, set `CONTENTOPS_ARTIFACT_STORE_PROVIDER=s3` so each local artifact
 write is mirrored to S3 under:

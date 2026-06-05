@@ -111,6 +111,9 @@ The static-site and homepage publishers also upsert `contentops-publish-index.js
 target. The index is a machine-readable content catalog with run ids, public URLs, provider names,
 timestamps, and evaluation scores, giving downstream automation a stable contract for homepage
 aggregation, search indexing, RSS generation, or social promotion without scraping HTML.
+The CLI command `contentops content-assets` consumes that index and writes `feed.xml` plus
+`promotion-brief.md`, separating publishing from distribution so operators can review or automate
+RSS, newsletter, search, and social workflows independently.
 Publish verification reads the current target files and compares their hashes against the publish
 receipt, producing `publish-verification.json` for drift detection after deploys or manual edits.
 Incident reports sit above the review artifacts and aggregate run failures, scorecard warnings,
