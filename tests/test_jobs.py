@@ -15,6 +15,7 @@ from contentops_core.jobs import (
     JobExecutionReport,
     JobRunner,
     JobRunResult,
+    content_calendar_brief,
     create_scheduled_workflow_review_archive,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -184,6 +185,79 @@ jobs:
     assert report.results[0].homepage_handoff is True
     assert report.results[0].tags == ["ai", "roundup"]
     assert report.results[0].metadata == {"owner": "zack"}
+
+
+def test_content_calendar_brief_prioritizes_publish_handoffs(tmp_path: Path) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    receipt_dir = tmp_path / "receipts"
+    path = pipeline_dir / "jobs.yaml"
+    path.write_text(
+        """
+name: editorial-calendar
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+  timezone: Asia/Shanghai
+run_policy:
+  timeout_minutes: 45
+  concurrency_policy: forbid
+jobs:
+  - name: launch-post
+    topic: Production AI launch narrative
+    publish: true
+    homepage_handoff: true
+    source_urls:
+      - https://example.com/source
+    tags: [portfolio, launch]
+    metadata:
+      owner: zack
+  - name: research-note
+    topic: AI research note
+    publish: false
+    tags: [research]
+""",
+        encoding="utf-8",
+    )
+    failed = JobExecutionReport(
+        name="editorial-calendar",
+        total=2,
+        succeeded=1,
+        failed=1,
+        results=[
+            JobRunResult(
+                job_name="launch-post",
+                topic="Production AI launch narrative",
+                publish=True,
+                homepage_handoff=True,
+                status=RunStatus.PUBLISHED,
+                run_id="published-run",
+            ),
+            JobRunResult(
+                job_name="research-note",
+                topic="AI research note",
+                status="failed",
+                error="provider timeout",
+            ),
+        ],
+    )
+    write_job_execution_report(failed, receipt_dir)
+
+    brief = content_calendar_brief(pipeline_dir, receipt_dir)
+
+    assert brief.status == "fail"
+    assert brief.action_required is True
+    assert brief.planned_workflows == 1
+    assert brief.planned_jobs == 2
+    assert brief.publish_intent == 1
+    assert brief.homepage_handoff_intent == 1
+    assert brief.recent_success_rate == 0.5
+    assert brief.tag_coverage == {"launch": 1, "portfolio": 1, "research": 1}
+    assert brief.next_items[0].job_name == "launch-post"
+    assert brief.next_items[0].priority == 1
+    assert brief.next_items[0].owner == "zack"
+    assert any("failed execution" in risk for risk in brief.risks)
+    assert any("job recovery plan" in action for action in brief.recommended_actions)
 
 
 def test_job_execution_receipts_can_be_listed_and_loaded(tmp_path: Path) -> None:

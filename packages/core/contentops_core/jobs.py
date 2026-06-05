@@ -453,6 +453,43 @@ class WorkerJobReadinessResponse(BaseModel):
     items: list[WorkerJobReadinessItem] = Field(default_factory=list)
 
 
+class ContentCalendarPlanItem(BaseModel):
+    workflow_name: str
+    job_name: str
+    topic: str
+    publish: bool = False
+    homepage_handoff: bool = False
+    tags: list[str] = Field(default_factory=list)
+    source_count: int = Field(ge=0, default=0)
+    schedule_cron: str | None = None
+    schedule_timezone: str = "UTC"
+    owner: str = "content"
+    priority: int = Field(ge=1, le=5)
+    intent: str
+    status: str
+    rationale: str
+
+
+class ContentCalendarBrief(BaseModel):
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    status: str
+    action_required: bool = False
+    planned_workflows: int = Field(ge=0)
+    planned_jobs: int = Field(ge=0)
+    publish_intent: int = Field(ge=0)
+    review_intent: int = Field(ge=0)
+    homepage_handoff_intent: int = Field(ge=0)
+    ready_workflows: int = Field(ge=0)
+    warning_workflows: int = Field(ge=0)
+    failed_workflows: int = Field(ge=0)
+    recent_execution_count: int = Field(ge=0)
+    recent_success_rate: float = Field(ge=0, le=1)
+    tag_coverage: dict[str, int] = Field(default_factory=dict)
+    next_items: list[ContentCalendarPlanItem] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    recommended_actions: list[str] = Field(default_factory=list)
+
+
 class JobRecoveryPlan(BaseModel):
     execution_id: str
     source_execution_name: str
@@ -644,6 +681,57 @@ def worker_job_readiness(pipeline_dir: Path) -> WorkerJobReadinessResponse:
     )
 
 
+def content_calendar_brief(
+    pipeline_dir: Path,
+    receipt_dir: Path,
+    *,
+    limit: int = 10,
+) -> ContentCalendarBrief:
+    catalog = list_worker_job_catalog(pipeline_dir)
+    readiness = worker_job_readiness(pipeline_dir)
+    executions = list_job_execution_reports(receipt_dir, limit=limit)
+    failed_workflows = sum(1 for item in readiness.items if item.status == "failed")
+    warning_workflows = sum(1 for item in readiness.items if item.status == "warning")
+    ready_workflows = sum(1 for item in readiness.items if item.status == "ready")
+    success_rate = _calendar_success_rate(executions.items)
+    tag_coverage = _calendar_tag_coverage(catalog.items)
+    risks = _calendar_risks(
+        catalog=catalog,
+        readiness=readiness,
+        executions=executions.items,
+        success_rate=success_rate,
+    )
+    recommended_actions = _calendar_recommended_actions(
+        catalog=catalog,
+        readiness=readiness,
+        executions=executions.items,
+        risks=risks,
+    )
+    status = "ready"
+    if failed_workflows or any(report.failed for report in executions.items):
+        status = "fail"
+    elif warning_workflows or risks:
+        status = "warn"
+    return ContentCalendarBrief(
+        status=status,
+        action_required=status != "ready",
+        planned_workflows=catalog.total,
+        planned_jobs=catalog.job_count,
+        publish_intent=catalog.publish_count,
+        review_intent=catalog.review_count,
+        homepage_handoff_intent=catalog.handoff_count,
+        ready_workflows=ready_workflows,
+        warning_workflows=warning_workflows,
+        failed_workflows=failed_workflows,
+        recent_execution_count=len(executions.items),
+        recent_success_rate=success_rate,
+        tag_coverage=tag_coverage,
+        next_items=_calendar_plan_items(catalog.items),
+        risks=risks,
+        recommended_actions=recommended_actions,
+    )
+
+
 def write_job_execution_report(report: JobExecutionReport, receipt_dir: Path) -> Path:
     receipt_dir.mkdir(parents=True, exist_ok=True)
     path = (
@@ -787,6 +875,152 @@ def _worker_job_catalog_item(path: Path, pipeline_dir: Path) -> WorkerJobCatalog
         tags=tags,
         jobs=job_file.jobs,
     )
+
+
+def _calendar_plan_items(items: list[WorkerJobCatalogItem]) -> list[ContentCalendarPlanItem]:
+    plan_items: list[ContentCalendarPlanItem] = []
+    for item in items:
+        schedule = item.schedule or WorkerJobSchedule(enabled=False)
+        for job in item.jobs:
+            plan_items.append(
+                ContentCalendarPlanItem(
+                    workflow_name=item.name,
+                    job_name=job.name,
+                    topic=job.topic,
+                    publish=job.publish,
+                    homepage_handoff=job.homepage_handoff,
+                    tags=job.tags,
+                    source_count=len(job.source_urls),
+                    schedule_cron=schedule.cron,
+                    schedule_timezone=schedule.timezone,
+                    owner=job.metadata.get("owner", "content"),
+                    priority=_calendar_priority(job),
+                    intent="publish" if job.publish else "review",
+                    status=_calendar_item_status(item, job),
+                    rationale=_calendar_item_rationale(item, job),
+                )
+            )
+    return sorted(
+        plan_items,
+        key=lambda plan: (
+            plan.priority,
+            0 if plan.publish else 1,
+            plan.workflow_name,
+            plan.job_name,
+        ),
+    )
+
+
+def _calendar_priority(job: ContentJob) -> int:
+    if job.publish and job.homepage_handoff:
+        return 1
+    if job.publish:
+        return 2
+    if job.homepage_handoff:
+        return 3
+    if job.source_urls or job.tags:
+        return 4
+    return 5
+
+
+def _calendar_item_status(item: WorkerJobCatalogItem, job: ContentJob) -> str:
+    if not item.valid:
+        return "blocked"
+    if item.readiness_status == "failed":
+        return "blocked"
+    if item.readiness_status == "warning":
+        return "needs_attention"
+    if job.publish and not job.homepage_handoff:
+        return "publish_ready"
+    if job.homepage_handoff:
+        return "review_handoff"
+    return "planned_review"
+
+
+def _calendar_item_rationale(item: WorkerJobCatalogItem, job: ContentJob) -> str:
+    if not item.valid:
+        return "Workflow YAML must be fixed before this topic can run."
+    if item.readiness_status == "failed":
+        return "Workflow readiness failed and should be remediated before scheduling."
+    if job.publish and job.homepage_handoff:
+        return "High-leverage publish candidate with a homepage handoff for review."
+    if job.publish:
+        return "Publish intent is enabled, so this item should produce distribution assets."
+    if job.homepage_handoff:
+        return "Review-focused item prepares a homepage handoff before publication."
+    if job.source_urls:
+        return "Seeded source URLs make this item suitable for reviewer-backed drafting."
+    return "Backlog topic for research, drafting, and human review."
+
+
+def _calendar_success_rate(executions: list[JobExecutionReport]) -> float:
+    total = sum(report.total for report in executions)
+    if total == 0:
+        return 1.0
+    succeeded = sum(report.succeeded for report in executions)
+    return round(succeeded / total, 4)
+
+
+def _calendar_tag_coverage(items: list[WorkerJobCatalogItem]) -> dict[str, int]:
+    counter: Counter[str] = Counter()
+    for item in items:
+        for job in item.jobs:
+            counter.update(job.tags or ["untagged"])
+    return dict(sorted(counter.items()))
+
+
+def _calendar_risks(
+    *,
+    catalog: WorkerJobCatalogResponse,
+    readiness: WorkerJobReadinessResponse,
+    executions: list[JobExecutionReport],
+    success_rate: float,
+) -> list[str]:
+    risks: list[str] = []
+    if catalog.total == 0:
+        risks.append("No pipeline YAML files were found, so the content calendar is empty.")
+    if catalog.invalid_count:
+        risks.append(f"{catalog.invalid_count} workflow file(s) cannot be parsed.")
+    if readiness.failed_count:
+        risks.append(f"{readiness.failed_count} workflow(s) fail scheduling readiness checks.")
+    if catalog.publish_count and catalog.handoff_count < catalog.publish_count:
+        risks.append(
+            "Some publish-intent jobs do not request homepage handoff evidence before release."
+        )
+    if executions and success_rate < 0.9:
+        risks.append("Recent worker execution success rate is below 90%.")
+    failed_executions = [report for report in executions if report.failed]
+    if failed_executions:
+        latest = failed_executions[0]
+        risks.append(
+            f"Latest failed execution `{latest.execution_id}` left {latest.failed} job(s) failed."
+        )
+    if catalog.job_count and not catalog.publish_count:
+        risks.append("The calendar has no publish-intent jobs, so automation stops at review.")
+    return risks
+
+
+def _calendar_recommended_actions(
+    *,
+    catalog: WorkerJobCatalogResponse,
+    readiness: WorkerJobReadinessResponse,
+    executions: list[JobExecutionReport],
+    risks: list[str],
+) -> list[str]:
+    actions: list[str] = []
+    if catalog.invalid_count or readiness.failed_count:
+        actions.append("Fix failed workflow readiness checks before connecting the schedule.")
+    if catalog.publish_count and catalog.handoff_count < catalog.publish_count:
+        actions.append("Enable homepage_handoff for publish-intent jobs that need reviewer review.")
+    if any(report.failed for report in executions):
+        actions.append("Run a job recovery plan for the latest failed worker execution.")
+    if catalog.job_count and not catalog.publish_count:
+        actions.append(
+            "Promote at least one reviewed job to publish intent when quality gates pass."
+        )
+    if not risks:
+        actions.append("Run the scheduled workflow and archive the generated review package.")
+    return actions
 
 
 def _worker_job_readiness_item(item: WorkerJobCatalogItem) -> WorkerJobReadinessItem:

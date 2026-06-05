@@ -6,6 +6,7 @@ from html import escape
 from urllib.parse import urlencode
 
 from contentops_core.jobs import (
+    ContentCalendarBrief,
     JobExecutionAlertDelivery,
     JobExecutionAlertReport,
     JobExecutionReport,
@@ -835,6 +836,71 @@ def _worker_jobs_html(items: list[WorkerJobCatalogItem]) -> str:
           </tr>
         </thead>
         <tbody>{file_rows}</tbody>
+      </table>
+    """
+
+
+def _content_calendar_brief_html(report: ContentCalendarBrief) -> str:
+    tag_rows = "".join(
+        f"<tr><td>{escape(tag)}</td><td>{count}</td></tr>"
+        for tag, count in report.tag_coverage.items()
+    )
+    item_rows = "".join(
+        f"""
+        <tr>
+          <td>P{item.priority}</td>
+          <td>{escape(item.workflow_name)}</td>
+          <td>{escape(item.job_name)}</td>
+          <td>{escape(item.intent)}</td>
+          <td>{escape(item.status)}</td>
+          <td>{escape(item.topic)}</td>
+          <td>{escape(item.schedule_cron or "manual")}</td>
+          <td>{escape(", ".join(item.tags) or "none")}</td>
+          <td>{escape(item.rationale)}</td>
+        </tr>
+        """
+        for item in report.next_items
+    )
+    risks = "".join(f"<li>{escape(risk)}</li>" for risk in report.risks)
+    actions = "".join(
+        f"<li>{escape(action)}</li>" for action in report.recommended_actions
+    )
+    return f"""
+      <h3>Calendar Brief</h3>
+      <p><a href="/content-calendar">Content calendar JSON</a></p>
+      <div class="metrics">
+        <div><strong>{escape(report.status)}</strong><span>Status</span></div>
+        <div><strong>{report.planned_workflows}</strong><span>Workflows</span></div>
+        <div><strong>{report.planned_jobs}</strong><span>Planned jobs</span></div>
+        <div><strong>{report.publish_intent}</strong><span>Publish intent</span></div>
+        <div><strong>{report.review_intent}</strong><span>Review intent</span></div>
+        <div><strong>{report.homepage_handoff_intent}</strong><span>Handoffs</span></div>
+        <div><strong>{report.recent_success_rate:.0%}</strong><span>Recent success</span></div>
+      </div>
+      <h4>Next Planned Items</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Priority</th><th>Workflow</th><th>Job</th><th>Intent</th>
+            <th>Status</th><th>Topic</th><th>Schedule</th><th>Tags</th><th>Rationale</th>
+          </tr>
+        </thead>
+        <tbody>{item_rows}</tbody>
+      </table>
+      <div class="grid">
+        <div>
+          <h4>Risks</h4>
+          <ul>{risks or "<li>No calendar risks detected.</li>"}</ul>
+        </div>
+        <div>
+          <h4>Recommended Actions</h4>
+          <ul>{actions}</ul>
+        </div>
+      </div>
+      <h4>Tag Coverage</h4>
+      <table>
+        <thead><tr><th>Tag</th><th>Jobs</th></tr></thead>
+        <tbody>{tag_rows}</tbody>
       </table>
     """
 

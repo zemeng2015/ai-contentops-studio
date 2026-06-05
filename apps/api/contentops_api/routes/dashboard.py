@@ -18,6 +18,7 @@ from contentops_core.jobs import (
     JobExecutionTrendReport,
     JobRunner,
     archive_scheduled_workflow_review_package,
+    content_calendar_brief,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
@@ -72,6 +73,7 @@ from contentops_api.views import (
     _avg_duration,
     _comparison_html,
     _config_audit_html,
+    _content_calendar_brief_html,
     _cost_report_html,
     _cost_reports_html,
     _duration_label,
@@ -165,6 +167,11 @@ def build_dashboard_router(
             limit=5,
         )
         worker_jobs = list_worker_job_catalog(settings.pipeline_dir)
+        calendar_brief = content_calendar_brief(
+            settings.pipeline_dir,
+            job_execution_dir(settings.artifact_root),
+            limit=5,
+        )
         published_content = review_service.published_content(limit=5)
         scorecards = review_service.scorecards(limit=5)
         cost_reports = review_service.cost_reports(limit=5)
@@ -306,6 +313,19 @@ def build_dashboard_router(
                   <h2>Worker Job Catalog</h2>
                   <p>Planned YAML content calendars and publish/review intent before execution.</p>
                   <p><a href="/dashboard/worker-jobs">Open content calendar</a></p>
+                  <div class="metrics">
+                    <div><strong>{escape(calendar_brief.status)}</strong><span>Calendar</span></div>
+                    <div>
+                      <strong>{calendar_brief.planned_jobs}</strong><span>Planned jobs</span>
+                    </div>
+                    <div>
+                      <strong>{calendar_brief.publish_intent}</strong><span>Publish intent</span>
+                    </div>
+                    <div>
+                      <strong>{calendar_brief.recent_success_rate:.0%}</strong>
+                      <span>Worker success</span>
+                    </div>
+                  </div>
                   {_worker_jobs_html(worker_jobs.items)}
                 </section>
                 <section class="hero compact">
@@ -837,6 +857,11 @@ def build_dashboard_router(
     def dashboard_worker_jobs(api_key: str = Query(default="")) -> HTMLResponse:
         worker_jobs = list_worker_job_catalog(settings.pipeline_dir)
         readiness = worker_job_readiness(settings.pipeline_dir)
+        calendar_brief = content_calendar_brief(
+            settings.pipeline_dir,
+            job_execution_dir(settings.artifact_root),
+            limit=10,
+        )
         return HTMLResponse(
             _page(
                 "Content Calendar",
@@ -849,6 +874,7 @@ def build_dashboard_router(
                     update jobs should stay in review mode until a human approves the generated
                     article.
                   </p>
+                  {_content_calendar_brief_html(calendar_brief)}
                   {_worker_job_readiness_html(readiness)}
                   {_worker_jobs_html(worker_jobs.items)}
                 </section>

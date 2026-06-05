@@ -170,6 +170,40 @@ def test_cli_doctor_reports_system_status(
     assert release_payload["can_release"] is True
 
 
+def test_cli_content_calendar_outputs_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: cli-calendar
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+jobs:
+  - name: ai-launch
+    topic: AI launch content operations
+    publish: true
+    homepage_handoff: true
+    tags: [launch]
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CONTENTOPS_PIPELINE_DIR", str(pipeline_dir))
+    monkeypatch.setenv("CONTENTOPS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["content-calendar", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "ready"
+    assert payload["planned_jobs"] == 1
+    assert payload["next_items"][0]["job_name"] == "ai-launch"
+
+
 def test_cli_release_approval_records_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

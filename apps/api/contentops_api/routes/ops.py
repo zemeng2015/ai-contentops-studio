@@ -15,6 +15,7 @@ from contentops_core.diagnostics import (
     system_status,
 )
 from contentops_core.jobs import (
+    ContentCalendarBrief,
     JobExecutionAlertDelivery,
     JobExecutionAlertReport,
     JobExecutionListResponse,
@@ -30,6 +31,7 @@ from contentops_core.jobs import (
     WorkerJobCatalogResponse,
     WorkerJobReadinessResponse,
     archive_scheduled_workflow_review_package,
+    content_calendar_brief,
     get_job_execution_report,
     get_scheduled_workflow_review_package,
     job_execution_alert_notification_log,
@@ -335,6 +337,24 @@ def build_ops_router(
     def get_worker_job_readiness(response: Response) -> WorkerJobReadinessResponse:
         report = worker_job_readiness(settings.pipeline_dir)
         if not report.can_schedule:
+            response.status_code = 409
+        return report
+
+    @router.get(
+        "/content-calendar",
+        response_model=ContentCalendarBrief,
+        dependencies=[Depends(require_read_access)],
+    )
+    def get_content_calendar(
+        response: Response,
+        limit: int = Query(default=10, ge=1, le=100),
+    ) -> ContentCalendarBrief:
+        report = content_calendar_brief(
+            settings.pipeline_dir,
+            job_execution_dir(settings.artifact_root),
+            limit=limit,
+        )
+        if report.action_required:
             response.status_code = 409
         return report
 

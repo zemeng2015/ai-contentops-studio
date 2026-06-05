@@ -23,6 +23,7 @@ from contentops_core.diagnostics import (
 from contentops_core.factory import build_pipeline, build_review_service
 from contentops_core.jobs import (
     JobRunner,
+    content_calendar_brief,
     create_scheduled_workflow_review_archive,
     get_job_execution_report,
     job_execution_alert_notification_log,
@@ -878,6 +879,48 @@ def worker_job_readiness_command(
         for check in item.checks:
             typer.echo(f"  - {check.name}: {check.status} - {check.message}")
     raise typer.Exit(0 if report.can_schedule else 1)
+
+
+@app.command("content-calendar")
+def content_calendar_command(
+    pipeline_dir: Annotated[
+        Path | None,
+        typer.Option(help="Directory or YAML file containing worker job definitions."),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(help="Number of recent worker executions to compare with the plan."),
+    ] = 10,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Print structured JSON."),
+    ] = False,
+) -> None:
+    settings = Settings()
+    report = content_calendar_brief(
+        pipeline_dir or settings.pipeline_dir,
+        job_execution_dir(settings.artifact_root),
+        limit=limit,
+    )
+    if json_output:
+        typer.echo(report.model_dump_json(indent=2))
+        raise typer.Exit(0 if not report.action_required else 1)
+    typer.echo(
+        f"Content calendar: {report.status}  workflows={report.planned_workflows} "
+        f"jobs={report.planned_jobs} publish={report.publish_intent} "
+        f"review={report.review_intent}"
+    )
+    typer.echo(f"Recent worker success rate: {report.recent_success_rate:.0%}")
+    for item in report.next_items:
+        typer.echo(
+            f"- P{item.priority} {item.workflow_name}/{item.job_name}: "
+            f"{item.intent} {item.status} - {item.topic}"
+        )
+    for risk in report.risks:
+        typer.echo(f"risk: {risk}")
+    for action in report.recommended_actions:
+        typer.echo(f"next: {action}")
+    raise typer.Exit(0 if not report.action_required else 1)
 
 
 @app.command("scheduled-workflow-summary")

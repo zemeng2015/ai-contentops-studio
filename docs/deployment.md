@@ -400,6 +400,9 @@ CloudWatch.
 Worker job definitions are discovered from `CONTENTOPS_PIPELINE_DIR` and exposed through
 `contentops worker-jobs`, `GET /worker-jobs`, and the dashboard so scheduled calendars can be
 reviewed before EventBridge launches them.
+Use `contentops content-calendar --json` or `GET /content-calendar` as the higher-level planning
+check: it reports publish intent, review intent, homepage handoff coverage, recent worker success,
+and recommended actions before enabling or rerunning a schedule.
 Jobs that set `homepage_handoff: true` generate a homepage handoff zip after a successful run when
 `CONTENTOPS_PUBLISHER_PROVIDER=homepage` is configured. The worker receipt stores the handoff path
 or error for each job, and the post-run release evidence records those zip files in

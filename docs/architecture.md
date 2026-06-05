@@ -241,6 +241,10 @@ contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-r
 The worker job catalog scans `CONTENTOPS_PIPELINE_DIR` and exposes planned calendars through
 `GET /worker-jobs`, `contentops worker-jobs`, and the dashboard. Operators can review job count,
 publish intent, topics, tags, and invalid YAML before EventBridge or a manual run executes it.
+`contentops content-calendar` and `GET /content-calendar` add an operator brief on top of that
+catalog. The brief combines planned workflows, publish/review intent, homepage handoff coverage,
+tag coverage, recent worker execution success rate, risks, and recommended actions so teams can
+decide what to run, review, or fix next without reading every YAML file or receipt.
 
 Every worker invocation writes a job execution receipt under `artifact_root/job-executions` by
 default. Receipts include execution id, dry-run flag, timestamps, duration, job metadata, run ids,

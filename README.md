@@ -113,7 +113,7 @@ Each run writes inspectable artifacts such as:
 | Review | Review queue, status filters, batch approve/reject, run comparison |
 | Publishing | Static site and git-aware homepage publishers, publish index, receipts, verification, rollback |
 | Observability | Trace artifacts, scorecards, token budgets, incidents, operations summary |
-| Scheduling | YAML worker jobs, dry runs, receipts, recovery plans |
+| Scheduling | YAML worker jobs, content calendar brief, dry runs, receipts, recovery plans |
 | Release Evidence | Deployment manifest, release readiness gate, release approvals, hashed CI evidence manifest |
 | Deployment | Docker image, Alembic migrations, S3 mirroring, RDS, EventBridge, CloudWatch |
 
@@ -139,6 +139,7 @@ contentops s3-mirror-log <run_id>
 contentops release-evidence --output-dir release-evidence
 contentops operations-console --days 14 --json
 contentops provider-health --json
+contentops content-calendar --json
 contentops release-approve --decision approved --approver "operator"
 contentops release-approvals
 contentops release-gate --git-sha <commit_sha> --json --record --checklist-output release-gate-checklist.md
@@ -233,6 +234,7 @@ POST /release-approvals
 GET  /release-gate
 GET  /release-gates
 GET  /worker-jobs
+GET  /content-calendar
 GET  /job-executions
 GET  /job-executions/trends
 GET  /job-executions/recovery-lineage
@@ -248,6 +250,9 @@ GET  /scheduled-reviews/{package_id}/s3-mirror-log
 The system status dashboard turns `/ready` and deployment manifest checks into operator-facing
 configuration fixes, including missing API keys, scheduled research readiness, artifact storage,
 database, and publishing-provider risks.
+`content-calendar` and `GET /content-calendar` summarize planned YAML campaigns, publish/review
+intent, homepage handoff coverage, recent worker success rate, tag coverage, risks, and recommended
+next actions. This gives operators a planning view before scheduled automation creates new runs.
 `config-audit` exposes a redacted runtime and secret posture report, so production operators can
 verify required providers and credentials without leaking secret values.
 Use `contentops init-config --profile production --path .env.production` or

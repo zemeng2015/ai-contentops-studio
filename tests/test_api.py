@@ -1114,6 +1114,45 @@ jobs:
     assert readiness_payload["items"][0]["status"] == "ready"
 
 
+def test_content_calendar_endpoint_returns_operator_brief(tmp_path: Path) -> None:
+    client = TestClient(app)
+    original_pipeline_dir = settings.pipeline_dir
+    original_artifact_root = settings.artifact_root
+    pipeline_dir = tmp_path / "pipelines"
+    pipeline_dir.mkdir()
+    (pipeline_dir / "calendar.yaml").write_text(
+        """
+name: api-calendar
+schedule:
+  enabled: true
+  cron: "0 8 * * *"
+jobs:
+  - name: api-launch
+    topic: API launch content operations
+    publish: true
+    homepage_handoff: true
+    tags: [api, launch]
+""",
+        encoding="utf-8",
+    )
+    settings.pipeline_dir = pipeline_dir
+    settings.artifact_root = tmp_path / "artifacts"
+    try:
+        response = client.get("/content-calendar")
+    finally:
+        settings.pipeline_dir = original_pipeline_dir
+        settings.artifact_root = original_artifact_root
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["planned_workflows"] == 1
+    assert payload["planned_jobs"] == 1
+    assert payload["publish_intent"] == 1
+    assert payload["tag_coverage"] == {"api": 1, "launch": 1}
+    assert payload["next_items"][0]["job_name"] == "api-launch"
+
+
 def test_dashboard_worker_jobs_shows_content_calendar(tmp_path: Path) -> None:
     client = TestClient(app)
     original_pipeline_dir = settings.pipeline_dir

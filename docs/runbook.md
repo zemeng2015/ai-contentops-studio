@@ -14,6 +14,7 @@ contentops deployment-manifest
 contentops release-readiness --json
 contentops worker-jobs --json
 contentops worker-job-readiness --json
+contentops content-calendar --json
 contentops-worker run-pipeline pipelines/daily_ai_roundup.yaml --dry-run --json
 contentops-worker run-pipeline pipelines/project_repository_updates.yaml --dry-run --json
 ```
@@ -29,6 +30,8 @@ Expected result:
 - `worker-jobs` finds the expected calendars and reports `invalid_count=0`.
 - `worker-job-readiness` reports `can_schedule=true` before a cron, EventBridge, or GitHub Actions
   schedule is enabled.
+- `content-calendar` reports the planned publish/review mix, homepage handoff coverage, risks, and
+  recommended actions before the next worker window.
 - Worker dry run writes a receipt under `CONTENTOPS_ARTIFACT_ROOT/job-executions`.
 - Research and OpenAI retry settings are present when network-backed providers are enabled.
 
