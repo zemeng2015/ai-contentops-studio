@@ -388,6 +388,17 @@ def release_gates(
         typer.echo(reports.model_dump_json(indent=2))
         return
     typer.echo(f"Showing {len(reports.items)} of {reports.total} release gate reports")
+    typer.echo(
+        f"Summary: latest={reports.summary.latest_status or 'n/a'} "
+        f"pass_rate={reports.summary.pass_rate:.0%} "
+        f"blocked={reports.summary.blocked_count} "
+        f"consecutive_failures={reports.summary.consecutive_failures}"
+    )
+    if reports.summary.most_common_failed_checks:
+        failures = ", ".join(
+            f"{item.name}={item.count}" for item in reports.summary.most_common_failed_checks
+        )
+        typer.echo(f"Failed checks: {failures}")
     for report in reports.items:
         typer.echo(
             f"{report.generated_at.isoformat()}  {report.status:5}  "

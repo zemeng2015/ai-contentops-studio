@@ -215,7 +215,10 @@ state, and git SHA matching into a single CI/CD pass/fail report.
 CI uploads `release-gate/release-gate.json` as a non-blocking report; deployment jobs can rerun the
 same command with `--strict` after an approval exists.
 Use `--record` to store local gate history under `artifacts/release-gates`, which is also exposed
-through `/release-gates` and the release evidence dashboard.
+through `/release-gates` and the release evidence dashboard. The history response includes a
+rollup with pass rate, blocked deployments, consecutive failures, and the most common failed
+checks, so operators can see whether release health is improving or degrading without opening
+individual reports.
 
 ## Scheduled Jobs
 

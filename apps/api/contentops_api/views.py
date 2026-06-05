@@ -1524,6 +1524,12 @@ def _release_gate_html(report: ReleaseGateReport) -> str:
 
 
 def _release_gate_history_html(reports: ReleaseGateListResponse) -> str:
+    summary = reports.summary
+    common_failures = ", ".join(
+        f"{item.name} ({item.count})" for item in summary.most_common_failed_checks
+    )
+    if not common_failures:
+        common_failures = "No failed checks recorded."
     rows = "".join(
         f"""
         <tr>
@@ -1544,7 +1550,14 @@ def _release_gate_history_html(reports: ReleaseGateListResponse) -> str:
         """
     return f"""
       <h2>Recent Release Gates</h2>
-      <p><a href="/release-gates">Release gate history JSON</a></p>
+      <p>
+        <a href="/release-gates">Release gate history JSON</a> |
+        Latest: <strong>{escape(summary.latest_status or "n/a")}</strong> |
+        Pass rate: <strong>{summary.pass_rate:.0%}</strong> |
+        Blocked: <strong>{summary.blocked_count}</strong> |
+        Consecutive failures: <strong>{summary.consecutive_failures}</strong>
+      </p>
+      <p class="muted">Most common failed checks: {escape(common_failures)}</p>
       <table>
         <thead>
           <tr>

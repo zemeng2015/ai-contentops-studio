@@ -661,11 +661,31 @@ class ReleaseGateReport(BaseModel):
     config_audit: ConfigAuditReport | None = None
 
 
+class ReleaseGateFailureSummary(BaseModel):
+    name: str
+    count: int = Field(ge=0)
+
+
+class ReleaseGateHistorySummary(BaseModel):
+    total_reports: int = Field(ge=0)
+    pass_count: int = Field(ge=0)
+    warn_count: int = Field(ge=0)
+    fail_count: int = Field(ge=0)
+    deployable_count: int = Field(ge=0)
+    blocked_count: int = Field(ge=0)
+    pass_rate: float = Field(ge=0, le=1)
+    consecutive_failures: int = Field(ge=0)
+    latest_status: str | None = None
+    latest_generated_at: datetime | None = None
+    most_common_failed_checks: list[ReleaseGateFailureSummary] = Field(default_factory=list)
+
+
 class ReleaseGateListResponse(BaseModel):
     items: list[ReleaseGateReport]
     total: int = Field(ge=0)
     limit: int = Field(ge=1)
     offset: int = Field(ge=0)
+    summary: ReleaseGateHistorySummary
 
 
 class SourceOverlap(BaseModel):

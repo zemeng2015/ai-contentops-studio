@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections import Counter
 from pathlib import Path
 
 from contentops_core.config_audit import config_audit
@@ -8,6 +9,8 @@ from contentops_core.models import (
     ConfigAuditReport,
     ReleaseApprovalDecision,
     ReleaseEvidenceBundle,
+    ReleaseGateFailureSummary,
+    ReleaseGateHistorySummary,
     ReleaseGateItem,
     ReleaseGateListResponse,
     ReleaseGateReport,
@@ -80,6 +83,7 @@ def list_release_gate_reports(
         total=len(reports),
         limit=limit,
         offset=offset,
+        summary=_release_gate_history_summary(reports),
     )
 
 
@@ -262,6 +266,41 @@ def _release_gate_report_paths(artifact_root: Path) -> list[Path]:
 
 def _read_release_gate_report(path: Path) -> ReleaseGateReport:
     return ReleaseGateReport.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def _release_gate_history_summary(
+    reports: list[ReleaseGateReport],
+) -> ReleaseGateHistorySummary:
+    total = len(reports)
+    status_counts = Counter(report.status for report in reports)
+    deployable_count = sum(1 for report in reports if report.can_deploy)
+    failed_checks = Counter(
+        check.name
+        for report in reports
+        for check in report.checks
+        if check.status == "fail"
+    )
+    consecutive_failures = 0
+    for report in reports:
+        if report.status != "fail":
+            break
+        consecutive_failures += 1
+    return ReleaseGateHistorySummary(
+        total_reports=total,
+        pass_count=status_counts["pass"],
+        warn_count=status_counts["warn"],
+        fail_count=status_counts["fail"],
+        deployable_count=deployable_count,
+        blocked_count=total - deployable_count,
+        pass_rate=(status_counts["pass"] / total) if total else 0,
+        consecutive_failures=consecutive_failures,
+        latest_status=reports[0].status if reports else None,
+        latest_generated_at=reports[0].generated_at if reports else None,
+        most_common_failed_checks=[
+            ReleaseGateFailureSummary(name=name, count=count)
+            for name, count in failed_checks.most_common(5)
+        ],
+    )
 
 
 def _release_gate_report_id(report: ReleaseGateReport) -> str:

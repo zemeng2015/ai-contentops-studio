@@ -199,7 +199,11 @@ CI also uploads a non-blocking `release-gate/release-gate.json` report with
 `--no-require-approval`, so reviewers can inspect the gate shape before a human approval exists.
 Use `--strict` in an actual deployment job once approval is required.
 Recorded gate reports are stored under `artifacts/release-gates` and can be inspected through
-`contentops release-gates --json` or `GET /release-gates`.
+`contentops release-gates --json` or `GET /release-gates`. Both surfaces include a release gate
+history summary with pass rate, blocked deployment count, consecutive failures, latest status, and
+the most common failed checks. Use that summary during deployment reviews to spot recurring
+approval, configuration, source governance, or preflight failures before they become release
+incidents.
 
 The Terraform worker schedule is disabled by default. Enable it only after the container image,
 private subnets, database connectivity, and feed configuration are ready:

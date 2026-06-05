@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from contentops_core.factory import build_review_service
@@ -174,20 +175,39 @@ def test_release_gate_reports_can_be_persisted_and_listed(tmp_path: Path) -> Non
         database_url=f"sqlite:///{tmp_path / 'contentops.db'}",
         site_output_dir=tmp_path / "site",
     )
-    report = release_gate(
+    repository = RunRepository(settings.database_url)
+    service = build_review_service(settings)
+    warning_report = release_gate(
         settings=settings,
-        repository=RunRepository(settings.database_url),
-        review_service=build_review_service(settings),
-        git_sha="history-sha",
+        repository=repository,
+        review_service=service,
+        git_sha="history-warn-sha",
         require_approval=False,
     )
+    warning_report.generated_at = datetime(2026, 6, 5, 10, 0, tzinfo=UTC)
+    failing_report = release_gate(
+        settings=settings,
+        repository=repository,
+        review_service=service,
+        git_sha="history-fail-sha",
+    )
+    failing_report.generated_at = datetime(2026, 6, 5, 11, 0, tzinfo=UTC)
 
-    path = write_release_gate_report(report, settings.artifact_root)
+    write_release_gate_report(warning_report, settings.artifact_root)
+    path = write_release_gate_report(failing_report, settings.artifact_root)
     reports = list_release_gate_reports(settings.artifact_root)
 
     assert path.exists()
-    assert reports.total == 1
-    assert reports.items[0].git_sha == "history-sha"
+    assert reports.total == 2
+    assert reports.items[0].git_sha == "history-fail-sha"
+    assert reports.summary.total_reports == 2
+    assert reports.summary.warn_count == 1
+    assert reports.summary.fail_count == 1
+    assert reports.summary.blocked_count == 2
+    assert reports.summary.pass_rate == 0
+    assert reports.summary.latest_status == "fail"
+    assert reports.summary.consecutive_failures == 1
+    assert reports.summary.most_common_failed_checks[0].name == "release_approval"
 
 
 def _write_source_review(run_dir: Path, decision: str) -> None:

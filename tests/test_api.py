@@ -191,6 +191,8 @@ def test_release_approval_api_and_dashboard(
     assert gate_history_response.status_code == 200
     assert gate_history_response.json()["total"] == 1
     assert gate_history_response.json()["items"][0]["git_sha"] == "api-history-sha"
+    assert gate_history_response.json()["summary"]["total_reports"] == 1
+    assert "summary" in gate_history_response.json()
     assert gate_response.status_code in {200, 409}
     gate_payload = gate_response.json()
     assert gate_payload["latest_release_approval"]["approval_id"] == approval["approval_id"]
@@ -208,6 +210,8 @@ def test_release_approval_api_and_dashboard(
     assert dashboard_response.status_code == 200
     assert "Release Approval" in dashboard_response.text
     assert "Recent Release Gates" in dashboard_response.text
+    assert "Pass rate:" in dashboard_response.text
+    assert "Most common failed checks:" in dashboard_response.text
     assert "api-history-sha" in dashboard_response.text
     assert "Recent Release Approvals" in dashboard_response.text
     assert "API approval record." in dashboard_response.text

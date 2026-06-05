@@ -144,6 +144,8 @@ def test_cli_release_approval_records_decision(
     gate_history_payload = json.loads(gate_history_result.output)
     assert gate_history_payload["total"] == 1
     assert gate_history_payload["items"][0]["git_sha"] == approval_payload["git_sha"]
+    assert gate_history_payload["summary"]["total_reports"] == 1
+    assert gate_history_payload["summary"]["pass_count"] == 1
 
 
 def test_cli_init_config_supports_production_profile(tmp_path: Path) -> None:
